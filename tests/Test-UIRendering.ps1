@@ -369,6 +369,33 @@ if (-not (Test-Path $AppJsFile)) {
     Assert-True ($rawCount -eq 0) "All /api/output/ href assignments use stripOutputPrefix (found $rawCount raw usages)"
 }
 
+# ========================================
+# TC66: Report links use vscode:// or file:// URI, not /api/output/
+# ========================================
+Write-Host "`nTC66: Report links use vscode:// or file:// URI, not /api/output/" -ForegroundColor Cyan
+
+if (-not (Test-Path $AppJsFile)) {
+    Write-Host "ERROR: Cannot find app.js at $AppJsFile" -ForegroundColor Red
+    $script:Failed++
+} else {
+    if (-not $AppJsContent) {
+        $AppJsContent = Get-Content -Path $AppJsFile -Raw
+    }
+
+    $hasGetReportHref = $AppJsContent -match "function getReportHref"
+    Assert-True $hasGetReportHref "app.js defines getReportHref helper function"
+
+    $hasVscodeUri = $AppJsContent -match 'vscode://file/'
+    Assert-True $hasVscodeUri "app.js contains vscode://file/ URI scheme"
+
+    $hasFileUri = $AppJsContent -match 'file:///'
+    Assert-True $hasFileUri "app.js contains file:/// URI scheme for HTML reports"
+
+    # Verify NO remaining /api/output/ href assignments
+    $apiOutputCount = ([regex]::Matches($AppJsContent, '/api/output/')).Count
+    Assert-True ($apiOutputCount -eq 0) "app.js has zero /api/output/ href assignments (found $apiOutputCount)"
+}
+
 # --- Summary ---
 Write-Host "`n========================================" -ForegroundColor White
 Write-Host "Test-UIRendering: $script:Passed passed, $script:Failed failed" -ForegroundColor $(if ($script:Failed -gt 0) { "Red" } else { "Green" })

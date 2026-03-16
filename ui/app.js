@@ -49,6 +49,18 @@ function stripOutputPrefix(path) {
   return path;
 }
 
+function getReportHref(lastOutput) {
+  var outputPath = lastOutput;
+  if (outputPath && outputPath.startsWith("output/")) {
+    outputPath = outputPath.substring("output/".length);
+  }
+  var fullPath = "Q:/src/personal_projects/virtual-office/output/" + outputPath;
+  if (fullPath.endsWith(".html")) {
+    return "file:///" + fullPath.replace(/\\/g, "/");
+  }
+  return "vscode://file/" + fullPath.replace(/\\/g, "/");
+}
+
 // --- Time formatting ---
 
 function formatTimeAgo(timestamp) {
@@ -242,8 +254,8 @@ function renderAgentCard(name, agentData) {
       if (job.lastOutput) {
         var reportLink = document.createElement("a");
         reportLink.className = "report-link";
-        reportLink.href = "/api/output/" + stripOutputPrefix(job.lastOutput);
-        reportLink.target = "_blank";
+        reportLink.href = getReportHref(job.lastOutput);
+        reportLink.target = "";
         reportLink.textContent = "View";
         reportLink.title = "View latest report" + (job.lastOutputTime ? " (" + formatTimeAgo(job.lastOutputTime) + ")" : "");
         reportLink.addEventListener("click", function(e) { e.stopPropagation(); });
@@ -319,8 +331,8 @@ function renderAgentCard(name, agentData) {
     footer.appendChild(footerText);
     var footerLink = document.createElement("a");
     footerLink.className = "footer-report-link";
-    footerLink.href = "/api/output/" + stripOutputPrefix(latestOutput);
-    footerLink.target = "_blank";
+    footerLink.href = getReportHref(latestOutput);
+    footerLink.target = "";
     footerLink.textContent = "Open";
     footer.appendChild(footerLink);
     card.appendChild(footer);
@@ -596,8 +608,8 @@ function showRunningModal(agentName, agentData) {
   outputRow.appendChild(outputLabel);
   if (lastOutputFile) {
     var outputLink = document.createElement("a");
-    outputLink.href = "/api/output/" + stripOutputPrefix(lastOutputFile);
-    outputLink.target = "_blank";
+    outputLink.href = getReportHref(lastOutputFile);
+    outputLink.target = "";
     outputLink.textContent = "View Report";
     outputLink.style.color = "#2563eb";
     outputLink.style.fontWeight = "600";
