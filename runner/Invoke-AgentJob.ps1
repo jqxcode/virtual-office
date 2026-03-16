@@ -29,14 +29,19 @@ $ErrorActionPreference = "Stop"
 function Write-AtomicFile {
     param(
         [string]$Path,
-        [string]$Content
+        [string]$Content,
+        [System.Text.Encoding]$Encoding = $null
     )
     $dir = Split-Path -Parent $Path
     if (-not (Test-Path $dir)) {
         New-Item -ItemType Directory -Path $dir -Force | Out-Null
     }
     $tmpPath = "$Path.tmp"
-    [System.IO.File]::WriteAllText($tmpPath, $Content)
+    if ($Encoding) {
+        [System.IO.File]::WriteAllText($tmpPath, $Content, $Encoding)
+    } else {
+        [System.IO.File]::WriteAllText($tmpPath, $Content)
+    }
     Move-Item -Path $tmpPath -Destination $Path -Force
 }
 
@@ -355,8 +360,8 @@ while ($keepRunning) {
     $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
     $outputFile = Join-Path $outputAgentDir "$Job-$timestamp.md"
     $latestFile = Join-Path $outputAgentDir "$Job-latest.md"
-    Write-AtomicFile -Path $outputFile -Content $output
-    Write-AtomicFile -Path $latestFile -Content $output
+    Write-AtomicFile -Path $outputFile -Content $output -Encoding ([System.Text.Encoding]::UTF8)
+    Write-AtomicFile -Path $latestFile -Content $output -Encoding ([System.Text.Encoding]::UTF8)
 
     # Step 9b: Compute relative output path and track in dashboard
     $relOutputPath = "output/$Agent/$Job-$timestamp.md"

@@ -39,13 +39,21 @@ function Remove-TestRoot {
 # Import Write-AtomicFile directly (no need for full runner)
 function Import-AtomicWrite {
     function global:Write-AtomicFile {
-        param([string]$Path, [string]$Content)
+        param(
+            [string]$Path,
+            [string]$Content,
+            [System.Text.Encoding]$Encoding = $null
+        )
         $dir = Split-Path -Parent $Path
         if (-not (Test-Path $dir)) {
             New-Item -ItemType Directory -Path $dir -Force | Out-Null
         }
         $tmpPath = "$Path.tmp"
-        [System.IO.File]::WriteAllText($tmpPath, $Content)
+        if ($Encoding) {
+            [System.IO.File]::WriteAllText($tmpPath, $Content, $Encoding)
+        } else {
+            [System.IO.File]::WriteAllText($tmpPath, $Content)
+        }
         Move-Item -Path $tmpPath -Destination $Path -Force
     }
 }
@@ -149,6 +157,40 @@ try {
     # Additional test: verify that original file in a different location is untouched
     $stillOriginal = [System.IO.File]::ReadAllText($targetFile)
     Assert-True ($stillOriginal -eq $originalContent) "Unrelated original file is untouched"
+} finally {
+    Remove-TestRoot -Root $root
+}
+
+# ========================================
+# TC67: Output files written with UTF-8 encoding
+# ========================================
+Write-Host "`nTC67: Output files preserve Unicode (UTF-8 encoding)" -ForegroundColor Cyan
+$root = New-TestRoot
+try {
+    $emDash = [char]0x2014
+    $testContent = "Summary $emDash details follow"
+    $outputFile = Join-Path $root "state/output-report.md"
+
+    # Write with UTF-8 encoding (same as runner does for output files)
+    Write-AtomicFile -Path $outputFile -Content $testContent -Encoding ([System.Text.Encoding]::UTF8)
+
+    Assert-True (Test-Path $outputFile) "UTF-8 output file exists"
+    if (Test-Path $outputFile) {
+        $readBack = [System.IO.File]::ReadAllText($outputFile, [System.Text.Encoding]::UTF8)
+        Assert-True ($readBack -eq $testContent) "Em-dash preserved in UTF-8 output file"
+        Assert-True ($readBack.Contains($emDash)) "File content contains em-dash character"
+    }
+
+    # Verify raw bytes contain UTF-8 em-dash sequence (E2 80 94)
+    $bytes = [System.IO.File]::ReadAllBytes($outputFile)
+    $hasUtf8EmDash = $false
+    for ($i = 0; $i -lt $bytes.Length - 2; $i++) {
+        if ($bytes[$i] -eq 0xE2 -and $bytes[$i+1] -eq 0x80 -and $bytes[$i+2] -eq 0x94) {
+            $hasUtf8EmDash = $true
+            break
+        }
+    }
+    Assert-True $hasUtf8EmDash "Raw bytes contain UTF-8 em-dash sequence (E2 80 94)"
 } finally {
     Remove-TestRoot -Root $root
 }
