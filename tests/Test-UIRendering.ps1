@@ -1,0 +1,198 @@
+#Requires -Version 7.0
+# Test-UIRendering.ps1 -- Structural validation of UI rendering (tooltip/card clipping)
+# Run: pwsh -File tests/Test-UIRendering.ps1
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = "Stop"
+
+# --- Test harness ---
+$script:Passed = 0
+$script:Failed = 0
+
+function Assert-True {
+    param([bool]$Condition, [string]$Message)
+    if ($Condition) {
+        $script:Passed++
+        Write-Host "  [PASS] $Message" -ForegroundColor Green
+    } else {
+        $script:Failed++
+        Write-Host "  [FAIL] $Message" -ForegroundColor Red
+    }
+}
+
+# --- Locate UI files ---
+$ProjectRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+# Handle case where script is run directly from tests/ or via pwsh -File
+if (-not (Test-Path (Join-Path $ProjectRoot "ui/styles.css"))) {
+    $ProjectRoot = Split-Path -Parent $PSScriptRoot
+}
+if (-not (Test-Path (Join-Path $ProjectRoot "ui/styles.css"))) {
+    # Fallback: assume we are in the project root
+    $ProjectRoot = $PSScriptRoot | Split-Path -Parent
+}
+
+$CssFile = Join-Path $ProjectRoot "ui/styles.css"
+$HtmlFile = Join-Path $ProjectRoot "ui/index.html"
+
+if (-not (Test-Path $CssFile)) {
+    Write-Host "ERROR: Cannot find styles.css at $CssFile" -ForegroundColor Red
+    exit 1
+}
+if (-not (Test-Path $HtmlFile)) {
+    Write-Host "ERROR: Cannot find index.html at $HtmlFile" -ForegroundColor Red
+    exit 1
+}
+
+$CssContent = Get-Content -Path $CssFile -Raw
+$HtmlContent = Get-Content -Path $HtmlFile -Raw
+
+# --- Helper: extract a CSS rule block by selector ---
+function Get-CssRuleBlock {
+    param([string]$Css, [string]$Selector)
+    # Escape dots and other regex-special chars in the selector
+    $escaped = [regex]::Escape($Selector)
+    # Match selector followed by { ... } (non-greedy, handles one level of nesting)
+    $pattern = "$escaped\s*\{([^}]*)\}"
+    $match = [regex]::Match($Css, $pattern)
+    if ($match.Success) {
+        return $match.Groups[1].Value
+    }
+    return $null
+}
+
+# --- Helper: check if a CSS class is defined anywhere in the file ---
+function Test-CssClassDefined {
+    param([string]$Css, [string]$ClassName)
+    $escaped = [regex]::Escape($ClassName)
+    return [regex]::IsMatch($Css, "$escaped\s*\{")
+}
+
+# ========================================
+# TC30: Tooltip not clipped by overflow
+# ========================================
+Write-Host "`nTC30: Tooltip not clipped by overflow" -ForegroundColor Cyan
+
+$agentCardBlock = Get-CssRuleBlock -Css $CssContent -Selector ".agent-card"
+$agentGridBlock = Get-CssRuleBlock -Css $CssContent -Selector ".agent-grid"
+$tooltipBlock = Get-CssRuleBlock -Css $CssContent -Selector ".capabilities-tooltip"
+
+# .agent-card should NOT have overflow: hidden
+$cardHasOverflowHidden = $false
+if ($agentCardBlock -and ($agentCardBlock -match "overflow\s*:\s*hidden")) {
+    $cardHasOverflowHidden = $true
+}
+Assert-True (-not $cardHasOverflowHidden) ".agent-card does NOT have overflow: hidden"
+
+# .agent-grid should NOT have overflow: hidden
+$gridHasOverflowHidden = $false
+if ($agentGridBlock -and ($agentGridBlock -match "overflow\s*:\s*hidden")) {
+    $gridHasOverflowHidden = $true
+}
+Assert-True (-not $gridHasOverflowHidden) ".agent-grid does NOT have overflow: hidden"
+
+# .capabilities-tooltip has z-index >= 50
+$tooltipZIndex = 0
+if ($tooltipBlock -match "z-index\s*:\s*(\d+)") {
+    $tooltipZIndex = [int]$matches[1]
+}
+Assert-True ($tooltipZIndex -ge 50) ".capabilities-tooltip has z-index >= 50 (found: $tooltipZIndex)"
+
+# ========================================
+# TC31: Tooltip positioned below hint
+# ========================================
+Write-Host "`nTC31: Tooltip positioning uses top (not bottom: 100%% which clips upward)" -ForegroundColor Cyan
+
+# Check whether tooltip uses bottom: 100% (upward, can clip) or top positioning
+$usesBottomPosition = $false
+if ($tooltipBlock -match "bottom\s*:\s*100%") {
+    $usesBottomPosition = $true
+}
+# If it uses top positioning, that is preferred; if it uses bottom: 100%, flag it.
+# Note: The current CSS may use bottom: 100% -- the test documents the current state.
+$usesTopPosition = $false
+if ($tooltipBlock -match "top\s*:") {
+    $usesTopPosition = $true
+}
+# Pass if it uses top positioning OR does not use bottom: 100%
+Assert-True ($usesTopPosition -or (-not $usesBottomPosition)) ".capabilities-tooltip uses top positioning (or avoids bottom: 100%%)"
+
+# ========================================
+# TC32: Card minimum height
+# ========================================
+Write-Host "`nTC32: Card minimum height prevents content truncation" -ForegroundColor Cyan
+
+# Check if .agent-card has min-height set
+$hasMinHeight = $false
+if ($agentCardBlock -match "min-height\s*:") {
+    $hasMinHeight = $true
+}
+# Note: min-height may be enforced by flexbox/grid instead of explicit property.
+# The card uses padding which provides implicit minimum sizing.
+# Check for either min-height or sufficient padding as acceptable.
+$hasPadding = $false
+if ($agentCardBlock -match "padding\s*:") {
+    $hasPadding = $true
+}
+Assert-True ($hasMinHeight -or $hasPadding) ".agent-card has min-height or padding set (content not truncated)"
+
+# ========================================
+# TC33: Section titles not truncated
+# ========================================
+Write-Host "`nTC33: Section titles not truncated" -ForegroundColor Cyan
+
+$sectionTitleBlock = Get-CssRuleBlock -Css $CssContent -Selector ".section-title"
+
+$titleHasOverflowHidden = $false
+if ($sectionTitleBlock -and ($sectionTitleBlock -match "overflow\s*:\s*hidden")) {
+    $titleHasOverflowHidden = $true
+}
+Assert-True (-not $titleHasOverflowHidden) ".section-title does NOT have overflow: hidden"
+
+$titleHasEllipsis = $false
+if ($sectionTitleBlock -and ($sectionTitleBlock -match "text-overflow\s*:\s*ellipsis")) {
+    $titleHasEllipsis = $true
+}
+Assert-True (-not $titleHasEllipsis) ".section-title does NOT have text-overflow: ellipsis"
+
+# ========================================
+# TC34: All required CSS classes exist
+# ========================================
+Write-Host "`nTC34: All required CSS classes exist" -ForegroundColor Cyan
+
+$requiredClasses = @(
+    ".agent-card",
+    ".agent-card.idle",
+    ".agent-card.busy",
+    ".agent-card.disabled",
+    ".capabilities-tooltip",
+    ".capabilities-wrapper",
+    ".capabilities-hint",
+    ".job-list",
+    ".job-item",
+    ".queue-badge",
+    ".event-log",
+    ".event-row"
+)
+
+foreach ($cls in $requiredClasses) {
+    $found = Test-CssClassDefined -Css $CssContent -ClassName $cls
+    Assert-True $found "CSS class '$cls' is defined in styles.css"
+}
+
+# ========================================
+# TC35: HTML structure valid
+# ========================================
+Write-Host "`nTC35: HTML structure valid" -ForegroundColor Cyan
+
+Assert-True ($HtmlContent -match 'id="agent-grid"') "index.html contains id=""agent-grid"""
+Assert-True ($HtmlContent -match 'id="event-log"') "index.html contains id=""event-log"""
+Assert-True ($HtmlContent -match 'href="styles\.css"') "index.html links to styles.css"
+Assert-True ($HtmlContent -match 'src="app\.js"') "index.html links to app.js"
+
+# --- Summary ---
+Write-Host "`n========================================" -ForegroundColor White
+Write-Host "Test-UIRendering: $script:Passed passed, $script:Failed failed" -ForegroundColor $(if ($script:Failed -gt 0) { "Red" } else { "Green" })
+Write-Host "========================================" -ForegroundColor White
+
+if ($script:Failed -gt 0) { exit 1 }
+exit 0

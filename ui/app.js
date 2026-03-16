@@ -10,8 +10,16 @@ var CONFIG = {
 var lastDashboardJSON = "";
 var lastEventsJSON = "";
 var isConnected = false;
+var agentConfig = null; // loaded once from /api/config
+var agentErrors = {};
 
 // --- Fetch helpers ---
+
+async function fetchConfig() {
+  var response = await fetch(CONFIG.API_BASE + "/api/config", { cache: "no-store" });
+  if (!response.ok) throw new Error("HTTP " + response.status);
+  return await response.json();
+}
 
 async function fetchDashboard() {
   var response = await fetch(CONFIG.API_BASE + "/api/dashboard", { cache: "no-store" });
@@ -21,6 +29,12 @@ async function fetchDashboard() {
 
 async function fetchEvents() {
   var response = await fetch(CONFIG.API_BASE + "/api/events", { cache: "no-store" });
+  if (!response.ok) throw new Error("HTTP " + response.status);
+  return await response.json();
+}
+
+async function fetchErrors() {
+  var response = await fetch(CONFIG.API_BASE + "/api/errors", { cache: "no-store" });
   if (!response.ok) throw new Error("HTTP " + response.status);
   return await response.json();
 }
@@ -126,27 +140,71 @@ function renderAgentCard(name, agentData) {
     card.appendChild(badge);
   }
 
-  // Job list
+  // Error warning badge
+  var errorCount = 0;
+  if (agentErrors[name]) {
+    errorCount = agentErrors[name].filter(function(e) { return !e.resolved; }).length;
+  }
+  if (errorCount > 0) {
+    var errorBadge = document.createElement("span");
+    errorBadge.className = "error-badge";
+    errorBadge.textContent = errorCount + (errorCount === 1 ? " error" : " errors");
+    errorBadge.title = "Click to view error details";
+    errorBadge.addEventListener("click", function(e) {
+      e.stopPropagation();
+      showErrorModal(name, agentErrors[name]);
+    });
+    card.appendChild(errorBadge);
+  }
+
+  // Split jobs into active (running/queued/completed/failed) vs registered (idle capabilities)
   var jobs = agentData.jobs || [];
-  if (jobs.length > 0) {
+  var activeJobs = [];
+  var capabilities = [];
+  jobs.forEach(function (job) {
+    if (job.status === "running" || job.status === "queued" || job.status === "pending" ||
+        job.status === "completed" || job.status === "done" ||
+        job.status === "failed" || job.status === "error") {
+      activeJobs.push(job);
+    } else {
+      capabilities.push(job);
+    }
+  });
+
+  // Show active jobs directly on card
+  if (activeJobs.length > 0) {
     var ul = document.createElement("ul");
     ul.className = "job-list";
-    jobs.forEach(function (job) {
+    activeJobs.forEach(function (job) {
       var li = document.createElement("li");
       li.className = "job-item";
 
       var statusIcon = document.createElement("span");
       statusIcon.className = "job-status-icon";
+      var statusLabel = document.createElement("span");
+      statusLabel.className = "job-status-label";
+
       if (job.status === "running") {
-        statusIcon.textContent = "\u25B6"; // play triangle
+        statusIcon.textContent = "\u25B6";
+        statusIcon.classList.add("running");
+        statusLabel.textContent = "RUNNING";
+        statusLabel.classList.add("running");
+        li.classList.add("running");
       } else if (job.status === "completed" || job.status === "done") {
-        statusIcon.textContent = "\u2713"; // checkmark
+        statusIcon.textContent = "\u2713";
+        statusIcon.classList.add("completed");
+        statusLabel.textContent = "DONE";
+        statusLabel.classList.add("completed");
       } else if (job.status === "failed" || job.status === "error") {
-        statusIcon.textContent = "\u2717"; // x mark
+        statusIcon.textContent = "\u2717";
+        statusIcon.classList.add("error");
+        statusLabel.textContent = "FAILED";
+        statusLabel.classList.add("error");
       } else if (job.status === "queued" || job.status === "pending") {
-        statusIcon.textContent = "\u2022"; // bullet
-      } else {
-        statusIcon.textContent = "\u2022";
+        statusIcon.textContent = "\u25CB";
+        statusIcon.classList.add("queued");
+        statusLabel.textContent = "QUEUED";
+        statusLabel.classList.add("queued");
       }
       li.appendChild(statusIcon);
 
@@ -155,22 +213,306 @@ function renderAgentCard(name, agentData) {
       jobName.textContent = job.name || job.job || "unknown";
       li.appendChild(jobName);
 
+      li.appendChild(statusLabel);
+
+      if (job.lastOutput) {
+        var reportLink = document.createElement("a");
+        reportLink.className = "report-link";
+        reportLink.href = "/api/output/" + job.lastOutput;
+        reportLink.target = "_blank";
+        reportLink.textContent = "View";
+        reportLink.title = "View latest report" + (job.lastOutputTime ? " (" + formatTimeAgo(job.lastOutputTime) + ")" : "");
+        reportLink.addEventListener("click", function(e) { e.stopPropagation(); });
+        li.appendChild(reportLink);
+      }
+
       ul.appendChild(li);
     });
     card.appendChild(ul);
   }
 
+  // Capabilities shown on hover via tooltip
+  if (capabilities.length > 0) {
+    var capCount = document.createElement("div");
+    capCount.className = "capabilities-hint";
+    capCount.textContent = capabilities.length + (capabilities.length === 1 ? " capability" : " capabilities");
+
+    var tooltip = document.createElement("div");
+    tooltip.className = "capabilities-tooltip";
+
+    var tooltipTitle = document.createElement("div");
+    tooltipTitle.className = "tooltip-title";
+    tooltipTitle.textContent = "Capabilities";
+    tooltip.appendChild(tooltipTitle);
+
+    capabilities.forEach(function (job) {
+      var item = document.createElement("div");
+      item.className = "tooltip-item";
+
+      var jobName = document.createElement("span");
+      jobName.className = "tooltip-job-name";
+      jobName.textContent = job.name || job.job || "unknown";
+      item.appendChild(jobName);
+
+      if (job.description) {
+        var desc = document.createElement("span");
+        desc.className = "tooltip-job-desc";
+        desc.textContent = job.description;
+        item.appendChild(desc);
+      }
+
+      if (job.lastOutput) {
+        var capReport = document.createElement("span");
+        capReport.className = "tooltip-job-report";
+        capReport.textContent = "Last report: " + formatTimeAgo(job.lastOutputTime);
+        item.appendChild(capReport);
+      }
+
+      tooltip.appendChild(item);
+    });
+
+    var capWrapper = document.createElement("div");
+    capWrapper.className = "capabilities-wrapper";
+    capWrapper.appendChild(capCount);
+    capWrapper.appendChild(tooltip);
+    card.appendChild(capWrapper);
+  }
+
+  // Card footer - latest report
+  var latestOutput = null;
+  var latestOutputTime = null;
+  jobs.forEach(function(job) {
+    if (job.lastOutputTime && (!latestOutputTime || job.lastOutputTime > latestOutputTime)) {
+      latestOutputTime = job.lastOutputTime;
+      latestOutput = job.lastOutput;
+    }
+  });
+  if (latestOutput) {
+    var footer = document.createElement("div");
+    footer.className = "card-footer";
+    var footerText = document.createElement("span");
+    footerText.textContent = "Latest report: " + formatTimeAgo(latestOutputTime);
+    footer.appendChild(footerText);
+    var footerLink = document.createElement("a");
+    footerLink.className = "footer-report-link";
+    footerLink.href = "/api/output/" + latestOutput;
+    footerLink.target = "_blank";
+    footerLink.textContent = "Open";
+    footer.appendChild(footerLink);
+    card.appendChild(footer);
+  }
+
   return card;
+}
+
+function mergeConfigAndDashboard(config, dashboard) {
+  // Start with all agents from config, overlay with dashboard state
+  var merged = {};
+  if (config && config.agents) {
+    Object.keys(config.agents).forEach(function (name) {
+      var cfg = config.agents[name];
+      merged[name] = {
+        display_name: cfg.displayName || name,
+        icon: cfg.icon || null,
+        description: cfg.description || "",
+        status: "idle",
+        running_job: null,
+        last_completed: null,
+        queue_depth: 0,
+        jobs: []
+      };
+      // Add jobs from config as idle
+      if (cfg.jobs) {
+        var jobList = [];
+        Object.keys(cfg.jobs).forEach(function (jobName) {
+          jobList.push({
+            name: jobName,
+            status: cfg.jobs[jobName].enabled === false ? "disabled" : "idle",
+            description: cfg.jobs[jobName].description || ""
+          });
+        });
+        merged[name].jobs = jobList;
+      }
+    });
+  }
+  // Overlay with dashboard state
+  if (dashboard && dashboard.agents) {
+    Object.keys(dashboard.agents).forEach(function (name) {
+      var state = dashboard.agents[name];
+      if (!merged[name]) {
+        merged[name] = { display_name: name, jobs: [] };
+      }
+      // Copy state fields over config defaults
+      if (state.status) merged[name].status = state.status;
+      if (state.activeJob) merged[name].running_job = { job: state.activeJob };
+      if (state.jobs) {
+        // Update individual job statuses
+        Object.keys(state.jobs).forEach(function (jobName) {
+          var jobState = state.jobs[jobName];
+          var found = false;
+          merged[name].jobs.forEach(function (j, i) {
+            if (j.name === jobName) {
+              merged[name].jobs[i].status = jobState.status || "idle";
+              merged[name].jobs[i].run = jobState.run || 0;
+              merged[name].jobs[i].queueDepth = jobState.queueDepth || 0;
+              merged[name].jobs[i].lastCompleted = jobState.lastCompleted || null;
+              merged[name].jobs[i].lastOutput = jobState.lastOutput || null;
+              merged[name].jobs[i].lastOutputTime = jobState.lastOutputTime || null;
+              found = true;
+            }
+          });
+          if (!found) {
+            merged[name].jobs.push({
+              name: jobName,
+              status: jobState.status || "idle",
+              run: jobState.run || 0,
+              queueDepth: jobState.queueDepth || 0,
+              lastCompleted: jobState.lastCompleted || null,
+              lastOutput: jobState.lastOutput || null,
+              lastOutputTime: jobState.lastOutputTime || null
+            });
+          }
+          // Bubble up last_completed
+          if (jobState.lastCompleted && (!merged[name].last_completed || jobState.lastCompleted > merged[name].last_completed)) {
+            merged[name].last_completed = jobState.lastCompleted;
+          }
+          // Bubble up queue depth
+          if (jobState.queueDepth) {
+            merged[name].queue_depth = (merged[name].queue_depth || 0) + jobState.queueDepth;
+          }
+        });
+      }
+    });
+  }
+  return merged;
+}
+
+function showErrorModal(agentName, errors) {
+  // Remove existing modal if any
+  var existing = document.getElementById("error-modal-overlay");
+  if (existing) existing.remove();
+
+  var overlay = document.createElement("div");
+  overlay.id = "error-modal-overlay";
+  overlay.className = "modal-overlay";
+  overlay.addEventListener("click", function(e) {
+    if (e.target === overlay) overlay.remove();
+  });
+
+  var modal = document.createElement("div");
+  modal.className = "error-modal";
+
+  // Header
+  var header = document.createElement("div");
+  header.className = "modal-header";
+  var title = document.createElement("span");
+  title.className = "modal-title";
+  title.textContent = (agentName) + " - Error Log";
+  header.appendChild(title);
+  var closeBtn = document.createElement("button");
+  closeBtn.className = "modal-close";
+  closeBtn.textContent = "X";
+  closeBtn.addEventListener("click", function() { overlay.remove(); });
+  header.appendChild(closeBtn);
+  modal.appendChild(header);
+
+  // Error list
+  var list = document.createElement("div");
+  list.className = "error-list";
+
+  errors.forEach(function(err) {
+    var row = document.createElement("div");
+    row.className = "error-row" + (err.resolved ? " resolved" : "");
+
+    var summary = document.createElement("div");
+    summary.className = "error-summary";
+    summary.addEventListener("click", function() {
+      var detail = row.querySelector(".error-detail");
+      detail.style.display = detail.style.display === "none" ? "block" : "none";
+    });
+
+    var levelBadge = document.createElement("span");
+    levelBadge.className = "error-level " + (err.level || "error");
+    levelBadge.textContent = (err.level || "ERROR").toUpperCase();
+    summary.appendChild(levelBadge);
+
+    var jobSpan = document.createElement("span");
+    jobSpan.className = "error-job";
+    jobSpan.textContent = err.job || "unknown";
+    summary.appendChild(jobSpan);
+
+    var timeSpan = document.createElement("span");
+    timeSpan.className = "error-time";
+    timeSpan.textContent = formatTimeAgo(err.ts);
+    summary.appendChild(timeSpan);
+
+    var summaryText = document.createElement("span");
+    summaryText.className = "error-summary-text";
+    summaryText.textContent = err.summary || "";
+    summary.appendChild(summaryText);
+
+    row.appendChild(summary);
+
+    // Expandable detail
+    var detail = document.createElement("div");
+    detail.className = "error-detail";
+    detail.style.display = "none";
+
+    var detailItems = [
+      { label: "Detail", value: err.detail || "No additional details" },
+      { label: "Log", value: err.logPath || "N/A" },
+      { label: "Duration", value: err.duration || "N/A" },
+      { label: "Exit Code", value: (err.exitCode !== undefined ? err.exitCode : "N/A") },
+      { label: "Run ID", value: err.runId || "N/A" },
+      { label: "Time", value: err.ts || "N/A" }
+    ];
+
+    detailItems.forEach(function(item) {
+      var line = document.createElement("div");
+      line.className = "detail-line";
+      var label = document.createElement("span");
+      label.className = "detail-label";
+      label.textContent = item.label + ": ";
+      line.appendChild(label);
+      var value = document.createElement("span");
+      value.className = "detail-value";
+      value.textContent = String(item.value);
+      line.appendChild(value);
+      detail.appendChild(line);
+    });
+
+    // Mark resolved button
+    if (!err.resolved) {
+      var resolveBtn = document.createElement("button");
+      resolveBtn.className = "resolve-btn";
+      resolveBtn.textContent = "Mark Resolved";
+      resolveBtn.addEventListener("click", function() {
+        // For now just visually resolve (full impl would POST to server)
+        row.classList.add("resolved");
+        err.resolved = true;
+        // Update badge count
+        var badge = document.querySelector("[data-agent='" + agentName + "'] .error-badge");
+        if (badge) {
+          var remaining = errors.filter(function(e) { return !e.resolved; }).length;
+          if (remaining === 0) { badge.remove(); }
+          else { badge.textContent = remaining + (remaining === 1 ? " error" : " errors"); }
+        }
+      });
+      detail.appendChild(resolveBtn);
+    }
+
+    row.appendChild(detail);
+    list.appendChild(row);
+  });
+
+  modal.appendChild(list);
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
 }
 
 function renderAgents(dashboard) {
   var grid = document.getElementById("agent-grid");
-  if (!dashboard || !dashboard.agents) {
-    grid.innerHTML = '<div class="placeholder-message">No agents configured</div>';
-    return;
-  }
-
-  var agents = dashboard.agents;
+  var agents = mergeConfigAndDashboard(agentConfig, dashboard);
   var agentNames = Object.keys(agents);
 
   if (agentNames.length === 0) {
@@ -280,9 +622,31 @@ async function poll() {
   } catch (e) {
     console.warn("Events fetch failed:", e.message);
   }
+
+  try {
+    var errors = await fetchErrors();
+    agentErrors = {};
+    if (Array.isArray(errors)) {
+      errors.forEach(function(err) {
+        if (!err.resolved) {
+          var agent = err.agent || "unknown";
+          if (!agentErrors[agent]) agentErrors[agent] = [];
+          agentErrors[agent].push(err);
+        }
+      });
+    }
+  } catch (e) {
+    console.warn("Errors fetch failed:", e.message);
+  }
 }
 
-function startPolling() {
+async function startPolling() {
+  // Load config once (agent registry + job definitions)
+  try {
+    agentConfig = await fetchConfig();
+  } catch (e) {
+    console.warn("Config fetch failed, will retry on next poll:", e.message);
+  }
   // Initial fetch
   poll();
   // Repeat

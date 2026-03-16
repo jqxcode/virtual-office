@@ -89,3 +89,53 @@ Virtual Office is a Windows-based agent orchestration framework. It schedules Cl
 - Lock = exclusive run; other triggers queue
 - Queue is FIFO, drained by the running instance after completion
 - maxRuns is checked before each run (including queued drains)
+
+### Error Tracking
+
+Errors are recorded in `state/errors.jsonl` (one JSON object per line).
+
+**Schema:**
+
+```json
+{
+  "ts": "ISO-8601",
+  "agent": "string",
+  "job": "string",
+  "runId": "string",
+  "level": "error|warning|timeout",
+  "summary": "short description",
+  "detail": "first 500 chars of error output",
+  "logPath": "relative path to output file",
+  "exitCode": "number",
+  "duration": "string (e.g. 142s)",
+  "resolved": "boolean",
+  "systemVersion": "string"
+}
+```
+
+**Error levels:**
+
+| Level     | Trigger                                    |
+|-----------|--------------------------------------------|
+| `error`   | Non-zero exit code from claude CLI         |
+| `warning` | Partial failure (job completed with issues) |
+| `timeout` | Job exceeded its configured max duration   |
+
+**Resolution flow:**
+
+- Errors are written with `resolved: false`.
+- The dashboard UI provides a "Mark Resolved" action which sets `resolved: true`.
+- Resolved errors remain in the file for audit purposes but do not count toward the unresolved error badge in the UI.
+
+**Dashboard integration:**
+
+- Agent-level fields: `errorCount` (unresolved errors across all jobs) and `lastError` (timestamp of most recent error).
+- Job-level fields: `lastOutput` (relative path to most recent output file) and `lastOutputTime` (ISO-8601 timestamp of that output).
+
+### Latest Reports
+
+Each job run records its output path in `dashboard.json` under the job's `lastOutput` and `lastOutputTime` fields.
+
+- The dashboard UI renders "View report" links on each job card, pointing to the most recent output file.
+- The card footer displays the report timestamp for quick reference.
+- Reports are served to the browser via the `/api/output/*` endpoint, which maps to the `output/` directory on disk.

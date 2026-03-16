@@ -5,6 +5,18 @@
       "maxRuns": 0,
       "enabled": true,
       "description": "Queries ADO work items and meeting notes to generate sprint progress report"
+    },
+    "dry-run-ado-status-update": {
+      "prompt": "Run ADO autopilot dry-run for both meeting-join and meeting-notes areas. Execute these commands sequentially from Q:/src/hackathon/ado-autopilot/: (1) python src/main.py update-status --config configs/meeting-join.json --dry-run (2) python src/main.py update-status --config configs/meeting-notes.json --dry-run. Save the HTML reports from reports/ folder to the Virtual Office output directory at Q:/src/personal_projects/virtual-office/output/scrum-master/ with copies named dry-run-meeting-join-latest.html and dry-run-meeting-notes-latest.html. Open both reports in Edge after completion.",
+      "maxRuns": 0,
+      "enabled": true,
+      "description": "Runs ADO autopilot status tweet dry-run for Meeting Join and Meeting Notes areas at 9am and 9pm daily"
+    },
+    "dry-run-bug-autopilot": {
+      "prompt": "Run bug-autopilot dry-run for Meeting Join area bugs. Steps: (1) cd Q:/src/hackathon/bug-autopilot/ (2) git pull to get latest code (3) Validate configs exist and are valid JSON (4) pip install -r requirements.txt --quiet (5) Run: powershell.exe -File bugautopilot.ps1 -Once -DryRun (6) Copy the latest HTML report from reports/ (run-*.html) to Q:/src/personal_projects/virtual-office/output/scrum-master/ as dry-run-bug-autopilot-latest.html (7) Open the report in Edge.",
+      "maxRuns": 0,
+      "enabled": true,
+      "description": "Runs bug-autopilot dry-run for Meeting Join bugs at 8am and 8pm daily"
     }
   }
 }

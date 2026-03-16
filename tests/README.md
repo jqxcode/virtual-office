@@ -24,6 +24,8 @@ Get-ChildItem tests/Test-*.ps1 | ForEach-Object { pwsh -File $_ }
 | Test-ScheduleRegistration.ps1 | Schedule parsing, task name generation, invalid cron handling |
 | Test-DashboardState.ps1 | Dashboard init, multi-agent isolation, status updates |
 | Test-AtomicWrites.ps1 | Atomic file writes (.tmp rename), crash safety |
+| Test-UIRendering.ps1 | CSS/HTML structural validation: tooltip clipping, card sizing, required classes |
+| Test-ErrorTracking.ps1 | Error entries, schema validation, dashboard errorCount, resolved filtering, append-only, lastOutput |
 
 ## Conventions
 

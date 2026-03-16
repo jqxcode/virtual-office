@@ -91,7 +91,8 @@ function Update-Dashboard {
         [string]$AgentName,
         [string]$JobName,
         [string]$Status,
-        [hashtable]$Details = @{}
+        [hashtable]$Details = @{},
+        [hashtable]$AgentDetails = @{}
     )
     $dashboard = @{}
     if (Test-Path $DASHBOARD_FILE) {
@@ -119,8 +120,70 @@ function Update-Dashboard {
     }
     $dashboard["agents"][$AgentName][$JobName] = $jobState
 
+    # Apply agent-level details (errorCount, lastError, etc.)
+    foreach ($key in $AgentDetails.Keys) {
+        $dashboard["agents"][$AgentName][$key] = $AgentDetails[$key]
+    }
+
     $json = $dashboard | ConvertTo-Json -Depth 10
     Write-AtomicFile -Path $DASHBOARD_FILE -Content $json
+}
+
+function Write-ErrorEntry {
+    param(
+        [string]$Agent,
+        [string]$Job,
+        [string]$RunId,
+        [string]$Level,
+        [string]$Summary,
+        [string]$Detail,
+        [string]$LogPath,
+        [int]$ExitCode,
+        [string]$Duration
+    )
+    $dir = Split-Path -Parent $ERRORS_FILE
+    if (-not (Test-Path $dir)) {
+        New-Item -ItemType Directory -Path $dir -Force | Out-Null
+    }
+    $truncatedDetail = $Detail
+    if ($Detail.Length -gt 500) {
+        $truncatedDetail = $Detail.Substring(0, 500)
+    }
+    $entry = @{
+        ts            = (Get-Date -Format "o")
+        agent         = $Agent
+        job           = $Job
+        runId         = $RunId
+        level         = $Level
+        summary       = $Summary
+        detail        = $truncatedDetail
+        logPath       = $LogPath
+        exitCode      = $ExitCode
+        duration      = $Duration
+        resolved      = $false
+        systemVersion = $SYSTEM_VERSION
+    }
+    $line = $entry | ConvertTo-Json -Compress
+    Add-Content -Path $ERRORS_FILE -Value $line -Encoding ASCII
+}
+
+function Get-UnresolvedErrorCount {
+    param([string]$AgentName)
+    if (-not (Test-Path $ERRORS_FILE)) { return 0 }
+    $count = 0
+    foreach ($line in (Get-Content -Path $ERRORS_FILE)) {
+        $trimmed = $line.Trim()
+        if ($trimmed -eq "") { continue }
+        try {
+            $obj = $trimmed | ConvertFrom-Json
+            if ($obj.agent -eq $AgentName -and $obj.resolved -eq $false) {
+                $count++
+            }
+        } catch {
+            # Skip malformed lines
+        }
+    }
+    return $count
 }
 
 function Ensure-StateDir {
@@ -251,6 +314,7 @@ while ($keepRunning) {
 
     $output = ""
     $exitCode = 0
+    $runStart = Get-Date
     try {
         if ($agentFile -and (Test-Path $agentFile)) {
             $output = & claude --agent $agentFile $prompt 2>&1 | Out-String
@@ -261,6 +325,24 @@ while ($keepRunning) {
     } catch {
         $output = "ERROR: $_"
         $exitCode = 1
+    }
+    $runEnd = Get-Date
+    $runDuration = "{0}s" -f [math]::Round(($runEnd - $runStart).TotalSeconds)
+
+    # Step 8b: Track errors if non-zero exit
+    if ($exitCode -ne 0) {
+        $errorLevel = "error"
+        if ($output.Length -gt 0 -and $output -notmatch "^ERROR:") {
+            $errorLevel = "warning"
+        }
+        $relLogPath = "output/$Agent/$Job-$(Get-Date -Format 'yyyyMMdd-HHmmss').md"
+        Write-ErrorEntry -Agent $Agent -Job $Job -RunId $runId `
+            -Level $errorLevel `
+            -Summary "Claude CLI exited with code $exitCode" `
+            -Detail $output `
+            -LogPath $relLogPath `
+            -ExitCode $exitCode `
+            -Duration $runDuration
     }
 
     # Step 9: Save output
@@ -274,6 +356,10 @@ while ($keepRunning) {
     Write-AtomicFile -Path $outputFile -Content $output
     Write-AtomicFile -Path $latestFile -Content $output
 
+    # Step 9b: Compute relative output path and track in dashboard
+    $relOutputPath = "output/$Agent/$Job-$timestamp.md"
+    $outputWriteTime = Get-Date -Format "o"
+
     # Step 10: Increment counter, write audit/event
     $counter["count"] = $counter["count"] + 1
     $counter["last_run"] = (Get-Date -Format "o")
@@ -282,10 +368,10 @@ while ($keepRunning) {
     Write-AtomicFile -Path $counterFile -Content $counterJson
 
     $completedAction = if ($exitCode -eq 0) { "completed" } else { "failed" }
-    Write-AuditEntry -Action $completedAction -AgentName $Agent -JobName $Job -RunId $runId -Details @{ exit_code = $exitCode; output_file = $outputFile }
-    Write-Event -AgentName $Agent -JobName $Job -Event $completedAction -Details @{ run_id = $runId; exit_code = $exitCode }
+    Write-AuditEntry -Action $completedAction -AgentName $Agent -JobName $Job -RunId $runId -Details @{ exit_code = $exitCode; output_file = $outputFile; duration = $runDuration }
+    Write-Event -AgentName $Agent -JobName $Job -Event $completedAction -Details @{ run_id = $runId; exit_code = $exitCode; duration = $runDuration }
 
-    Write-Host "Job '$Job' for agent '$Agent' $completedAction (run: $runId, output: $outputFile)"
+    Write-Host "Job '$Job' for agent '$Agent' $completedAction (run: $runId, output: $outputFile, duration: $runDuration)"
 
     # Step 11: Remove lock
     if (Test-Path $lockFile) { Remove-Item -Path $lockFile -Force }
@@ -302,10 +388,19 @@ while ($keepRunning) {
     }
 }
 
-# Step 13: Update dashboard to idle
+# Step 13: Update dashboard to idle with output and error tracking
+$agentErrorCount = Get-UnresolvedErrorCount -AgentName $Agent
+$agentLevelDetails = @{
+    errorCount = $agentErrorCount
+}
+if ($exitCode -ne 0) {
+    $agentLevelDetails["lastError"] = (Get-Date -Format "o")
+}
 Update-Dashboard -AgentName $Agent -JobName $Job -Status "idle" -Details @{
     last_completed = (Get-Date -Format "o")
     runs_completed = $counter["count"]
-}
+    lastOutput     = $relOutputPath
+    lastOutputTime = $outputWriteTime
+} -AgentDetails $agentLevelDetails
 
 Write-Host "Agent '$Agent' job '$Job' is now idle."
