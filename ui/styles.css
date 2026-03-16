@@ -157,8 +157,8 @@ body {
 }
 
 .status-dot.busy {
-  background: #3b82f6;
-  box-shadow: 0 0 4px #3b82f6;
+  background: #ef4444;
+  box-shadow: 0 0 4px #ef4444;
 }
 
 .status-dot.disabled {
@@ -613,6 +613,109 @@ body {
 
 .footer-report-link:hover {
   text-decoration: underline;
+}
+
+/* === Running Modal === */
+.running-modal {
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  width: 90%;
+  max-width: 550px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.running-modal .modal-header {
+  border-bottom-color: #3b82f6;
+  border-bottom-width: 2px;
+}
+
+.running-section {
+  padding: 0.8rem 1.25rem;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.running-section:last-child {
+  border-bottom: none;
+}
+
+.running-section-title {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6b7280;
+  margin-bottom: 0.5rem;
+}
+
+.running-field {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.25rem 0;
+  font-size: 0.82rem;
+}
+
+.running-field-label {
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.running-field-value {
+  color: #1f2937;
+  font-weight: 600;
+}
+
+.running-field-value.status-running {
+  color: #3b82f6;
+}
+
+.running-duration {
+  font-family: "Cascadia Code", "Fira Code", "Consolas", monospace;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #3b82f6;
+  text-align: center;
+  padding: 0.4rem 0;
+}
+
+.running-events {
+  max-height: 180px;
+  overflow-y: auto;
+  font-family: "Cascadia Code", "Fira Code", "Consolas", monospace;
+  font-size: 0.75rem;
+}
+
+.running-event-row {
+  padding: 0.25rem 0.4rem;
+  display: flex;
+  gap: 0.5rem;
+  border-bottom: 1px solid #f9fafb;
+}
+
+.running-event-row:nth-child(even) {
+  background: #f9fafb;
+}
+
+.running-event-time {
+  color: #9ca3af;
+  flex-shrink: 0;
+}
+
+.running-event-type {
+  font-weight: 600;
+  color: #3b82f6;
+  flex-shrink: 0;
+  min-width: 70px;
+}
+
+.running-event-detail {
+  color: #4b5563;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* === Event Log === */

@@ -1,7 +1,7 @@
 /* Virtual Office - Live Dashboard */
 
 var CONFIG = {
-  POLL_INTERVAL: 2000,
+  POLL_INTERVAL: 120000,
   MAX_EVENTS: 50,
   API_BASE: ""
 };
@@ -12,6 +12,7 @@ var lastEventsJSON = "";
 var isConnected = false;
 var agentConfig = null; // loaded once from /api/config
 var agentErrors = {};
+var latestEvents = [];
 
 // --- Fetch helpers ---
 
@@ -157,6 +158,14 @@ function renderAgentCard(name, agentData) {
     card.appendChild(errorBadge);
   }
 
+  // Click handler for busy cards
+  if (status === "busy") {
+    card.style.cursor = "pointer";
+    card.addEventListener("click", function() {
+      showRunningModal(name, agentData);
+    });
+  }
+
   // Capabilities = ALL jobs (count never changes); active jobs shown separately
   var jobs = agentData.jobs || [];
   var activeJobs = [];
@@ -212,6 +221,14 @@ function renderAgentCard(name, agentData) {
       li.appendChild(jobName);
 
       li.appendChild(statusLabel);
+
+      if (job.status === "running") {
+        li.style.cursor = "pointer";
+        li.addEventListener("click", function(e) {
+          e.stopPropagation();
+          showRunningModal(name, agentData);
+        });
+      }
 
       if (job.lastOutput) {
         var reportLink = document.createElement("a");
@@ -401,6 +418,252 @@ function mergeConfigAndDashboard(config, dashboard) {
     });
   }
   return merged;
+}
+
+function showRunningModal(agentName, agentData) {
+  var existing = document.getElementById("running-modal-overlay");
+  if (existing) existing.remove();
+
+  var overlay = document.createElement("div");
+  overlay.id = "running-modal-overlay";
+  overlay.className = "modal-overlay";
+
+  var durationInterval = null;
+
+  function closeModal() {
+    if (durationInterval) clearInterval(durationInterval);
+    overlay.remove();
+  }
+
+  overlay.addEventListener("click", function(e) {
+    if (e.target === overlay) closeModal();
+  });
+
+  var modal = document.createElement("div");
+  modal.className = "running-modal";
+
+  // Header
+  var header = document.createElement("div");
+  header.className = "modal-header";
+  var title = document.createElement("span");
+  title.className = "modal-title";
+  var displayName = agentData.display_name || agentName;
+  var runningJobName = "unknown";
+  if (agentData.running_job) {
+    runningJobName = agentData.running_job.job || agentData.running_job.name || "unknown";
+  }
+  title.textContent = displayName + " - Running: " + runningJobName;
+  header.appendChild(title);
+  var closeBtn = document.createElement("button");
+  closeBtn.className = "modal-close";
+  closeBtn.textContent = "X";
+  closeBtn.addEventListener("click", closeModal);
+  header.appendChild(closeBtn);
+  modal.appendChild(header);
+
+  var body = document.createElement("div");
+  body.style.overflowY = "auto";
+  body.style.flex = "1";
+
+  // --- Status section ---
+  var statusSection = document.createElement("div");
+  statusSection.className = "running-section";
+  var statusTitle = document.createElement("div");
+  statusTitle.className = "running-section-title";
+  statusTitle.textContent = "Status";
+  statusSection.appendChild(statusTitle);
+
+  // Find the running job data
+  var runId = "";
+  var startedTime = null;
+  var runningJobData = null;
+  if (agentData.running_job) {
+    runId = agentData.running_job.run || "";
+  }
+  // Look through jobs for the running one
+  var jobs = agentData.jobs || [];
+  jobs.forEach(function(j) {
+    if (j.status === "running") {
+      runningJobData = j;
+      if (j.run) runId = j.run;
+      if (j.started) startedTime = j.started;
+    }
+  });
+
+  var statusFields = [
+    { label: "Status", value: "RUNNING", cls: "status-running" },
+    { label: "Run ID", value: runId || "N/A", cls: "" },
+    { label: "Started", value: startedTime ? formatTimestamp(startedTime) + " (" + formatTimeAgo(startedTime) + ")" : "N/A", cls: "" }
+  ];
+
+  statusFields.forEach(function(f) {
+    var row = document.createElement("div");
+    row.className = "running-field";
+    var label = document.createElement("span");
+    label.className = "running-field-label";
+    label.textContent = f.label;
+    row.appendChild(label);
+    var val = document.createElement("span");
+    val.className = "running-field-value" + (f.cls ? " " + f.cls : "");
+    val.textContent = f.value;
+    row.appendChild(val);
+    statusSection.appendChild(row);
+  });
+
+  // Duration counter
+  var durationRow = document.createElement("div");
+  durationRow.className = "running-duration";
+  function updateDuration() {
+    if (startedTime) {
+      var elapsed = Math.max(0, Math.floor((Date.now() - new Date(startedTime).getTime()) / 1000));
+      var m = Math.floor(elapsed / 60);
+      var s = elapsed % 60;
+      durationRow.textContent = m + "m " + (s < 10 ? "0" : "") + s + "s";
+    } else {
+      durationRow.textContent = "--:--";
+    }
+  }
+  updateDuration();
+  durationInterval = setInterval(updateDuration, 1000);
+  statusSection.appendChild(durationRow);
+  body.appendChild(statusSection);
+
+  // --- Stats section ---
+  var statsSection = document.createElement("div");
+  statsSection.className = "running-section";
+  var statsTitle = document.createElement("div");
+  statsTitle.className = "running-section-title";
+  statsTitle.textContent = "Stats";
+  statsSection.appendChild(statsTitle);
+
+  var queueDepth = 0;
+  if (agentData.queue && Array.isArray(agentData.queue)) {
+    queueDepth = agentData.queue.length;
+  } else if (typeof agentData.queue_depth === "number") {
+    queueDepth = agentData.queue_depth;
+  }
+
+  var totalRuns = 0;
+  var lastCompleted = null;
+  var lastOutputFile = null;
+  var lastOutputTime = null;
+  jobs.forEach(function(j) {
+    if (j.run) totalRuns += (typeof j.run === "number" ? j.run : 0);
+    if (j.lastCompleted && (!lastCompleted || j.lastCompleted > lastCompleted)) {
+      lastCompleted = j.lastCompleted;
+    }
+    if (j.lastOutputTime && (!lastOutputTime || j.lastOutputTime > lastOutputTime)) {
+      lastOutputTime = j.lastOutputTime;
+      lastOutputFile = j.lastOutput;
+    }
+  });
+
+  var statsFields = [
+    { label: "Queue Depth", value: String(queueDepth) },
+    { label: "Total Runs", value: String(totalRuns) },
+    { label: "Last Completed", value: lastCompleted ? formatTimeAgo(lastCompleted) : "never" }
+  ];
+
+  statsFields.forEach(function(f) {
+    var row = document.createElement("div");
+    row.className = "running-field";
+    var label = document.createElement("span");
+    label.className = "running-field-label";
+    label.textContent = f.label;
+    row.appendChild(label);
+    var val = document.createElement("span");
+    val.className = "running-field-value";
+    val.textContent = f.value;
+    row.appendChild(val);
+    statsSection.appendChild(row);
+  });
+
+  // Last Output row (with link if available)
+  var outputRow = document.createElement("div");
+  outputRow.className = "running-field";
+  var outputLabel = document.createElement("span");
+  outputLabel.className = "running-field-label";
+  outputLabel.textContent = "Last Output";
+  outputRow.appendChild(outputLabel);
+  if (lastOutputFile) {
+    var outputLink = document.createElement("a");
+    outputLink.href = "/api/output/" + lastOutputFile;
+    outputLink.target = "_blank";
+    outputLink.textContent = "View Report";
+    outputLink.style.color = "#2563eb";
+    outputLink.style.fontWeight = "600";
+    outputLink.style.fontSize = "0.82rem";
+    outputLink.style.textDecoration = "none";
+    outputRow.appendChild(outputLink);
+  } else {
+    var outputDash = document.createElement("span");
+    outputDash.className = "running-field-value";
+    outputDash.textContent = "\u2014";
+    outputRow.appendChild(outputDash);
+  }
+  statsSection.appendChild(outputRow);
+  body.appendChild(statsSection);
+
+  // --- Recent Events section ---
+  var eventsSection = document.createElement("div");
+  eventsSection.className = "running-section";
+  var eventsTitle = document.createElement("div");
+  eventsTitle.className = "running-section-title";
+  eventsTitle.textContent = "Recent Events";
+  eventsSection.appendChild(eventsTitle);
+
+  var eventsContainer = document.createElement("div");
+  eventsContainer.className = "running-events";
+
+  var agentEvents = latestEvents.filter(function(evt) {
+    var evtAgent = evt.agent || evt.message || evt.detail || evt.msg || "";
+    return evtAgent.indexOf(agentName) !== -1 ||
+           (evt.agent && evt.agent === agentName);
+  });
+
+  var recentEvents = agentEvents.slice(-10);
+  if (recentEvents.length === 0) {
+    var noEvt = document.createElement("div");
+    noEvt.style.color = "#9ca3af";
+    noEvt.style.fontStyle = "italic";
+    noEvt.style.padding = "0.4rem";
+    noEvt.textContent = "No recent events for this agent";
+    eventsContainer.appendChild(noEvt);
+  } else {
+    recentEvents.forEach(function(evt) {
+      var row = document.createElement("div");
+      row.className = "running-event-row";
+
+      var time = document.createElement("span");
+      time.className = "running-event-time";
+      time.textContent = formatTimestamp(evt.timestamp || evt.ts || evt.time);
+      row.appendChild(time);
+
+      var type = document.createElement("span");
+      type.className = "running-event-type";
+      type.textContent = evt.type || evt.event || "info";
+      row.appendChild(type);
+
+      var detail = document.createElement("span");
+      detail.className = "running-event-detail";
+      var detailText = evt.job || "";
+      if (evt.message) detailText = evt.message;
+      else if (evt.detail) detailText = evt.detail;
+      else if (evt.msg) detailText = evt.msg;
+      detail.textContent = detailText;
+      detail.title = detailText;
+      row.appendChild(detail);
+
+      eventsContainer.appendChild(row);
+    });
+  }
+
+  eventsSection.appendChild(eventsContainer);
+  body.appendChild(eventsSection);
+
+  modal.appendChild(body);
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
 }
 
 function showErrorModal(agentName, errors) {
@@ -630,6 +893,7 @@ async function poll() {
 
   try {
     var events = await fetchEvents();
+    latestEvents = events;
     var evtJSON = JSON.stringify(events);
     if (evtJSON !== lastEventsJSON) {
       lastEventsJSON = evtJSON;

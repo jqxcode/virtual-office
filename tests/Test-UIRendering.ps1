@@ -232,6 +232,109 @@ if (-not (Test-Path $AppJsFile)) {
     Assert-True $hasRunIdBubble "app.js references run_id for flat format bubble-up"
 }
 
+# ========================================
+# TC56: Busy status dot is red
+# ========================================
+Write-Host "`nTC56: Busy status dot is red" -ForegroundColor Cyan
+
+$statusDotBusyBlock = Get-CssRuleBlock -Css $CssContent -Selector ".status-dot.busy"
+$dotBusyHasRed = $false
+if ($statusDotBusyBlock -and ($statusDotBusyBlock -match "#ef4444")) {
+    $dotBusyHasRed = $true
+}
+Assert-True $dotBusyHasRed ".status-dot.busy contains red (#ef4444)"
+
+# ========================================
+# TC57: Busy card stays neutral (not red)
+# ========================================
+Write-Host "`nTC57: Busy card stays neutral (not red)" -ForegroundColor Cyan
+
+$cardBusyBlock = Get-CssRuleBlock -Css $CssContent -Selector ".agent-card.busy"
+
+$cardBusyHasRedBg = $false
+if ($cardBusyBlock -and ($cardBusyBlock -match "background.*#ef4444")) {
+    $cardBusyHasRedBg = $true
+}
+Assert-True (-not $cardBusyHasRedBg) ".agent-card.busy does NOT have red background"
+
+$cardBusyHasRedBorder = $false
+if ($cardBusyBlock -and ($cardBusyBlock -match "border-left-color\s*:\s*#ef4444")) {
+    $cardBusyHasRedBorder = $true
+}
+Assert-True (-not $cardBusyHasRedBorder) ".agent-card.busy does NOT have red border-left-color"
+
+$cardBusyHasPulse = $false
+if ($cardBusyBlock -and ($cardBusyBlock -match "animation\s*:\s*pulse")) {
+    $cardBusyHasPulse = $true
+}
+Assert-True (-not $cardBusyHasPulse) ".agent-card.busy does NOT have pulse animation"
+
+# ========================================
+# TC58: Idle status dot is green
+# ========================================
+Write-Host "`nTC58: Idle status dot is green" -ForegroundColor Cyan
+
+$statusDotIdleBlock = Get-CssRuleBlock -Css $CssContent -Selector ".status-dot.idle"
+$dotIdleHasGreen = $false
+if ($statusDotIdleBlock -and ($statusDotIdleBlock -match "#22c55e")) {
+    $dotIdleHasGreen = $true
+}
+Assert-True $dotIdleHasGreen ".status-dot.idle contains green (#22c55e)"
+
+# ========================================
+# TC59: app.js contains showRunningModal function
+# ========================================
+Write-Host "`nTC59: app.js contains showRunningModal function" -ForegroundColor Cyan
+
+if (-not (Test-Path $AppJsFile)) {
+    Write-Host "ERROR: Cannot find app.js at $AppJsFile" -ForegroundColor Red
+    $script:Failed++
+} else {
+    if (-not $AppJsContent) {
+        $AppJsContent = Get-Content -Path $AppJsFile -Raw
+    }
+    $hasShowRunningModal = $AppJsContent -match "function showRunningModal"
+    Assert-True $hasShowRunningModal "app.js contains 'function showRunningModal'"
+}
+
+# ========================================
+# TC60: Running modal has live duration counter
+# ========================================
+Write-Host "`nTC60: Running modal has live duration counter" -ForegroundColor Cyan
+
+if (-not (Test-Path $AppJsFile)) {
+    Write-Host "ERROR: Cannot find app.js at $AppJsFile" -ForegroundColor Red
+    $script:Failed++
+} else {
+    if (-not $AppJsContent) {
+        $AppJsContent = Get-Content -Path $AppJsFile -Raw
+    }
+    $hasSetInterval = $AppJsContent -match "setInterval"
+    Assert-True $hasSetInterval "app.js contains 'setInterval' for live duration updates"
+
+    $hasClearInterval = $AppJsContent -match "clearInterval"
+    Assert-True $hasClearInterval "app.js contains 'clearInterval' for cleanup on modal close"
+}
+
+# ========================================
+# TC61: Busy card has click handler for running modal
+# ========================================
+Write-Host "`nTC61: Busy card has click handler for running modal" -ForegroundColor Cyan
+
+if (-not (Test-Path $AppJsFile)) {
+    Write-Host "ERROR: Cannot find app.js at $AppJsFile" -ForegroundColor Red
+    $script:Failed++
+} else {
+    if (-not $AppJsContent) {
+        $AppJsContent = Get-Content -Path $AppJsFile -Raw
+    }
+    $hasBusyCheck = $AppJsContent -match 'status === "busy"'
+    Assert-True $hasBusyCheck "app.js contains busy status check"
+
+    $hasRunningModalCall = $AppJsContent -match "showRunningModal"
+    Assert-True $hasRunningModalCall "app.js calls showRunningModal from click handler"
+}
+
 # --- Summary ---
 Write-Host "`n========================================" -ForegroundColor White
 Write-Host "Test-UIRendering: $script:Passed passed, $script:Failed failed" -ForegroundColor $(if ($script:Failed -gt 0) { "Red" } else { "Green" })
