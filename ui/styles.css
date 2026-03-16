@@ -768,6 +768,8 @@ body {
 .event-type.job-completed { color: #16a34a; }
 .event-type.job-failed { color: #ef4444; }
 .event-type.job-queued { color: #d97706; }
+.event-type.schedule-registered { color: #8b5cf6; }
+.event-type.schedule-removed { color: #6b7280; }
 
 .event-detail {
   color: #4b5563;

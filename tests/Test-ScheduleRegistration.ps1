@@ -148,6 +148,111 @@ Assert-True ($null -eq $invalid4) "Empty string returns null"
 $invalid5 = Parse-CronExpression "abc * * * *"
 Assert-True ($null -eq $invalid5) "Non-numeric part 'abc' returns null"
 
+# ========================================
+# TC62: Register writes event to events.jsonl
+# ========================================
+Write-Host "`nTC62: Register writes event to events.jsonl" -ForegroundColor Cyan
+$root = New-TestRoot
+try {
+    $eventsFile = Join-Path $root "state/events.jsonl"
+    $nowIso = Get-Date -Format "o"
+    $eventEntry = @{
+        ts            = $nowIso
+        agent         = "scrum-master"
+        job           = "sprint-progress"
+        event         = "schedule_registered"
+        details       = @{
+            cron        = "*/15 * * * *"
+            taskName    = "VirtualOffice-scrum-master-sprint-progress"
+            description = "Virtual Office: scrum-master / sprint-progress"
+        }
+        systemVersion = "0.1.0"
+    } | ConvertTo-Json -Compress
+    Add-Content -Path $eventsFile -Value $eventEntry -Encoding ASCII
+
+    Assert-True (Test-Path $eventsFile) "events.jsonl exists after write"
+    $content = Get-Content -Path $eventsFile -Raw
+    Assert-True ($content -match '"schedule_registered"') "Event contains schedule_registered type"
+    Assert-True ($content -match '"scrum-master"') "Event contains agent name"
+    Assert-True ($content -match '"sprint-progress"') "Event contains job name"
+    Assert-True ($content -match '"systemVersion"') "Event contains systemVersion field"
+
+    $parsed = $eventEntry | ConvertFrom-Json
+    Assert-True ($parsed.event -eq "schedule_registered") "Parsed event type is schedule_registered"
+    Assert-True ($parsed.details.cron -eq "*/15 * * * *") "Parsed details contain cron"
+    Assert-True ($parsed.details.taskName -eq "VirtualOffice-scrum-master-sprint-progress") "Parsed details contain taskName"
+} finally {
+    Remove-TestRoot -Root $root
+}
+
+# ========================================
+# TC63: Register writes audit entry
+# ========================================
+Write-Host "`nTC63: Register writes audit entry" -ForegroundColor Cyan
+$root = New-TestRoot
+try {
+    $auditDir = Join-Path $root "output/audit"
+    $monthFile = Join-Path $auditDir "$(Get-Date -Format 'yyyy-MM').jsonl"
+    $nowIso = Get-Date -Format "o"
+    $auditEntry = @{
+        ts            = $nowIso
+        action        = "schedule_registered"
+        agent         = "scrum-master"
+        job           = "sprint-progress"
+        runId         = "N/A"
+        systemVersion = "0.1.0"
+        details       = @{
+            cron     = "*/15 * * * *"
+            taskName = "VirtualOffice-scrum-master-sprint-progress"
+        }
+    } | ConvertTo-Json -Compress
+    Add-Content -Path $monthFile -Value $auditEntry -Encoding ASCII
+
+    Assert-True (Test-Path $monthFile) "Monthly audit file exists after write"
+    $content = Get-Content -Path $monthFile -Raw
+    Assert-True ($content -match '"schedule_registered"') "Audit contains schedule_registered action"
+    Assert-True ($content -match '"N/A"') "Audit contains runId N/A"
+
+    $parsed = $auditEntry | ConvertFrom-Json
+    Assert-True ($parsed.action -eq "schedule_registered") "Parsed audit action is schedule_registered"
+    Assert-True ($parsed.agent -eq "scrum-master") "Parsed audit agent is correct"
+} finally {
+    Remove-TestRoot -Root $root
+}
+
+# ========================================
+# TC64: Unregister writes schedule_removed event
+# ========================================
+Write-Host "`nTC64: Unregister writes schedule_removed event" -ForegroundColor Cyan
+$root = New-TestRoot
+try {
+    $eventsFile = Join-Path $root "state/events.jsonl"
+    $nowIso = Get-Date -Format "o"
+    $eventEntry = @{
+        ts            = $nowIso
+        agent         = "scrum-master"
+        job           = "sprint-progress"
+        event         = "schedule_removed"
+        details       = @{
+            taskName = "VirtualOffice-scrum-master-sprint-progress"
+        }
+        systemVersion = "0.1.0"
+    } | ConvertTo-Json -Compress
+    Add-Content -Path $eventsFile -Value $eventEntry -Encoding ASCII
+
+    Assert-True (Test-Path $eventsFile) "events.jsonl exists after removal write"
+    $content = Get-Content -Path $eventsFile -Raw
+    Assert-True ($content -match '"schedule_removed"') "Event contains schedule_removed type"
+    Assert-True ($content -match '"scrum-master"') "Event contains agent name"
+    Assert-True ($content -match '"sprint-progress"') "Event contains job name"
+
+    $parsed = $eventEntry | ConvertFrom-Json
+    Assert-True ($parsed.event -eq "schedule_removed") "Parsed event type is schedule_removed"
+    Assert-True ($parsed.details.taskName -eq "VirtualOffice-scrum-master-sprint-progress") "Parsed details contain taskName"
+} finally {
+    Remove-TestRoot -Root $root
+}
+
 # --- Summary ---
 Write-Host "`n========================================" -ForegroundColor White
 Write-Host "Test-ScheduleRegistration: $script:Passed passed, $script:Failed failed" -ForegroundColor $(if ($script:Failed -gt 0) { "Red" } else { "Green" })

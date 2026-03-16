@@ -136,6 +136,47 @@ foreach ($entry in $schedules) {
 
     Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Settings $settings -Description "Virtual Office: $agentName / $jobName" | Out-Null
 
+    # Write event and audit entries
+    $nowIso = Get-Date -Format "o"
+    $monthFileName = "$(Get-Date -Format 'yyyy-MM').jsonl"
+    $description = "Virtual Office: $agentName / $jobName"
+
+    if (-not (Test-Path $STATE_DIR)) {
+        New-Item -ItemType Directory -Path $STATE_DIR -Force | Out-Null
+    }
+    if (-not (Test-Path $AUDIT_DIR)) {
+        New-Item -ItemType Directory -Path $AUDIT_DIR -Force | Out-Null
+    }
+
+    $eventEntry = @{
+        ts            = $nowIso
+        agent         = $agentName
+        job           = $jobName
+        event         = "schedule_registered"
+        details       = @{
+            cron        = $cron
+            taskName    = $taskName
+            description = $description
+        }
+        systemVersion = $SYSTEM_VERSION
+    } | ConvertTo-Json -Compress
+    Add-Content -Path $EVENTS_FILE -Value $eventEntry -Encoding ASCII
+
+    $auditEntry = @{
+        ts            = $nowIso
+        action        = "schedule_registered"
+        agent         = $agentName
+        job           = $jobName
+        runId         = "N/A"
+        systemVersion = $SYSTEM_VERSION
+        details       = @{
+            cron     = $cron
+            taskName = $taskName
+        }
+    } | ConvertTo-Json -Compress
+    $auditFile = Join-Path $AUDIT_DIR $monthFileName
+    Add-Content -Path $auditFile -Value $auditEntry -Encoding ASCII
+
     $registered += [PSCustomObject]@{
         TaskName = $taskName
         Agent    = $agentName
