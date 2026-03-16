@@ -21,6 +21,7 @@ Virtual Office is an agent orchestration framework for Windows that turns Claude
 | D8 | Generic runner, agent-agnostic | Invoke-AgentJob.ps1 -Agent X -Job Y works for any agent. Adding agents requires zero runner changes. | Per-agent scripts -- rejected: duplication, drift |
 | D9 | dashboard.json as UI contract | Single file is the API between runner and UI. UI polls this file only. Simple, no server-side logic needed. | WebSocket/real-time -- rejected: overkill for local use |
 | D10 | PS1 with ASCII only | PowerShell on Windows misreads non-BOM UTF-8. All scripts use ASCII characters only. | UTF-8 without BOM -- rejected: causes phantom parse errors |
+| D11 | All jobs go through Task Scheduler, including one-offs | Every job must flow through Invoke-AgentJob.ps1 so it appears on the dashboard, writes audit/events, and tracks errors. One-off jobs use a single-fire Task Scheduler trigger instead of session-only cron. | Session cron -- rejected: bypasses dashboard, no state tracking, no error capture |
 
 ## Audit Log Schema
 

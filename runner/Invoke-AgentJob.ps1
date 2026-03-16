@@ -223,7 +223,8 @@ if (-not (Test-Path $agentsFile)) {
     Write-Error "Config file not found: $agentsFile"
     exit 1
 }
-$agentsConfig = Get-Content -Path $agentsFile -Raw | ConvertFrom-Json -AsHashtable
+$agentsConfigRaw = Get-Content -Path $agentsFile -Raw | ConvertFrom-Json -AsHashtable
+$agentsConfig = if ($agentsConfigRaw.ContainsKey("agents")) { $agentsConfigRaw["agents"] } else { $agentsConfigRaw }
 if (-not $agentsConfig.ContainsKey($Agent)) {
     Write-Error "Agent '$Agent' not found in agents.json. Available: $($agentsConfig.Keys -join ', ')"
     exit 1
@@ -235,7 +236,8 @@ if (-not (Test-Path $jobsFile)) {
     Write-Error "Jobs file not found: $jobsFile"
     exit 1
 }
-$jobsConfig = Get-Content -Path $jobsFile -Raw | ConvertFrom-Json -AsHashtable
+$jobsConfigRaw = Get-Content -Path $jobsFile -Raw | ConvertFrom-Json -AsHashtable
+$jobsConfig = if ($jobsConfigRaw.ContainsKey("jobs")) { $jobsConfigRaw["jobs"] } else { $jobsConfigRaw }
 if (-not $jobsConfig.ContainsKey($Job)) {
     Write-Error "Job '$Job' not found in $jobsFile. Available: $($jobsConfig.Keys -join ', ')"
     exit 1

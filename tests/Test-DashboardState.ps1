@@ -39,14 +39,14 @@ function Remove-TestRoot {
 function Write-TestConstants {
     param([string]$Root)
     $content = @"
-`$SYSTEM_VERSION = "0.1.0-test"
-`$PROJECT_ROOT = "$($Root -replace '\\', '\\')"
-`$CONFIG_DIR = Join-Path `$PROJECT_ROOT "config"
-`$STATE_DIR = Join-Path `$PROJECT_ROOT "state"
-`$OUTPUT_DIR = Join-Path `$PROJECT_ROOT "output"
-`$AUDIT_DIR = Join-Path `$OUTPUT_DIR "audit"
-`$EVENTS_FILE = Join-Path `$STATE_DIR "events.jsonl"
-`$DASHBOARD_FILE = Join-Path `$STATE_DIR "dashboard.json"
+`$global:SYSTEM_VERSION = "0.1.0-test"
+`$global:PROJECT_ROOT = "$($Root -replace '\\', '\\')"
+`$global:CONFIG_DIR = Join-Path `$PROJECT_ROOT "config"
+`$global:STATE_DIR = Join-Path `$PROJECT_ROOT "state"
+`$global:OUTPUT_DIR = Join-Path `$PROJECT_ROOT "output"
+`$global:AUDIT_DIR = Join-Path `$OUTPUT_DIR "audit"
+`$global:EVENTS_FILE = Join-Path `$STATE_DIR "events.jsonl"
+`$global:DASHBOARD_FILE = Join-Path `$STATE_DIR "dashboard.json"
 "@
     Set-Content -Path (Join-Path $Root "runner/constants.ps1") -Value $content -Encoding ASCII
 }
@@ -187,6 +187,80 @@ try {
     Assert-True ($dash["agents"]["fresh-agent"]["first-job"]["status"] -eq "running") "Status is running"
     Assert-True ($dash["agents"]["fresh-agent"]["first-job"]["run_id"] -eq "first-run") "run_id is correct"
     Assert-True ($dash["agents"]["fresh-agent"]["first-job"].ContainsKey("updated")) "updated timestamp present"
+} finally {
+    Remove-TestRoot -Root $root
+}
+
+# ========================================
+# TC52: Dashboard flat job format has status field
+# ========================================
+Write-Host "`nTC52: Dashboard flat job format has status field" -ForegroundColor Cyan
+$root = New-TestRoot
+try {
+    Write-TestConstants -Root $root
+    Import-RunnerFunctions -Root $root
+
+    # Write dashboard.json with flat format (job data directly on agent, no "jobs" wrapper)
+    $flatDash = @{
+        agents = @{
+            "scrum-master" = @{
+                "dry-run-bug-autopilot" = @{
+                    status = "running"
+                    run_id = "abc123"
+                    started = "2026-03-15T10:00:00Z"
+                    updated = "2026-03-15T10:00:00Z"
+                }
+            }
+        }
+    }
+    $dashFile = Join-Path $root "state/dashboard.json"
+    $json = $flatDash | ConvertTo-Json -Depth 10
+    Write-AtomicFile -Path $dashFile -Content $json
+
+    $dash = Get-Content -Path $dashFile -Raw | ConvertFrom-Json -AsHashtable
+    $jobEntry = $dash["agents"]["scrum-master"]["dry-run-bug-autopilot"]
+
+    Assert-True ($null -ne $jobEntry) "Flat job entry exists on agent object"
+    Assert-True ($jobEntry.ContainsKey("status")) "Flat job entry has 'status' field"
+
+    $validStatuses = @("running", "idle", "completed", "error")
+    $statusIsValid = $validStatuses -contains $jobEntry["status"]
+    Assert-True $statusIsValid "Status value '$($jobEntry["status"])' is one of: running, idle, completed, error"
+} finally {
+    Remove-TestRoot -Root $root
+}
+
+# ========================================
+# TC53: Dashboard flat format includes run_id
+# ========================================
+Write-Host "`nTC53: Dashboard flat format includes run_id" -ForegroundColor Cyan
+$root = New-TestRoot
+try {
+    Write-TestConstants -Root $root
+    Import-RunnerFunctions -Root $root
+
+    # Write dashboard.json with flat format
+    $flatDash = @{
+        agents = @{
+            "scrum-master" = @{
+                "dry-run-bug-autopilot" = @{
+                    status = "running"
+                    run_id = "def456"
+                    started = "2026-03-15T10:00:00Z"
+                    updated = "2026-03-15T10:00:00Z"
+                }
+            }
+        }
+    }
+    $dashFile = Join-Path $root "state/dashboard.json"
+    $json = $flatDash | ConvertTo-Json -Depth 10
+    Write-AtomicFile -Path $dashFile -Content $json
+
+    $dash = Get-Content -Path $dashFile -Raw | ConvertFrom-Json -AsHashtable
+    $jobEntry = $dash["agents"]["scrum-master"]["dry-run-bug-autopilot"]
+
+    Assert-True ($jobEntry.ContainsKey("run_id")) "Flat job entry has 'run_id' field"
+    Assert-True ($jobEntry["run_id"] -eq "def456") "run_id value is correct"
 } finally {
     Remove-TestRoot -Root $root
 }

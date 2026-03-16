@@ -397,6 +397,78 @@ try {
     Remove-TestRoot -Root $root
 }
 
+# ========================================
+# TC50: Config with wrapper key "agents" parsed correctly
+# ========================================
+Write-Host "`nTC50: Config with wrapper key 'agents' parsed correctly" -ForegroundColor Cyan
+$root = New-TestRoot
+try {
+    Write-TestConstants -Root $root
+    Import-RunnerFunctions -Root $root
+
+    # Write agents.json with the wrapper key format: {"agents": {"test-agent": {...}}}
+    $wrappedAgents = @{
+        agents = @{
+            "test-agent" = @{ displayName = "Test Agent"; description = "wrapped test" }
+        }
+    } | ConvertTo-Json -Depth 5
+    Set-Content -Path (Join-Path $root "config/agents.json") -Value $wrappedAgents -Encoding UTF8
+
+    # Write a valid job config so the runner can proceed
+    $jobsJson = @{
+        "test-job" = @{
+            prompt = "echo test"
+            maxRuns = 0
+            enabled = $true
+            description = "test job"
+        }
+    } | ConvertTo-Json -Depth 5
+    Set-Content -Path (Join-Path $root "config/jobs/test-agent.json") -Value $jobsJson -Encoding UTF8
+
+    $result = Invoke-Runner -Root $root -AgentName "test-agent" -JobName "test-job"
+    # The runner should NOT fail with "not found" -- it should unwrap the agents key
+    $hasNotFoundError = $result.Output -match "not found in agents\.json"
+    Assert-True (-not $hasNotFoundError) "Wrapped agents config does not cause 'not found' error"
+    Assert-True ($result.ExitCode -eq 0) "Runner exits with code 0 for wrapped agents config"
+} finally {
+    Remove-TestRoot -Root $root
+}
+
+# ========================================
+# TC51: Jobs config with wrapper key "jobs" parsed correctly
+# ========================================
+Write-Host "`nTC51: Jobs config with wrapper key 'jobs' parsed correctly" -ForegroundColor Cyan
+$root = New-TestRoot
+try {
+    Write-TestConstants -Root $root
+    Import-RunnerFunctions -Root $root
+
+    # Write agents.json (flat format -- already known to work)
+    $agentsJson = @{ "test-agent" = @{ displayName = "Test Agent"; description = "test" } } | ConvertTo-Json
+    Set-Content -Path (Join-Path $root "config/agents.json") -Value $agentsJson -Encoding UTF8
+
+    # Write jobs config with the wrapper key format: {"jobs": {"test-job": {...}}}
+    $wrappedJobs = @{
+        jobs = @{
+            "test-job" = @{
+                prompt = "echo test"
+                maxRuns = 0
+                enabled = $true
+                description = "wrapped job"
+            }
+        }
+    } | ConvertTo-Json -Depth 5
+    Set-Content -Path (Join-Path $root "config/jobs/test-agent.json") -Value $wrappedJobs -Encoding UTF8
+
+    $result = Invoke-Runner -Root $root -AgentName "test-agent" -JobName "test-job"
+    # The runner should NOT fail with "not found" -- it should unwrap the jobs key
+    $hasNotFoundError = $result.Output -match "not found in .*/jobs/test-agent\.json"
+    Assert-True (-not $hasNotFoundError) "Wrapped jobs config does not cause 'not found' error"
+    Assert-True ($result.ExitCode -eq 0) "Runner exits with code 0 for wrapped jobs config"
+} finally {
+    Remove-TestRoot -Root $root
+}
+
 # --- Summary ---
 Write-Host "`n========================================" -ForegroundColor White
 Write-Host "Test-InvokeAgentJob: $script:Passed passed, $script:Failed failed" -ForegroundColor $(if ($script:Failed -gt 0) { "Red" } else { "Green" })

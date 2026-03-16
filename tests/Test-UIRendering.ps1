@@ -189,6 +189,49 @@ Assert-True ($HtmlContent -match 'id="event-log"') "index.html contains id=""eve
 Assert-True ($HtmlContent -match 'href="styles\.css"') "index.html links to styles.css"
 Assert-True ($HtmlContent -match 'src="app\.js"') "index.html links to app.js"
 
+# ========================================
+# TC54: app.js handles flat dashboard format
+# ========================================
+Write-Host "`nTC54: app.js handles flat dashboard format" -ForegroundColor Cyan
+
+$AppJsFile = Join-Path $ProjectRoot "ui/app.js"
+if (-not (Test-Path $AppJsFile)) {
+    Write-Host "ERROR: Cannot find app.js at $AppJsFile" -ForegroundColor Red
+    $script:Failed++
+} else {
+    $AppJsContent = Get-Content -Path $AppJsFile -Raw
+
+    # Verify the jobsSource variable exists (handles both nested and flat formats)
+    $hasJobsSource = $AppJsContent -match "jobsSource"
+    Assert-True $hasJobsSource "app.js contains 'jobsSource' variable for dual-format handling"
+
+    # Verify it checks for flat job keys (object with status field treated as job)
+    $hasFlatKeyDetection = $AppJsContent -match "state\[key\]\.status" -or $AppJsContent -match "flat job keys"
+    Assert-True $hasFlatKeyDetection "app.js contains flat job key detection logic"
+}
+
+# ========================================
+# TC55: app.js detects running status from flat format
+# ========================================
+Write-Host "`nTC55: app.js detects running status from flat format" -ForegroundColor Cyan
+
+if (-not (Test-Path $AppJsFile)) {
+    Write-Host "ERROR: Cannot find app.js at $AppJsFile" -ForegroundColor Red
+    $script:Failed++
+} else {
+    if (-not $AppJsContent) {
+        $AppJsContent = Get-Content -Path $AppJsFile -Raw
+    }
+
+    # Verify app.js sets agent to "busy" when a flat job key has status "running"
+    $hasBusyFromRunning = $AppJsContent -match 'status\s*===\s*"running"' -and $AppJsContent -match 'status\s*=\s*"busy"'
+    Assert-True $hasBusyFromRunning "app.js sets agent status to 'busy' when flat job has status 'running'"
+
+    # Verify the flat-format code path bubbles up run_id
+    $hasRunIdBubble = $AppJsContent -match "run_id"
+    Assert-True $hasRunIdBubble "app.js references run_id for flat format bubble-up"
+}
+
 # --- Summary ---
 Write-Host "`n========================================" -ForegroundColor White
 Write-Host "Test-UIRendering: $script:Passed passed, $script:Failed failed" -ForegroundColor $(if ($script:Failed -gt 0) { "Red" } else { "Green" })

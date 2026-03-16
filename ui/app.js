@@ -157,17 +157,15 @@ function renderAgentCard(name, agentData) {
     card.appendChild(errorBadge);
   }
 
-  // Split jobs into active (running/queued/completed/failed) vs registered (idle capabilities)
+  // Capabilities = ALL jobs (count never changes); active jobs shown separately
   var jobs = agentData.jobs || [];
   var activeJobs = [];
-  var capabilities = [];
+  var capabilities = jobs; // always the full list
   jobs.forEach(function (job) {
     if (job.status === "running" || job.status === "queued" || job.status === "pending" ||
         job.status === "completed" || job.status === "done" ||
         job.status === "failed" || job.status === "error") {
       activeJobs.push(job);
-    } else {
-      capabilities.push(job);
     }
   });
 
@@ -345,10 +343,28 @@ function mergeConfigAndDashboard(config, dashboard) {
       // Copy state fields over config defaults
       if (state.status) merged[name].status = state.status;
       if (state.activeJob) merged[name].running_job = { job: state.activeJob };
-      if (state.jobs) {
+      // Runner may write job data directly on agent object (not nested under "jobs")
+      // Detect this: if a key has an object value with a "status" field, treat it as a job
+      var jobsSource = state.jobs || {};
+      if (!state.jobs) {
+        // Check for flat job keys on the agent object
+        Object.keys(state).forEach(function (key) {
+          if (key !== "status" && key !== "activeJob" && key !== "errorCount" &&
+              key !== "lastError" && typeof state[key] === "object" && state[key] !== null &&
+              state[key].status) {
+            jobsSource[key] = state[key];
+            // Bubble up agent status from job
+            if (state[key].status === "running") {
+              merged[name].status = "busy";
+              merged[name].running_job = { job: key, run: state[key].run_id };
+            }
+          }
+        });
+      }
+      if (Object.keys(jobsSource).length > 0) {
         // Update individual job statuses
-        Object.keys(state.jobs).forEach(function (jobName) {
-          var jobState = state.jobs[jobName];
+        Object.keys(jobsSource).forEach(function (jobName) {
+          var jobState = jobsSource[jobName];
           var found = false;
           merged[name].jobs.forEach(function (j, i) {
             if (j.name === jobName) {
