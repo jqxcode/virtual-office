@@ -86,6 +86,21 @@ function formatTimestamp(timestamp) {
   return d.toLocaleTimeString();
 }
 
+// --- Normalization helpers ---
+
+function normalizeJobState(raw) {
+  return {
+    status: raw.status || "idle",
+    started: raw.started || null,
+    runId: raw.run_id || raw.runId || null,
+    runsCompleted: raw.runs_completed || raw.runsCompleted || 0,
+    lastCompleted: raw.last_completed || raw.lastCompleted || null,
+    lastOutput: raw.lastOutput || raw.last_output || null,
+    lastOutputTime: raw.lastOutputTime || raw.last_output_time || null,
+    queueDepth: raw.queue_depth || raw.queueDepth || 0
+  };
+}
+
 // --- Render agents ---
 
 function getAgentStatus(agentData) {
@@ -344,6 +359,8 @@ function renderAgentCard(name, agentData) {
 function mergeConfigAndDashboard(config, dashboard) {
   // Start with all agents from config, overlay with dashboard state
   var merged = {};
+  var AGENT_META_KEYS = ["status", "activeJob", "errorCount", "lastError", "updated"];
+
   if (config && config.agents) {
     Object.keys(config.agents).forEach(function (name) {
       var cfg = config.agents[name];
@@ -355,87 +372,124 @@ function mergeConfigAndDashboard(config, dashboard) {
         running_job: null,
         last_completed: null,
         queue_depth: 0,
+        errorCount: 0,
+        lastError: null,
         jobs: []
       };
       // Add jobs from config as idle
       if (cfg.jobs) {
-        var jobList = [];
         Object.keys(cfg.jobs).forEach(function (jobName) {
-          jobList.push({
+          merged[name].jobs.push({
             name: jobName,
             status: cfg.jobs[jobName].enabled === false ? "disabled" : "idle",
-            description: cfg.jobs[jobName].description || ""
+            description: cfg.jobs[jobName].description || "",
+            enabled: cfg.jobs[jobName].enabled !== false,
+            started: null,
+            runId: null,
+            runsCompleted: 0,
+            lastCompleted: null,
+            lastOutput: null,
+            lastOutputTime: null,
+            queueDepth: 0
           });
         });
-        merged[name].jobs = jobList;
       }
     });
   }
+
   // Overlay with dashboard state
   if (dashboard && dashboard.agents) {
     Object.keys(dashboard.agents).forEach(function (name) {
       var state = dashboard.agents[name];
       if (!merged[name]) {
-        merged[name] = { display_name: name, jobs: [] };
+        merged[name] = {
+          display_name: name,
+          status: "idle",
+          running_job: null,
+          last_completed: null,
+          queue_depth: 0,
+          errorCount: 0,
+          lastError: null,
+          jobs: []
+        };
       }
-      // Copy state fields over config defaults
+
+      // Copy agent-level meta fields
+      if (typeof state.errorCount === "number") merged[name].errorCount = state.errorCount;
+      if (state.lastError) merged[name].lastError = state.lastError;
+
+      // Structured format: state.status + state.activeJob + state.jobs
       if (state.status) merged[name].status = state.status;
       if (state.activeJob) merged[name].running_job = { job: state.activeJob };
-      // Runner may write job data directly on agent object (not nested under "jobs")
-      // Detect this: if a key has an object value with a "status" field, treat it as a job
-      var jobsSource = state.jobs || {};
-      if (!state.jobs) {
-        // Check for flat job keys on the agent object
+
+      // Collect job data from either structured (state.jobs) or flat format
+      var jobsSource = {};
+      if (state.jobs && typeof state.jobs === "object") {
+        // Structured format: jobs nested under "jobs" key
+        jobsSource = state.jobs;
+      } else {
+        // Flat format: job data sits directly on agent object as named keys
         Object.keys(state).forEach(function (key) {
-          if (key !== "status" && key !== "activeJob" && key !== "errorCount" &&
-              key !== "lastError" && typeof state[key] === "object" && state[key] !== null &&
+          if (AGENT_META_KEYS.indexOf(key) === -1 &&
+              typeof state[key] === "object" && state[key] !== null &&
               state[key].status) {
             jobsSource[key] = state[key];
-            // Bubble up agent status from job
-            if (state[key].status === "running") {
-              merged[name].status = "busy";
-              merged[name].running_job = { job: key, run: state[key].run_id };
-            }
           }
         });
       }
-      if (Object.keys(jobsSource).length > 0) {
-        // Update individual job statuses
-        Object.keys(jobsSource).forEach(function (jobName) {
-          var jobState = jobsSource[jobName];
-          var found = false;
-          merged[name].jobs.forEach(function (j, i) {
-            if (j.name === jobName) {
-              merged[name].jobs[i].status = jobState.status || "idle";
-              merged[name].jobs[i].run = jobState.run || 0;
-              merged[name].jobs[i].queueDepth = jobState.queueDepth || 0;
-              merged[name].jobs[i].lastCompleted = jobState.lastCompleted || null;
-              merged[name].jobs[i].lastOutput = jobState.lastOutput || null;
-              merged[name].jobs[i].lastOutputTime = jobState.lastOutputTime || null;
-              found = true;
-            }
+
+      // Merge each job using normalizeJobState
+      Object.keys(jobsSource).forEach(function (jobName) {
+        var normalized = normalizeJobState(jobsSource[jobName]);
+
+        // Bubble up running status to agent level
+        if (normalized.status === "running") {
+          merged[name].status = "busy";
+          merged[name].running_job = { job: jobName, run: normalized.runId };
+        }
+
+        // Find existing job from config or create new
+        var found = false;
+        merged[name].jobs.forEach(function (j, i) {
+          if (j.name === jobName) {
+            // Preserve config-only fields (description, enabled)
+            merged[name].jobs[i].status = normalized.status;
+            merged[name].jobs[i].started = normalized.started;
+            merged[name].jobs[i].runId = normalized.runId;
+            merged[name].jobs[i].runsCompleted = normalized.runsCompleted;
+            merged[name].jobs[i].lastCompleted = normalized.lastCompleted;
+            merged[name].jobs[i].lastOutput = normalized.lastOutput;
+            merged[name].jobs[i].lastOutputTime = normalized.lastOutputTime;
+            merged[name].jobs[i].queueDepth = normalized.queueDepth;
+            found = true;
+          }
+        });
+        if (!found) {
+          merged[name].jobs.push({
+            name: jobName,
+            status: normalized.status,
+            description: "",
+            enabled: true,
+            started: normalized.started,
+            runId: normalized.runId,
+            runsCompleted: normalized.runsCompleted,
+            lastCompleted: normalized.lastCompleted,
+            lastOutput: normalized.lastOutput,
+            lastOutputTime: normalized.lastOutputTime,
+            queueDepth: normalized.queueDepth
           });
-          if (!found) {
-            merged[name].jobs.push({
-              name: jobName,
-              status: jobState.status || "idle",
-              run: jobState.run || 0,
-              queueDepth: jobState.queueDepth || 0,
-              lastCompleted: jobState.lastCompleted || null,
-              lastOutput: jobState.lastOutput || null,
-              lastOutputTime: jobState.lastOutputTime || null
-            });
-          }
-          // Bubble up last_completed
-          if (jobState.lastCompleted && (!merged[name].last_completed || jobState.lastCompleted > merged[name].last_completed)) {
-            merged[name].last_completed = jobState.lastCompleted;
-          }
-          // Bubble up queue depth
-          if (jobState.queueDepth) {
-            merged[name].queue_depth = (merged[name].queue_depth || 0) + jobState.queueDepth;
-          }
-        });
-      }
+        }
+
+        // Bubble up last_completed (most recent across all jobs)
+        if (normalized.lastCompleted &&
+            (!merged[name].last_completed || normalized.lastCompleted > merged[name].last_completed)) {
+          merged[name].last_completed = normalized.lastCompleted;
+        }
+        // Accumulate queue depth
+        if (normalized.queueDepth) {
+          merged[name].queue_depth = (merged[name].queue_depth || 0) + normalized.queueDepth;
+        }
+      });
     });
   }
   return merged;
@@ -494,7 +548,7 @@ function showRunningModal(agentName, agentData) {
   statusTitle.textContent = "Status";
   statusSection.appendChild(statusTitle);
 
-  // Find the running job data
+  // Find the running job data from merged jobs array
   var runId = "";
   var startedTime = null;
   var runningJobData = null;
@@ -506,7 +560,7 @@ function showRunningModal(agentName, agentData) {
   jobs.forEach(function(j) {
     if (j.status === "running") {
       runningJobData = j;
-      if (j.run) runId = j.run;
+      if (j.runId) runId = j.runId;
       if (j.started) startedTime = j.started;
     }
   });
@@ -569,7 +623,9 @@ function showRunningModal(agentName, agentData) {
   var lastOutputFile = null;
   var lastOutputTime = null;
   jobs.forEach(function(j) {
-    if (j.run) totalRuns += (typeof j.run === "number" ? j.run : 0);
+    if (j.runsCompleted) {
+      totalRuns += (typeof j.runsCompleted === "number" ? j.runsCompleted : 0);
+    }
     if (j.lastCompleted && (!lastCompleted || j.lastCompleted > lastCompleted)) {
       lastCompleted = j.lastCompleted;
     }

@@ -396,6 +396,149 @@ if (-not (Test-Path $AppJsFile)) {
     Assert-True ($apiOutputCount -eq 0) "app.js has zero /api/output/ href assignments (found $apiOutputCount)"
 }
 
+# ========================================
+# TC68: app.js merges started timestamp from flat dashboard format
+# ========================================
+Write-Host "`nTC68: app.js merges started timestamp via normalizeJobState" -ForegroundColor Cyan
+
+if (-not (Test-Path $AppJsFile)) {
+    Write-Host "ERROR: Cannot find app.js at $AppJsFile" -ForegroundColor Red
+    $script:Failed++
+} else {
+    if (-not $AppJsContent) {
+        $AppJsContent = Get-Content -Path $AppJsFile -Raw
+    }
+
+    # normalizeJobState reads raw.started
+    $hasStartedNormalize = $AppJsContent -match "raw\.started"
+    Assert-True $hasStartedNormalize "normalizeJobState reads raw.started from flat format"
+
+    # mergeConfigAndDashboard copies normalized.started into merged job
+    $hasStartedOnMergedJob = $AppJsContent -match "\.started\s*=\s*normalized\.started"
+    Assert-True $hasStartedOnMergedJob "mergeConfigAndDashboard copies normalized.started into merged job"
+}
+
+# ========================================
+# TC69: app.js merges runs_completed via normalizeJobState
+# ========================================
+Write-Host "`nTC69: app.js merges runs_completed via normalizeJobState" -ForegroundColor Cyan
+
+if (-not (Test-Path $AppJsFile)) {
+    Write-Host "ERROR: Cannot find app.js at $AppJsFile" -ForegroundColor Red
+    $script:Failed++
+} else {
+    if (-not $AppJsContent) {
+        $AppJsContent = Get-Content -Path $AppJsFile -Raw
+    }
+
+    # normalizeJobState reads raw.runs_completed
+    $hasRunsCompletedRead = $AppJsContent -match "raw\.runs_completed"
+    Assert-True $hasRunsCompletedRead "normalizeJobState reads raw.runs_completed from flat format"
+
+    # mergeConfigAndDashboard copies normalized.runsCompleted into merged job
+    $hasRunsCompletedOnMergedJob = $AppJsContent -match "\.runsCompleted\s*=\s*normalized\.runsCompleted"
+    Assert-True $hasRunsCompletedOnMergedJob "mergeConfigAndDashboard copies normalized.runsCompleted into merged job"
+
+    # showRunningModal uses camelCase j.runsCompleted
+    $hasRunsCompletedInModal = $AppJsContent -match "j\.runsCompleted"
+    Assert-True $hasRunsCompletedInModal "showRunningModal reads runsCompleted (camelCase) from job data"
+}
+
+# ========================================
+# TC70: app.js has normalizeJobState function
+# ========================================
+Write-Host "`nTC70: app.js has normalizeJobState function" -ForegroundColor Cyan
+
+if (-not (Test-Path $AppJsFile)) {
+    Write-Host "ERROR: Cannot find app.js at $AppJsFile" -ForegroundColor Red
+    $script:Failed++
+} else {
+    if (-not $AppJsContent) {
+        $AppJsContent = Get-Content -Path $AppJsFile -Raw
+    }
+
+    $hasNormalizeFunction = $AppJsContent -match "function normalizeJobState\s*\("
+    Assert-True $hasNormalizeFunction "app.js defines normalizeJobState function"
+}
+
+# ========================================
+# TC71: normalizeJobState handles all snake_case fields
+# ========================================
+Write-Host "`nTC71: normalizeJobState handles all snake_case fields" -ForegroundColor Cyan
+
+if (-not (Test-Path $AppJsFile)) {
+    Write-Host "ERROR: Cannot find app.js at $AppJsFile" -ForegroundColor Red
+    $script:Failed++
+} else {
+    if (-not $AppJsContent) {
+        $AppJsContent = Get-Content -Path $AppJsFile -Raw
+    }
+
+    # Extract the normalizeJobState function body
+    $fnMatch = [regex]::Match($AppJsContent, 'function normalizeJobState\s*\([^)]*\)\s*\{([\s\S]*?)\n\}')
+    $fnBody = ""
+    if ($fnMatch.Success) { $fnBody = $fnMatch.Groups[1].Value }
+
+    $hasRunId = $fnBody -match "raw\.run_id"
+    Assert-True $hasRunId "normalizeJobState handles run_id -> runId"
+
+    $hasRunsCompleted = $fnBody -match "raw\.runs_completed"
+    Assert-True $hasRunsCompleted "normalizeJobState handles runs_completed -> runsCompleted"
+
+    $hasLastCompleted = $fnBody -match "raw\.last_completed"
+    Assert-True $hasLastCompleted "normalizeJobState handles last_completed -> lastCompleted"
+
+    $hasQueueDepth = $fnBody -match "raw\.queue_depth"
+    Assert-True $hasQueueDepth "normalizeJobState handles queue_depth -> queueDepth"
+}
+
+# ========================================
+# TC72: No raw snake_case job field access outside normalizeJobState
+# ========================================
+Write-Host "`nTC72: No raw snake_case job field access outside normalizeJobState" -ForegroundColor Cyan
+
+if (-not (Test-Path $AppJsFile)) {
+    Write-Host "ERROR: Cannot find app.js at $AppJsFile" -ForegroundColor Red
+    $script:Failed++
+} else {
+    if (-not $AppJsContent) {
+        $AppJsContent = Get-Content -Path $AppJsFile -Raw
+    }
+
+    # Find normalizeJobState function boundaries
+    $fnMatch = [regex]::Match($AppJsContent, 'function normalizeJobState\s*\([^)]*\)\s*\{([\s\S]*?)\n\}')
+    $fnStart = 0
+    $fnEnd = 0
+    if ($fnMatch.Success) {
+        $fnStart = $fnMatch.Index
+        $fnEnd = $fnMatch.Index + $fnMatch.Length
+    }
+
+    # Get code OUTSIDE normalizeJobState
+    $before = ""
+    $after = ""
+    if ($fnEnd -gt 0) {
+        $before = $AppJsContent.Substring(0, $fnStart)
+        $after = $AppJsContent.Substring($fnEnd)
+    }
+    $outsideCode = $before + $after
+
+    # Check for direct snake_case job field access patterns (j.run_id, j.runs_completed, etc.)
+    # These patterns match property access like .run_id, .runs_completed, .last_completed, .queue_depth
+    # but NOT agent-level fields (merged[name].last_completed, agentData.queue_depth are OK at agent level)
+    # We specifically look for job-object access patterns: j.run_id, job.runs_completed, etc.
+    $snakeCaseJobAccess = [regex]::Matches($outsideCode, '(?<!\w)j\.run_id|(?<!\w)j\.runs_completed|(?<!\w)j\.last_completed|(?<!\w)j\.queue_depth')
+    $violationCount = $snakeCaseJobAccess.Count
+
+    Assert-True ($violationCount -eq 0) "No j.run_id/j.runs_completed/j.last_completed/j.queue_depth outside normalizeJobState (found $violationCount)"
+
+    # Also check for jobState.X direct access outside the normalizer (old merge pattern)
+    $jobStateSnake = [regex]::Matches($outsideCode, 'jobState\.run_id|jobState\.runs_completed|jobState\.last_completed|jobState\.queue_depth')
+    $jobStateViolations = $jobStateSnake.Count
+
+    Assert-True ($jobStateViolations -eq 0) "No jobState.run_id/runs_completed/last_completed/queue_depth outside normalizeJobState (found $jobStateViolations)"
+}
+
 # --- Summary ---
 Write-Host "`n========================================" -ForegroundColor White
 Write-Host "Test-UIRendering: $script:Passed passed, $script:Failed failed" -ForegroundColor $(if ($script:Failed -gt 0) { "Red" } else { "Green" })
