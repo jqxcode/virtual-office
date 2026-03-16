@@ -1,0 +1,5 @@
+{
+  "schedules": [
+    {"agent": "test-agent", "job": "test-job", "cron": "*/5 * * * *", "description": "Test schedule"}
+  ]
+}

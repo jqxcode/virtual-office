@@ -1,0 +1,10 @@
+{
+  "agents": {
+    "test-agent": {
+      "displayName": "Test Agent",
+      "icon": "test",
+      "agentFile": "test.md",
+      "description": "Agent for testing"
+    }
+  }
+}

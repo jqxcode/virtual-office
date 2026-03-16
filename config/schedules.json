@@ -1,0 +1,10 @@
+{
+  "schedules": [
+    {
+      "agent": "scrum-master",
+      "job": "sprint-progress",
+      "cron": "*/5 * * * *",
+      "description": "Sprint progress update every 5 minutes"
+    }
+  ]
+}

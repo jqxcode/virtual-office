@@ -1,0 +1,10 @@
+{
+  "agents": {
+    "scrum-master": {
+      "displayName": "Scrum Master",
+      "icon": "clipboard",
+      "agentFile": "~/.claude/agents/scrum-master.md",
+      "description": "Generates sprint progress reports and standup summaries for CMD - Meeting Join (US)"
+    }
+  }
+}

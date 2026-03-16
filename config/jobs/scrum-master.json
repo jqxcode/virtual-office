@@ -1,0 +1,10 @@
+{
+  "jobs": {
+    "sprint-progress": {
+      "prompt": "Generate a sprint progress update now.",
+      "maxRuns": 0,
+      "enabled": true,
+      "description": "Queries ADO work items and meeting notes to generate sprint progress report"
+    }
+  }
+}

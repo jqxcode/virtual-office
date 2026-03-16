@@ -1,0 +1,330 @@
+/* === Reset & Base === */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: #f3f4f6;
+  color: #1f2937;
+  min-height: 100vh;
+}
+
+/* === Header === */
+.header {
+  background: #1e293b;
+  color: #f8fafc;
+  padding: 0.75rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.header-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+.connection-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.connection-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.connection-indicator.connected .connection-dot {
+  background: #22c55e;
+  box-shadow: 0 0 4px #22c55e;
+}
+
+.connection-indicator.disconnected .connection-dot {
+  background: #ef4444;
+  box-shadow: 0 0 4px #ef4444;
+}
+
+.last-updated {
+  font-size: 0.8rem;
+  color: #94a3b8;
+}
+
+/* === Main Content === */
+.main-content {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.section-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6b7280;
+  margin-bottom: 0.75rem;
+}
+
+/* === Agent Grid === */
+.agent-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 1rem;
+}
+
+.placeholder-message {
+  color: #9ca3af;
+  font-style: italic;
+  padding: 1rem;
+}
+
+/* === Agent Card === */
+.agent-card {
+  background: #ffffff;
+  border-radius: 10px;
+  border-left: 4px solid #d1d5db;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+  padding: 1rem 1.15rem;
+  transition: box-shadow 0.2s, border-color 0.2s, background 0.2s;
+}
+
+.agent-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Card states */
+.agent-card.idle {
+  border-left-color: #22c55e;
+  background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 40%);
+}
+
+.agent-card.busy {
+  border-left-color: #ef4444;
+  background: linear-gradient(135deg, #fef2f2 0%, #ffffff 40%);
+  animation: pulse-busy 2.5s ease-in-out infinite;
+}
+
+.agent-card.disabled {
+  border-left-color: #9ca3af;
+  opacity: 0.55;
+}
+
+@keyframes pulse-busy {
+  0%, 100% { box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08); }
+  50% { box-shadow: 0 2px 10px rgba(239, 68, 68, 0.15); }
+}
+
+/* Card header */
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.6rem;
+}
+
+.status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.status-dot.idle {
+  background: #22c55e;
+  box-shadow: 0 0 4px #22c55e;
+}
+
+.status-dot.busy {
+  background: #ef4444;
+  box-shadow: 0 0 4px #ef4444;
+}
+
+.status-dot.disabled {
+  background: #9ca3af;
+}
+
+.agent-icon {
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.agent-name {
+  font-size: 0.95rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Card body */
+.card-status-line {
+  font-size: 0.8rem;
+  color: #6b7280;
+  margin-bottom: 0.5rem;
+}
+
+.card-status-line.running {
+  color: #dc2626;
+  font-weight: 500;
+}
+
+/* Queue badge */
+.queue-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  background: #eff6ff;
+  color: #2563eb;
+  border-radius: 9999px;
+  padding: 0.15rem 0.55rem;
+  margin-bottom: 0.5rem;
+}
+
+.queue-badge.empty {
+  display: none;
+}
+
+/* Job list */
+.job-list {
+  list-style: none;
+  margin-top: 0.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.job-item {
+  font-size: 0.78rem;
+  color: #4b5563;
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+  background: #f9fafb;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.job-item .job-status-icon {
+  flex-shrink: 0;
+  font-size: 0.7rem;
+}
+
+.job-item .job-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* === Event Log === */
+.events-section {
+  min-height: 200px;
+}
+
+.event-log {
+  background: #ffffff;
+  border-radius: 10px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  max-height: 320px;
+  overflow-y: auto;
+  font-family: "Cascadia Code", "Fira Code", "Consolas", monospace;
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.event-row {
+  padding: 0.35rem 0.75rem;
+  border-bottom: 1px solid #f3f4f6;
+  display: flex;
+  gap: 0.75rem;
+}
+
+.event-row:nth-child(even) {
+  background: #f9fafb;
+}
+
+.event-row:nth-child(odd) {
+  background: #ffffff;
+}
+
+.event-time {
+  color: #9ca3af;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.event-type {
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+  min-width: 110px;
+}
+
+.event-type.agent-started { color: #22c55e; }
+.event-type.agent-stopped { color: #6b7280; }
+.event-type.job-started { color: #2563eb; }
+.event-type.job-completed { color: #16a34a; }
+.event-type.job-failed { color: #ef4444; }
+.event-type.job-queued { color: #d97706; }
+
+.event-detail {
+  color: #4b5563;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* === Scrollbar === */
+.event-log::-webkit-scrollbar {
+  width: 6px;
+}
+
+.event-log::-webkit-scrollbar-track {
+  background: #f3f4f6;
+  border-radius: 3px;
+}
+
+.event-log::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+/* === Responsive === */
+@media (max-width: 768px) {
+  .main-content {
+    padding: 1rem;
+  }
+
+  .agent-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .header {
+    flex-direction: column;
+    gap: 0.5rem;
+    align-items: flex-start;
+  }
+}
