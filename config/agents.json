@@ -4,7 +4,8 @@
       "displayName": "Scrum Master",
       "icon": "",
       "agentFile": "~/.claude/agents/scrum-master.md",
-      "description": "Generates sprint progress reports and standup summaries for CMD - Meeting Join (US)"
+      "description": "Generates sprint progress reports and standup summaries for CMD - Meeting Join (US)",
+      "staleLockTimeoutMinutes": 120
     }
   }
 }

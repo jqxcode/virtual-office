@@ -10,3 +10,4 @@ $AUDIT_DIR = Join-Path $OUTPUT_DIR "audit"
 $EVENTS_FILE = Join-Path $STATE_DIR "events.jsonl"
 $ERRORS_FILE = Join-Path $STATE_DIR "errors.jsonl"
 $DASHBOARD_FILE = Join-Path $STATE_DIR "dashboard.json"
+$DEFAULT_STALE_LOCK_TIMEOUT_MINUTES = 120

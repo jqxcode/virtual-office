@@ -15,13 +15,29 @@ If the task exists but never fires, confirm the trigger schedule matches what yo
 
 If a job crashed or was killed mid-run, the lock file persists and blocks future runs. Symptoms: the job status shows "running" in the dashboard but no claude process is active.
 
-To fix, delete the lock file manually:
+**Automatic cleanup**: Stale locks are now auto-cleared after a configurable timeout (default 2 hours). When the runner detects a lock file older than the timeout, it removes the lock, logs a `stale_lock_cleared` event, and proceeds with the job as normal.
+
+The timeout can be configured per-agent via `staleLockTimeoutMinutes` in `config/agents.json`:
+
+```json
+{
+  "agents": {
+    "my-agent": {
+      "staleLockTimeoutMinutes": 60
+    }
+  }
+}
+```
+
+If not specified, the default timeout of 120 minutes (2 hours) is used.
+
+When a stale lock is cleared, a `stale_lock_cleared` event is written to both the events log and the audit log with the lock age and configured timeout.
+
+To clear a lock manually, delete the lock file:
 
 ```
 state/agents/{agent}/{job}/lock
 ```
-
-A lock file older than 30 minutes with no corresponding running process is likely orphaned and safe to delete.
 
 ## Queue Growing Unbounded
 

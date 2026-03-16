@@ -49,7 +49,9 @@ function Write-TestConstants {
 `$OUTPUT_DIR = Join-Path `$PROJECT_ROOT "output"
 `$AUDIT_DIR = Join-Path `$OUTPUT_DIR "audit"
 `$EVENTS_FILE = Join-Path `$STATE_DIR "events.jsonl"
+`$ERRORS_FILE = Join-Path `$STATE_DIR "errors.jsonl"
 `$DASHBOARD_FILE = Join-Path `$STATE_DIR "dashboard.json"
+`$DEFAULT_STALE_LOCK_TIMEOUT_MINUTES = 120
 "@
     Set-Content -Path (Join-Path $Root "runner/constants.ps1") -Value $content -Encoding ASCII
 }
@@ -244,7 +246,7 @@ try {
     Assert-True (-not (Test-Path $lockFile)) "Lock file is removed after run"
 
     # Check audit entry exists
-    $auditFiles = Get-ChildItem -Path (Join-Path $root "output/audit") -Filter "*.jsonl" -ErrorAction SilentlyContinue
+    $auditFiles = @(Get-ChildItem -Path (Join-Path $root "output/audit") -Filter "*.jsonl" -ErrorAction SilentlyContinue)
     Assert-True ($null -ne $auditFiles -and $auditFiles.Count -gt 0) "Audit log file was created"
 } finally {
     Remove-TestRoot -Root $root
@@ -465,6 +467,160 @@ try {
     $hasNotFoundError = $result.Output -match "not found in .*/jobs/test-agent\.json"
     Assert-True (-not $hasNotFoundError) "Wrapped jobs config does not cause 'not found' error"
     Assert-True ($result.ExitCode -eq 0) "Runner exits with code 0 for wrapped jobs config"
+} finally {
+    Remove-TestRoot -Root $root
+}
+
+# ========================================
+# TC75: Stale lock older than timeout is cleared
+# ========================================
+Write-Host "`nTC75: Stale lock older than timeout is cleared" -ForegroundColor Cyan
+$root = New-TestRoot
+try {
+    Write-TestConstants -Root $root
+    Write-TestConfig -Root $root -MaxRuns 0
+    Import-RunnerFunctions -Root $root
+
+    # Pre-create lock file with a timestamp 3 hours ago
+    $stateDir = Ensure-StateDir -AgentName "test-agent" -JobName "test-job"
+    $lockFile = Join-Path $stateDir "lock"
+    $staleTime = (Get-Date).AddHours(-3).ToString("o")
+    Set-Content -Path $lockFile -Value $staleTime -Encoding ASCII
+
+    $result = Invoke-Runner -Root $root
+    Assert-True ($result.ExitCode -eq 0) "Runner exits with code 0 after stale lock cleared"
+    Assert-True ($result.Output -match "Stale lock cleared" -or $result.Output -match "stale") "Output mentions stale lock"
+
+    # Lock file should be removed (runner clears it then re-acquires then removes after run)
+    Assert-True (-not (Test-Path $lockFile)) "Lock file is removed after stale lock cleared and run completed"
+
+    # Counter should show a run happened
+    $counterFile = Join-Path $stateDir "counter.json"
+    if (Test-Path $counterFile) {
+        $counter = Get-Content -Path $counterFile -Raw | ConvertFrom-Json -AsHashtable
+        Assert-True ($counter["count"] -eq 1) "Counter shows 1 (job ran after stale lock cleared)"
+    } else {
+        Assert-True $false "Counter file should exist after run"
+    }
+} finally {
+    Remove-TestRoot -Root $root
+}
+
+# ========================================
+# TC76: Fresh lock within timeout is NOT cleared
+# ========================================
+Write-Host "`nTC76: Fresh lock within timeout is NOT cleared" -ForegroundColor Cyan
+$root = New-TestRoot
+try {
+    Write-TestConstants -Root $root
+    Write-TestConfig -Root $root -MaxRuns 0
+    Import-RunnerFunctions -Root $root
+
+    # Pre-create lock file with a timestamp 30 minutes ago (within default 120m timeout)
+    $stateDir = Ensure-StateDir -AgentName "test-agent" -JobName "test-job"
+    $lockFile = Join-Path $stateDir "lock"
+    $freshTime = (Get-Date).AddMinutes(-30).ToString("o")
+    Set-Content -Path $lockFile -Value $freshTime -Encoding ASCII
+
+    $result = Invoke-Runner -Root $root
+    Assert-True ($result.ExitCode -eq 0) "Runner exits cleanly when lock is fresh"
+    Assert-True ($result.Output -match "locked" -or $result.Output -match "Queued") "Output mentions lock/queue"
+
+    # Lock file should still exist (not cleared)
+    Assert-True (Test-Path $lockFile) "Lock file still exists (fresh lock not cleared)"
+
+    # Queue file should exist
+    $queueFile = Join-Path $stateDir "queue"
+    Assert-True (Test-Path $queueFile) "Queue file was created (job was queued)"
+} finally {
+    Remove-TestRoot -Root $root
+}
+
+# ========================================
+# TC77: Custom staleLockTimeoutMinutes from agent config
+# ========================================
+Write-Host "`nTC77: Custom staleLockTimeoutMinutes from agent config" -ForegroundColor Cyan
+$root = New-TestRoot
+try {
+    Write-TestConstants -Root $root
+    Import-RunnerFunctions -Root $root
+
+    # Write agents.json with custom staleLockTimeoutMinutes of 30
+    $agentsJson = @{
+        "test-agent" = @{
+            displayName = "Test Agent"
+            description = "test"
+            staleLockTimeoutMinutes = 30
+        }
+    } | ConvertTo-Json -Depth 5
+    Set-Content -Path (Join-Path $root "config/agents.json") -Value $agentsJson -Encoding UTF8
+
+    # Write job config
+    $jobsJson = @{
+        "test-job" = @{
+            prompt = "echo test output"
+            maxRuns = 0
+            enabled = $true
+            description = "test job"
+        }
+    } | ConvertTo-Json -Depth 5
+    Set-Content -Path (Join-Path $root "config/jobs/test-agent.json") -Value $jobsJson -Encoding UTF8
+
+    # Pre-create lock file with a timestamp 45 minutes ago (stale with 30m timeout)
+    $stateDir = Ensure-StateDir -AgentName "test-agent" -JobName "test-job"
+    $lockFile = Join-Path $stateDir "lock"
+    $staleTime = (Get-Date).AddMinutes(-45).ToString("o")
+    Set-Content -Path $lockFile -Value $staleTime -Encoding ASCII
+
+    $result = Invoke-Runner -Root $root
+    Assert-True ($result.ExitCode -eq 0) "Runner exits with code 0 after custom stale lock cleared"
+    Assert-True ($result.Output -match "Stale lock cleared" -or $result.Output -match "stale") "Output mentions stale lock"
+
+    # Lock should be gone after run
+    Assert-True (-not (Test-Path $lockFile)) "Lock file removed after stale lock cleared"
+
+    # Counter should show a run happened
+    $counterFile = Join-Path $stateDir "counter.json"
+    if (Test-Path $counterFile) {
+        $counter = Get-Content -Path $counterFile -Raw | ConvertFrom-Json -AsHashtable
+        Assert-True ($counter["count"] -eq 1) "Counter shows 1 (job ran with custom timeout)"
+    } else {
+        Assert-True $false "Counter file should exist after run"
+    }
+} finally {
+    Remove-TestRoot -Root $root
+}
+
+# ========================================
+# TC78: Invalid lock timestamp treated as stale
+# ========================================
+Write-Host "`nTC78: Invalid lock timestamp treated as stale" -ForegroundColor Cyan
+$root = New-TestRoot
+try {
+    Write-TestConstants -Root $root
+    Write-TestConfig -Root $root -MaxRuns 0
+    Import-RunnerFunctions -Root $root
+
+    # Pre-create lock file with invalid timestamp content
+    $stateDir = Ensure-StateDir -AgentName "test-agent" -JobName "test-job"
+    $lockFile = Join-Path $stateDir "lock"
+    Set-Content -Path $lockFile -Value "invalid-timestamp" -Encoding ASCII
+
+    $result = Invoke-Runner -Root $root
+    Assert-True ($result.ExitCode -eq 0) "Runner exits with code 0 after invalid lock cleared"
+    Assert-True ($result.Output -match "Stale lock cleared" -or $result.Output -match "stale") "Output mentions stale lock"
+
+    # Lock should be gone after run
+    Assert-True (-not (Test-Path $lockFile)) "Lock file removed after invalid timestamp treated as stale"
+
+    # Counter should show a run happened
+    $counterFile = Join-Path $stateDir "counter.json"
+    if (Test-Path $counterFile) {
+        $counter = Get-Content -Path $counterFile -Raw | ConvertFrom-Json -AsHashtable
+        Assert-True ($counter["count"] -eq 1) "Counter shows 1 (job ran after invalid lock cleared)"
+    } else {
+        Assert-True $false "Counter file should exist after run"
+    }
 } finally {
     Remove-TestRoot -Root $root
 }

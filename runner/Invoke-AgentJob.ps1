@@ -267,15 +267,47 @@ $counterFile = Join-Path $stateDir "counter.json"
 
 # Step 4: Check lock
 if (Test-Path $lockFile) {
-    # Already running -- queue this request
-    $depth = Get-QueueDepth -QueueFile $queueFile
-    $depth++
-    Set-QueueDepth -QueueFile $queueFile -Depth $depth
-    Write-Host "Job '$Job' for agent '$Agent' is locked. Queued (depth: $depth)."
-    Write-AuditEntry -Action "queued" -AgentName $Agent -JobName $Job -RunId "" -Details @{ queue_depth = $depth }
-    Write-Event -AgentName $Agent -JobName $Job -Event "queued" -Details @{ queue_depth = $depth }
-    Update-Dashboard -AgentName $Agent -JobName $Job -Status "queued" -Details @{ queue_depth = $depth }
-    exit 0
+    # Check if lock is stale
+    $lockContent = Get-Content -Path $lockFile -Raw -ErrorAction SilentlyContinue
+    $staleLockTimeout = $DEFAULT_STALE_LOCK_TIMEOUT_MINUTES
+    # Check for per-agent override
+    if ($agentsConfig[$Agent].ContainsKey("staleLockTimeoutMinutes")) {
+        $staleLockTimeout = [int]$agentsConfig[$Agent]["staleLockTimeoutMinutes"]
+    }
+
+    $lockAge = $null
+    try {
+        $lockTime = [DateTime]::Parse($lockContent.Trim())
+        $lockAge = (Get-Date) - $lockTime
+    } catch {
+        # If lock content is not a valid timestamp, treat as stale
+        $lockAge = [TimeSpan]::FromMinutes($staleLockTimeout + 1)
+    }
+
+    if ($lockAge -and $lockAge.TotalMinutes -gt $staleLockTimeout) {
+        # Stale lock -- force clear
+        Remove-Item -Path $lockFile -Force
+        Write-Event -AgentName $Agent -JobName $Job -Event "stale_lock_cleared" -Details @{
+            lock_age_minutes = [math]::Round($lockAge.TotalMinutes)
+            timeout_minutes = $staleLockTimeout
+        }
+        Write-AuditEntry -Action "stale_lock_cleared" -AgentName $Agent -JobName $Job -RunId "N/A" -Details @{
+            lock_age_minutes = [math]::Round($lockAge.TotalMinutes)
+            timeout_minutes = $staleLockTimeout
+        }
+        Write-Host "Stale lock cleared for '$Job' on agent '$Agent' (age: $([math]::Round($lockAge.TotalMinutes))m, timeout: ${staleLockTimeout}m)."
+        # Fall through to normal run flow below
+    } else {
+        # Lock is fresh -- queue this request
+        $depth = Get-QueueDepth -QueueFile $queueFile
+        $depth++
+        Set-QueueDepth -QueueFile $queueFile -Depth $depth
+        Write-Host "Job '$Job' for agent '$Agent' is locked. Queued (depth: $depth)."
+        Write-AuditEntry -Action "queued" -AgentName $Agent -JobName $Job -RunId "" -Details @{ queue_depth = $depth }
+        Write-Event -AgentName $Agent -JobName $Job -Event "queued" -Details @{ queue_depth = $depth }
+        Update-Dashboard -AgentName $Agent -JobName $Job -Status "queued" -Details @{ queue_depth = $depth }
+        exit 0
+    }
 }
 
 # --- Run loop (handles queue drain) ---
