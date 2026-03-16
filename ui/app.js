@@ -40,6 +40,15 @@ async function fetchErrors() {
   return await response.json();
 }
 
+// --- URL helpers ---
+
+function stripOutputPrefix(path) {
+  if (path && path.startsWith("output/")) {
+    return path.substring("output/".length);
+  }
+  return path;
+}
+
 // --- Time formatting ---
 
 function formatTimeAgo(timestamp) {
@@ -233,7 +242,7 @@ function renderAgentCard(name, agentData) {
       if (job.lastOutput) {
         var reportLink = document.createElement("a");
         reportLink.className = "report-link";
-        reportLink.href = "/api/output/" + job.lastOutput;
+        reportLink.href = "/api/output/" + stripOutputPrefix(job.lastOutput);
         reportLink.target = "_blank";
         reportLink.textContent = "View";
         reportLink.title = "View latest report" + (job.lastOutputTime ? " (" + formatTimeAgo(job.lastOutputTime) + ")" : "");
@@ -310,7 +319,7 @@ function renderAgentCard(name, agentData) {
     footer.appendChild(footerText);
     var footerLink = document.createElement("a");
     footerLink.className = "footer-report-link";
-    footerLink.href = "/api/output/" + latestOutput;
+    footerLink.href = "/api/output/" + stripOutputPrefix(latestOutput);
     footerLink.target = "_blank";
     footerLink.textContent = "Open";
     footer.appendChild(footerLink);
@@ -587,7 +596,7 @@ function showRunningModal(agentName, agentData) {
   outputRow.appendChild(outputLabel);
   if (lastOutputFile) {
     var outputLink = document.createElement("a");
-    outputLink.href = "/api/output/" + lastOutputFile;
+    outputLink.href = "/api/output/" + stripOutputPrefix(lastOutputFile);
     outputLink.target = "_blank";
     outputLink.textContent = "View Report";
     outputLink.style.color = "#2563eb";

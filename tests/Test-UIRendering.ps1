@@ -335,6 +335,40 @@ if (-not (Test-Path $AppJsFile)) {
     Assert-True $hasRunningModalCall "app.js calls showRunningModal from click handler"
 }
 
+# ========================================
+# TC65: app.js strips output/ prefix from lastOutput URLs
+# ========================================
+Write-Host "`nTC65: app.js strips output/ prefix from lastOutput URLs" -ForegroundColor Cyan
+
+if (-not (Test-Path $AppJsFile)) {
+    Write-Host "ERROR: Cannot find app.js at $AppJsFile" -ForegroundColor Red
+    $script:Failed++
+} else {
+    if (-not $AppJsContent) {
+        $AppJsContent = Get-Content -Path $AppJsFile -Raw
+    }
+
+    $hasStartsWith = $AppJsContent -match 'startsWith\("output/"\)'
+    Assert-True $hasStartsWith "app.js contains startsWith(""output/"") check"
+
+    $hasSubstring = $AppJsContent -match 'substring\("output/"\.length\)'
+    Assert-True $hasSubstring "app.js contains substring(""output/"".length) to strip prefix"
+
+    $hasStripFunction = $AppJsContent -match "function stripOutputPrefix"
+    Assert-True $hasStripFunction "app.js defines stripOutputPrefix helper function"
+
+    # Verify all /api/output/ href assignments use the strip function
+    # Pattern: /api/output/" + <something> where <something> is NOT stripOutputPrefix
+    $allOutputHrefs = [regex]::Matches($AppJsContent, '/api/output/"\s*\+\s*(\w+)')
+    $rawCount = 0
+    foreach ($m in $allOutputHrefs) {
+        if ($m.Groups[1].Value -ne "stripOutputPrefix") {
+            $rawCount++
+        }
+    }
+    Assert-True ($rawCount -eq 0) "All /api/output/ href assignments use stripOutputPrefix (found $rawCount raw usages)"
+}
+
 # --- Summary ---
 Write-Host "`n========================================" -ForegroundColor White
 Write-Host "Test-UIRendering: $script:Passed passed, $script:Failed failed" -ForegroundColor $(if ($script:Failed -gt 0) { "Red" } else { "Green" })
