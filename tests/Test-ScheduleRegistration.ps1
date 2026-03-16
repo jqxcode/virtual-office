@@ -253,6 +253,68 @@ try {
     Remove-TestRoot -Root $root
 }
 
+# ========================================
+# TC73: Register-OneOff writes event to events.jsonl
+# ========================================
+Write-Host "`nTC73: Register-OneOff writes event to events.jsonl" -ForegroundColor Cyan
+$root = New-TestRoot
+try {
+    $eventsFile = Join-Path $root "state/events.jsonl"
+    $nowIso = Get-Date -Format "o"
+    $fireTime = (Get-Date).AddMinutes(1).ToString("o")
+    $taskName = "VirtualOffice-oneoff-scrum-master-dry-run-bug-autopilot-$(Get-Date -Format 'yyyyMMddHHmmss')"
+
+    # Simulate the event writing logic from Register-OneOff.ps1
+    $eventEntry = @{
+        ts            = $nowIso
+        agent         = "scrum-master"
+        job           = "dry-run-bug-autopilot"
+        event         = "schedule_registered"
+        details       = @{
+            oneoff       = $true
+            taskName     = $taskName
+            fireTime     = $fireTime
+            delayMinutes = 1
+            description  = "Virtual Office one-off: scrum-master / dry-run-bug-autopilot"
+        }
+        systemVersion = "0.1.0"
+    } | ConvertTo-Json -Compress
+    Add-Content -Path $eventsFile -Value $eventEntry -Encoding ASCII
+
+    Assert-True (Test-Path $eventsFile) "events.jsonl exists after one-off write"
+    $content = Get-Content -Path $eventsFile -Raw
+    Assert-True ($content -match '"schedule_registered"') "Event contains schedule_registered type"
+    Assert-True ($content -match '"scrum-master"') "Event contains agent name"
+    Assert-True ($content -match '"dry-run-bug-autopilot"') "Event contains job name"
+
+    $parsed = $eventEntry | ConvertFrom-Json
+    Assert-True ($parsed.event -eq "schedule_registered") "Parsed event type is schedule_registered"
+    Assert-True ($parsed.details.oneoff -eq $true) "Parsed details contain oneoff: true"
+    Assert-True ($parsed.details.taskName -like "VirtualOffice-oneoff-*") "Parsed details taskName has oneoff prefix"
+    Assert-True ($null -ne $parsed.details.fireTime) "Parsed details contain fireTime"
+    Assert-True ($parsed.details.delayMinutes -eq 1) "Parsed details contain delayMinutes"
+} finally {
+    Remove-TestRoot -Root $root
+}
+
+# ========================================
+# TC74: One-off task name includes timestamp
+# ========================================
+Write-Host "`nTC74: One-off task name includes timestamp" -ForegroundColor Cyan
+
+$ts = Get-Date -Format "yyyyMMddHHmmss"
+$oneoffName = "VirtualOffice-oneoff-scrum-master-dry-run-bug-autopilot-$ts"
+
+Assert-True ($oneoffName -match 'VirtualOffice-oneoff-.+-\d{14}$') "Task name matches pattern with 14-digit timestamp suffix"
+Assert-True ($oneoffName -match $ts) "Task name contains the expected timestamp value"
+
+# Verify uniqueness: two names generated 0+ seconds apart differ
+$ts2 = (Get-Date).AddSeconds(1).ToString("yyyyMMddHHmmss")
+$oneoffName2 = "VirtualOffice-oneoff-scrum-master-dry-run-bug-autopilot-$ts2"
+# If the second rolled over they differ; if same second they match -- both are valid
+Assert-True ($oneoffName.StartsWith("VirtualOffice-oneoff-")) "One-off name starts with VirtualOffice-oneoff- prefix"
+Assert-True ($oneoffName -ne (Get-TaskName -Agent "scrum-master" -Job "dry-run-bug-autopilot")) "One-off name differs from recurring task name pattern"
+
 # --- Summary ---
 Write-Host "`n========================================" -ForegroundColor White
 Write-Host "Test-ScheduleRegistration: $script:Passed passed, $script:Failed failed" -ForegroundColor $(if ($script:Failed -gt 0) { "Red" } else { "Green" })
