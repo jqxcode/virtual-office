@@ -605,6 +605,69 @@ if (-not (Test-Path $AgentsJsonFile)) {
     Assert-True $allHaveGroup "All agents in agents.json have a 'group' field"
 }
 
+# ========================================
+# TC82: activeGroup only reset when null or group missing
+# ========================================
+Write-Host "`nTC82: activeGroup only reset when null or group missing" -ForegroundColor Cyan
+
+if (-not (Test-Path $AppJsFile)) {
+    Write-Host "ERROR: Cannot find app.js at $AppJsFile" -ForegroundColor Red
+    $script:Failed++
+} else {
+    if (-not $AppJsContent) {
+        $AppJsContent = Get-Content -Path $AppJsFile -Raw
+    }
+
+    # Verify renderAgentTabs uses the guard pattern: if (!activeGroup || !groups[activeGroup])
+    $hasGuardPattern = $AppJsContent -match 'if\s*\(\s*!activeGroup\s*\|\|\s*!groups\[activeGroup\]\s*\)'
+    Assert-True $hasGuardPattern "renderAgentTabs uses guard pattern 'if (!activeGroup || !groups[activeGroup])'"
+
+    # Count all assignments to activeGroup (excluding declarations and comments)
+    # Expected: 1 declaration (var activeGroup = null), 1 guard default, 1 tab click handler, 1 URL restore = 4 total
+    $allAssignments = [regex]::Matches($AppJsContent, '(?<!//.*)\bactiveGroup\s*=\s*')
+    $assignmentCount = $allAssignments.Count
+    Assert-True ($assignmentCount -eq 4) "Exactly 4 assignments to activeGroup (declaration + guard + click + URL restore), found $assignmentCount"
+
+    # Verify no unconditional reset: activeGroup should never be set to null after declaration
+    # Remove the declaration line, then check for any "activeGroup = null"
+    $withoutDeclaration = $AppJsContent -replace 'var\s+activeGroup\s*=\s*null', ''
+    $hasUnconditionalReset = $withoutDeclaration -match 'activeGroup\s*=\s*null'
+    Assert-True (-not $hasUnconditionalReset) "No unconditional reset of activeGroup to null (besides declaration)"
+
+    # Verify poll() does not assign activeGroup
+    $pollMatch = [regex]::Match($AppJsContent, 'async function poll\s*\(\)\s*\{([\s\S]*?)\n\}')
+    if ($pollMatch.Success) {
+        $pollBody = $pollMatch.Groups[1].Value
+        $pollResetsActiveGroup = $pollBody -match 'activeGroup\s*='
+        Assert-True (-not $pollResetsActiveGroup) "poll() does not assign activeGroup"
+    } else {
+        Write-Host "    WARNING: Could not extract poll() function body" -ForegroundColor Yellow
+    }
+}
+
+# ========================================
+# TC83: app.js persists tab in URL query parameter
+# ========================================
+Write-Host "`nTC83: app.js persists tab in URL query parameter" -ForegroundColor Cyan
+
+if (-not (Test-Path $AppJsFile)) {
+    Write-Host "ERROR: Cannot find app.js at $AppJsFile" -ForegroundColor Red
+    $script:Failed++
+} else {
+    if (-not $AppJsContent) {
+        $AppJsContent = Get-Content -Path $AppJsFile -Raw
+    }
+
+    $hasSearchParamsSet = $AppJsContent -match 'searchParams\.set\("tab"'
+    Assert-True $hasSearchParamsSet "app.js writes tab to URL via searchParams.set(""tab"")"
+
+    $hasSearchParamsGet = $AppJsContent -match '\.get\("tab"\)'
+    Assert-True $hasSearchParamsGet "app.js reads tab from URL via .get(""tab"")"
+
+    $hasReplaceState = $AppJsContent -match "replaceState"
+    Assert-True $hasReplaceState "app.js updates URL without reload via replaceState"
+}
+
 # --- Summary ---
 Write-Host "`n========================================" -ForegroundColor White
 Write-Host "Test-UIRendering: $script:Passed passed, $script:Failed failed" -ForegroundColor $(if ($script:Failed -gt 0) { "Red" } else { "Green" })

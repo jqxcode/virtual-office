@@ -902,6 +902,9 @@ function renderAgentTabs(agents) {
     tab.textContent = groupName + " (" + groups[groupName].length + ")";
     tab.addEventListener("click", function() {
       activeGroup = groupName;
+      var url = new URL(window.location);
+      url.searchParams.set("tab", groupName);
+      window.history.replaceState({}, "", url);
       renderAgents(lastDashboard);
     });
     tabsEl.appendChild(tab);
@@ -1050,6 +1053,12 @@ async function poll() {
 }
 
 async function startPolling() {
+  // Restore active tab from URL query parameter (survives F5 refresh)
+  var urlParams = new URLSearchParams(window.location.search);
+  var tabParam = urlParams.get("tab");
+  if (tabParam) {
+    activeGroup = tabParam;
+  }
   // Load config once (agent registry + job definitions)
   try {
     agentConfig = await fetchConfig();
