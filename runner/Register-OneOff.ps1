@@ -1,5 +1,4 @@
 #Requires -Version 7.0
-#Requires -RunAsAdministrator
 <#
 .SYNOPSIS
     Registers a one-off Windows Task Scheduler task for a Virtual Office agent job.

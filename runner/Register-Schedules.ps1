@@ -1,5 +1,4 @@
 #Requires -Version 7.0
-#Requires -RunAsAdministrator
 <#
 .SYNOPSIS
     Registers Windows Task Scheduler entries for Virtual Office scheduled jobs.
@@ -108,7 +107,7 @@ $schedules = Get-Content -Path $schedulesFile -Raw | ConvertFrom-Json -AsHashtab
 $invokeScript = Join-Path $PSScriptRoot "Invoke-AgentJob.ps1"
 $registered = @()
 
-foreach ($entry in $schedules) {
+foreach ($entry in $schedules["schedules"]) {
     $agentName = $entry["agent"]
     $jobName = $entry["job"]
     $cron = $entry["cron"]

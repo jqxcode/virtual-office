@@ -13,6 +13,8 @@ var isConnected = false;
 var agentConfig = null; // loaded once from /api/config
 var agentErrors = {};
 var latestEvents = [];
+var activeGroup = null; // current agent group tab
+var lastDashboard = null; // cached for re-render on tab switch
 
 // --- Fetch helpers ---
 
@@ -83,7 +85,7 @@ function formatTimeAgo(timestamp) {
 function formatTimestamp(timestamp) {
   if (!timestamp) return "";
   var d = new Date(timestamp);
-  return d.toLocaleTimeString();
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" }) + " " + d.toLocaleTimeString();
 }
 
 // --- Normalization helpers ---
@@ -866,7 +868,54 @@ function showErrorModal(agentName, errors) {
   document.body.appendChild(overlay);
 }
 
+function getAgentGroup(name) {
+  if (agentConfig && agentConfig.agents && agentConfig.agents[name] && agentConfig.agents[name].group) {
+    return agentConfig.agents[name].group;
+  }
+  return "Agents";
+}
+
+function renderAgentTabs(agents) {
+  var tabsEl = document.getElementById("agent-tabs");
+  if (!tabsEl) return [];
+
+  // Collect groups preserving config order
+  var groups = {};
+  var groupOrder = [];
+  Object.keys(agents).forEach(function(name) {
+    var group = getAgentGroup(name);
+    if (!groups[group]) {
+      groups[group] = [];
+      groupOrder.push(group);
+    }
+    groups[group].push(name);
+  });
+
+  // Default to first group if activeGroup is invalid
+  if (!activeGroup || !groups[activeGroup]) activeGroup = groupOrder[0];
+
+  // Render tabs
+  tabsEl.innerHTML = "";
+  groupOrder.forEach(function(groupName) {
+    var tab = document.createElement("button");
+    tab.className = "agent-tab" + (groupName === activeGroup ? " active" : "");
+    tab.textContent = groupName + " (" + groups[groupName].length + ")";
+    tab.addEventListener("click", function() {
+      activeGroup = groupName;
+      renderAgents(lastDashboard);
+    });
+    tabsEl.appendChild(tab);
+  });
+
+  // Update section title
+  var titleEl = document.getElementById("agent-section-title");
+  if (titleEl) titleEl.textContent = activeGroup;
+
+  return groups[activeGroup] || [];
+}
+
 function renderAgents(dashboard) {
+  lastDashboard = dashboard;
   var grid = document.getElementById("agent-grid");
   var agents = mergeConfigAndDashboard(agentConfig, dashboard);
   var agentNames = Object.keys(agents);
@@ -876,9 +925,12 @@ function renderAgents(dashboard) {
     return;
   }
 
-  // Rebuild grid
+  // Render tabs and get filtered agent names for active group
+  var visibleNames = renderAgentTabs(agents);
+
+  // Rebuild grid with only visible agents
   grid.innerHTML = "";
-  agentNames.forEach(function (name) {
+  visibleNames.forEach(function (name) {
     var card = renderAgentCard(name, agents[name]);
     grid.appendChild(card);
   });

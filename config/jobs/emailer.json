@@ -1,0 +1,10 @@
+{
+  "jobs": {
+    "scan-all-mailboxes": {
+      "prompt": "Scan all enabled Gmail mailboxes for new emails. Run from Q:/src/personal_projects/gmail-manager/: python -m src.scanner --scan-all. Then open the digest page at http://localhost:8402/digest",
+      "maxRuns": 0,
+      "enabled": true,
+      "description": "Scans all Gmail mailboxes, classifies emails, generates daily digest"
+    }
+  }
+}

@@ -539,6 +539,72 @@ if (-not (Test-Path $AppJsFile)) {
     Assert-True ($jobStateViolations -eq 0) "No jobState.run_id/runs_completed/last_completed/queue_depth outside normalizeJobState (found $jobStateViolations)"
 }
 
+# ========================================
+# TC79: Scrum-master agent prompt includes Fundamentals area path filter
+# ========================================
+Write-Host "`nTC79: Scrum-master agent prompt includes Fundamentals area path filter" -ForegroundColor Cyan
+
+$ScrumMasterFile = "C:/Users/qitxu/.claude/agents/scrum-master.md"
+if (-not (Test-Path $ScrumMasterFile)) {
+    Write-Host "ERROR: Cannot find scrum-master.md at $ScrumMasterFile" -ForegroundColor Red
+    $script:Failed++
+} else {
+    $ScrumMasterContent = Get-Content -Path $ScrumMasterFile -Raw
+
+    # The sprint-progress section should mention Fundamentals
+    $hasFundamentals = $ScrumMasterContent -match "Fundamentals"
+    Assert-True $hasFundamentals "scrum-master.md contains 'Fundamentals' in sprint-progress section"
+
+    # Should have an instruction to exclude other sub-areas
+    $hasExcludeInstruction = $ScrumMasterContent -match "Exclude items from other sub-areas"
+    Assert-True $hasExcludeInstruction "scrum-master.md contains instruction to exclude other sub-areas"
+}
+
+# ========================================
+# TC80: app.js has agent group tab rendering
+# ========================================
+Write-Host "`nTC80: app.js has agent group tab rendering" -ForegroundColor Cyan
+
+if (-not (Test-Path $AppJsFile)) {
+    Write-Host "ERROR: Cannot find app.js at $AppJsFile" -ForegroundColor Red
+    $script:Failed++
+} else {
+    if (-not $AppJsContent) {
+        $AppJsContent = Get-Content -Path $AppJsFile -Raw
+    }
+
+    $hasAgentTab = $AppJsContent -match "agent-tab"
+    Assert-True $hasAgentTab "app.js contains 'agent-tab' class for group tabs"
+
+    $hasRenderAgentTabs = $AppJsContent -match "function renderAgentTabs"
+    Assert-True $hasRenderAgentTabs "app.js contains 'function renderAgentTabs' for group tab rendering"
+
+    $hasActiveGroup = $AppJsContent -match "activeGroup"
+    Assert-True $hasActiveGroup "app.js contains 'activeGroup' variable for tab state"
+}
+
+# ========================================
+# TC81: agents.json has group field
+# ========================================
+Write-Host "`nTC81: agents.json has group field" -ForegroundColor Cyan
+
+$AgentsJsonFile = Join-Path $ProjectRoot "config/agents.json"
+if (-not (Test-Path $AgentsJsonFile)) {
+    Write-Host "ERROR: Cannot find agents.json at $AgentsJsonFile" -ForegroundColor Red
+    $script:Failed++
+} else {
+    $AgentsJson = Get-Content -Path $AgentsJsonFile -Raw | ConvertFrom-Json
+    $allHaveGroup = $true
+    foreach ($agentName in $AgentsJson.agents.PSObject.Properties.Name) {
+        $agent = $AgentsJson.agents.$agentName
+        if (-not $agent.group) {
+            Write-Host "    Agent '$agentName' is missing 'group' field" -ForegroundColor Yellow
+            $allHaveGroup = $false
+        }
+    }
+    Assert-True $allHaveGroup "All agents in agents.json have a 'group' field"
+}
+
 # --- Summary ---
 Write-Host "`n========================================" -ForegroundColor White
 Write-Host "Test-UIRendering: $script:Passed passed, $script:Failed failed" -ForegroundColor $(if ($script:Failed -gt 0) { "Red" } else { "Green" })

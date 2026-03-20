@@ -1,5 +1,4 @@
 #Requires -Version 7.0
-#Requires -RunAsAdministrator
 <#
 .SYNOPSIS
     Removes all Virtual Office scheduled tasks from Windows Task Scheduler.

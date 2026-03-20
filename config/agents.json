@@ -5,7 +5,24 @@
       "icon": "",
       "agentFile": "~/.claude/agents/scrum-master.md",
       "description": "Generates sprint progress reports and standup summaries for CMD - Meeting Join (US)",
-      "staleLockTimeoutMinutes": 120
+      "staleLockTimeoutMinutes": 120,
+      "group": "Work Agents"
+    },
+    "bug-killer": {
+      "displayName": "Bug Killer",
+      "icon": "",
+      "agentFile": "~/.claude/agents/bug-killer.md",
+      "description": "Scans assigned repos for open bugs, analyzes root causes, and submits PR fixes",
+      "staleLockTimeoutMinutes": 180,
+      "group": "Work Agents"
+    },
+    "emailer": {
+      "displayName": "Emailer",
+      "icon": "",
+      "agentFile": "~/.claude/agents/emailer.md",
+      "description": "Manages Gmail inboxes - scans, classifies, generates digests across multiple mailboxes",
+      "staleLockTimeoutMinutes": 60,
+      "group": "Other Agents"
     }
   }
 }
