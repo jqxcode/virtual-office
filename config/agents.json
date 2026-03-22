@@ -22,7 +22,8 @@
       "agentFile": "~/.claude/agents/emailer.md",
       "description": "Manages Gmail inboxes - scans, classifies, generates digests across multiple mailboxes",
       "staleLockTimeoutMinutes": 60,
-      "group": "Other Agents"
+      "group": "Other Agents",
+      "portalUrl": "http://localhost:8402/"
     }
   }
 }

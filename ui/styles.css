@@ -647,6 +647,27 @@ body {
   text-decoration: underline;
 }
 
+/* === Portal Link === */
+.card-portal-link {
+  display: block;
+  text-align: center;
+  margin-top: 0.5rem;
+  padding: 0.45rem 0;
+  background: #eff6ff;
+  color: #2563eb;
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 0.15s;
+}
+
+.card-portal-link:hover {
+  background: #dbeafe;
+  text-decoration: none;
+}
+
 /* === Running Modal === */
 .running-modal {
   background: #ffffff;

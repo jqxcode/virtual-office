@@ -668,6 +668,52 @@ if (-not (Test-Path $AppJsFile)) {
     Assert-True $hasReplaceState "app.js updates URL without reload via replaceState"
 }
 
+# ========================================
+# TC84: app.js renders portal link when portalUrl exists
+# ========================================
+Write-Host "`nTC84: app.js renders portal link when portalUrl exists" -ForegroundColor Cyan
+
+if (-not (Test-Path $AppJsFile)) {
+    Write-Host "ERROR: Cannot find app.js at $AppJsFile" -ForegroundColor Red
+    $script:Failed++
+} else {
+    if (-not $AppJsContent) {
+        $AppJsContent = Get-Content -Path $AppJsFile -Raw
+    }
+
+    $hasPortalUrl = $AppJsContent -match "portalUrl"
+    Assert-True $hasPortalUrl "app.js contains 'portalUrl' reference"
+
+    $hasCardPortalLink = $AppJsContent -match "card-portal-link"
+    Assert-True $hasCardPortalLink "app.js contains 'card-portal-link' class for portal link element"
+}
+
+# ========================================
+# TC85: agents.json emailer has portalUrl
+# ========================================
+Write-Host "`nTC85: agents.json emailer has portalUrl" -ForegroundColor Cyan
+
+$AgentsJsonFileTC85 = Join-Path $ProjectRoot "config/agents.json"
+if (-not (Test-Path $AgentsJsonFileTC85)) {
+    Write-Host "ERROR: Cannot find agents.json at $AgentsJsonFileTC85" -ForegroundColor Red
+    $script:Failed++
+} else {
+    $AgentsJsonTC85 = Get-Content -Path $AgentsJsonFileTC85 -Raw | ConvertFrom-Json
+    $emailerAgent = $AgentsJsonTC85.agents.emailer
+    $hasPortalUrlField = $null -ne $emailerAgent.portalUrl -and $emailerAgent.portalUrl -ne ""
+    Assert-True $hasPortalUrlField "emailer agent in agents.json has a non-empty portalUrl field"
+
+    # Verify scrum-master does NOT have portalUrl
+    $scrumMasterAgent = $AgentsJsonTC85.agents."scrum-master"
+    $scrumMasterHasPortal = $null -ne ($scrumMasterAgent.PSObject.Properties | Where-Object { $_.Name -eq "portalUrl" })
+    Assert-True (-not $scrumMasterHasPortal) "scrum-master agent does NOT have portalUrl field"
+
+    # Verify bug-killer does NOT have portalUrl
+    $bugKillerAgent = $AgentsJsonTC85.agents."bug-killer"
+    $bugKillerHasPortal = $null -ne ($bugKillerAgent.PSObject.Properties | Where-Object { $_.Name -eq "portalUrl" })
+    Assert-True (-not $bugKillerHasPortal) "bug-killer agent does NOT have portalUrl field"
+}
+
 # --- Summary ---
 Write-Host "`n========================================" -ForegroundColor White
 Write-Host "Test-UIRendering: $script:Passed passed, $script:Failed failed" -ForegroundColor $(if ($script:Failed -gt 0) { "Red" } else { "Green" })

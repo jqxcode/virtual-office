@@ -331,6 +331,21 @@ function renderAgentCard(name, agentData) {
     card.appendChild(capWrapper);
   }
 
+  // Portal link
+  var portalUrl = agentData.portalUrl || null;
+  if (!portalUrl && agentConfig && agentConfig.agents) {
+    var cfgAgent = agentConfig.agents[name];
+    if (cfgAgent) portalUrl = cfgAgent.portalUrl;
+  }
+  if (portalUrl) {
+    var portalLink = document.createElement("a");
+    portalLink.className = "card-portal-link";
+    portalLink.href = portalUrl;
+    portalLink.target = "_blank";
+    portalLink.textContent = "Open Portal";
+    card.appendChild(portalLink);
+  }
+
   // Card footer - latest report
   var latestOutput = null;
   var latestOutputTime = null;
@@ -370,6 +385,7 @@ function mergeConfigAndDashboard(config, dashboard) {
         display_name: cfg.displayName || name,
         icon: cfg.icon || null,
         description: cfg.description || "",
+        portalUrl: cfg.portalUrl || null,
         status: "idle",
         running_job: null,
         last_completed: null,
