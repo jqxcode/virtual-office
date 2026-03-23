@@ -63,6 +63,29 @@ function Get-TaskName {
     return "VirtualOffice-$Agent-$Job"
 }
 
+# Helper: generate deduplicated task names from a list of schedule entries
+# Mirrors the logic in Register-Schedules.ps1
+function Get-DedupedTaskNames {
+    param([array]$Entries)
+    $taskNameCount = @{}
+    $result = @()
+    foreach ($e in $Entries) {
+        $baseKey = "$($e.agent)|$($e.job)"
+        if (-not $taskNameCount.ContainsKey($baseKey)) {
+            $taskNameCount[$baseKey] = 1
+        } else {
+            $taskNameCount[$baseKey]++
+        }
+        $occurrence = $taskNameCount[$baseKey]
+        if ($occurrence -eq 1) {
+            $result += "VirtualOffice-$($e.agent)-$($e.job)"
+        } else {
+            $result += "VirtualOffice-$($e.agent)-$($e.job)-$occurrence"
+        }
+    }
+    return $result
+}
+
 # ========================================
 # TC18: Parses schedules.json correctly
 # ========================================
@@ -113,6 +136,27 @@ Assert-True ($taskName3 -eq "VirtualOffice-a-b") "Task name: minimal input"
 
 # Verify the pattern prefix
 Assert-True ($taskName1.StartsWith("VirtualOffice-")) "Task name starts with VirtualOffice- prefix"
+
+# ========================================
+# TC19b: Duplicate agent+job entries get unique task names
+# ========================================
+Write-Host "`nTC19b: Duplicate cron entries get unique task names" -ForegroundColor Cyan
+
+$duplicateEntries = @(
+    @{ agent = "scrum-master"; job = "dry-run-ado-status-update"; cron = "0 9 * * *" }
+    @{ agent = "scrum-master"; job = "dry-run-ado-status-update"; cron = "0 21 * * *" }
+    @{ agent = "bug-killer";   job = "scan-and-fix";              cron = "0 10 * * *" }
+    @{ agent = "bug-killer";   job = "scan-and-fix";              cron = "0 22 * * *" }
+    @{ agent = "scrum-master"; job = "sprint-progress";           cron = "0 7 * * 1-5" }
+)
+$names = Get-DedupedTaskNames -Entries $duplicateEntries
+
+Assert-True ($names[0] -eq "VirtualOffice-scrum-master-dry-run-ado-status-update") "First occurrence keeps base task name"
+Assert-True ($names[1] -eq "VirtualOffice-scrum-master-dry-run-ado-status-update-2") "Second occurrence gets -2 suffix"
+Assert-True ($names[2] -eq "VirtualOffice-bug-killer-scan-and-fix") "First occurrence (different agent+job) keeps base task name"
+Assert-True ($names[3] -eq "VirtualOffice-bug-killer-scan-and-fix-2") "Second occurrence gets -2 suffix"
+Assert-True ($names[4] -eq "VirtualOffice-scrum-master-sprint-progress") "Unique entry keeps base task name"
+Assert-True (($names | Sort-Object -Unique).Count -eq $names.Count) "All generated task names are unique"
 
 # ========================================
 # TC20: Invalid cron expression handled gracefully
