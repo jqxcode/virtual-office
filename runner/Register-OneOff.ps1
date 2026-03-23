@@ -42,6 +42,7 @@ $actionArgs = "-NoProfile -ExecutionPolicy Bypass -File `"$invokeScript`" -Agent
 $action = New-ScheduledTaskAction -Execute "pwsh" -Argument $actionArgs -WorkingDirectory $PROJECT_ROOT
 
 $trigger = New-ScheduledTaskTrigger -Once -At $fireTime
+$trigger.EndBoundary = $fireTime.AddMinutes(5).ToString("o")
 $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -DeleteExpiredTaskAfter (New-TimeSpan -Minutes 30)
 
 Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Settings $settings -Description "Virtual Office one-off: $Agent / $Job" | Out-Null
