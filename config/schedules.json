@@ -8,33 +8,33 @@
     },
     {
       "agent": "scrum-master",
-      "job": "dry-run-ado-status-update",
+      "job": "ado-status-update",
       "cron": "0 9 * * *",
-      "description": "ADO status tweet dry-run at 9am daily"
+      "description": "ADO status tweet update (live) at 9am daily"
     },
     {
       "agent": "scrum-master",
-      "job": "dry-run-ado-status-update",
+      "job": "ado-status-update",
       "cron": "0 21 * * *",
-      "description": "ADO status tweet dry-run at 9pm daily"
+      "description": "ADO status tweet update (live) at 9pm daily"
     },
     {
       "agent": "scrum-master",
-      "job": "dry-run-bug-autopilot",
+      "job": "bug-autopilot",
       "cron": "0 8 * * *",
-      "description": "Bug autopilot dry-run at 8am daily"
+      "description": "Bug autopilot (live) at 8am daily"
     },
     {
       "agent": "scrum-master",
-      "job": "dry-run-bug-autopilot",
+      "job": "bug-autopilot",
       "cron": "0 20 * * *",
-      "description": "Bug autopilot dry-run at 8pm daily"
+      "description": "Bug autopilot (live) at 8pm daily"
     },
     {
       "agent": "scrum-master",
       "job": "compare-runs",
       "cron": "0 11 * * *",
-      "description": "Compare dry-run results and file GitHub issues at 11am daily"
+      "description": "Compare results and file GitHub issues at 11am daily"
     },
     {
       "agent": "bug-killer",

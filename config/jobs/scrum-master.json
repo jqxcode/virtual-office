@@ -7,26 +7,33 @@
       "saveOutput": false,
       "description": "Queries ADO work items and meeting notes to generate sprint progress report"
     },
-    "dry-run-ado-status-update": {
-      "prompt": "Run ADO autopilot dry-run for both meeting-join and meeting-notes areas. Execute these commands sequentially from Q:/src/hackathon/ado-autopilot/: (1) python src/main.py update-status --config configs/meeting-join.json --dry-run (2) python src/main.py update-status --config configs/meeting-notes.json --dry-run. Copy the newly generated HTML reports from reports/ folder to Q:/src/personal_projects/virtual-office/output/scrum-master/. The tool generates files named meeting-join-report-YYYYMMDD-HHMMSS.html and meeting-notes-report-YYYYMMDD-HHMMSS.html — copy them preserving their original filenames, and also copy each as dry-run-meeting-join-latest.html and dry-run-meeting-notes-latest.html respectively. After reports are saved, run the comparison script: python Q:/src/personal_projects/virtual-office/runner/Compare-Runs.py --dry-run. Open the comparison summary and both reports in Edge after completion.",
+    "ado-status-update": {
+      "prompt": "Run ADO autopilot LIVE for both meeting-join and meeting-notes areas. Execute these commands sequentially from Q:/src/hackathon/ado-autopilot/: (1) python src/main.py update-status --config configs/meeting-join.json --auto-approve (2) python src/main.py update-status --config configs/meeting-notes.json --auto-approve. This will generate reports AND write approved updates to ADO. Copy the newly generated HTML reports from reports/ folder to Q:/src/personal_projects/virtual-office/output/scrum-master/. The tool generates files named meeting-join-report-YYYYMMDD-HHMMSS.html and meeting-notes-report-YYYYMMDD-HHMMSS.html -- copy them preserving their original filenames, and also copy each as meeting-join-latest.html and meeting-notes-latest.html respectively. After reports are saved, run the comparison script: python Q:/src/personal_projects/virtual-office/runner/Compare-Runs.py. Open the comparison summary and both reports in Edge after completion.",
       "maxRuns": 0,
       "enabled": true,
       "saveOutput": false,
-      "description": "Runs ADO autopilot status tweet dry-run for Meeting Join and Meeting Notes areas at 9am and 9pm daily"
+      "description": "Runs ADO autopilot status tweet update (live) for Meeting Join and Meeting Notes areas"
     },
-    "dry-run-bug-autopilot": {
-      "prompt": "Run bug-autopilot dry-run for Meeting Join area bugs. Steps: (1) cd Q:/src/hackathon/bug-autopilot/ (2) git pull to get latest code (3) Validate configs exist and are valid JSON (4) pip install -r requirements.txt --quiet (5) Run: powershell.exe -File bugautopilot.ps1 -Once -DryRun (6) Copy the newly generated HTML report from reports/ (named run-YYYYMMDD-HHMMSS.html) to Q:/src/personal_projects/virtual-office/output/scrum-master/ preserving its original filename, and also copy it as dry-run-bug-autopilot-latest.html (7) Run the comparison script: python Q:/src/personal_projects/virtual-office/runner/Compare-Runs.py --dry-run (8) Open the report in Edge.",
+    "bug-autopilot": {
+      "prompt": "Run bug-autopilot LIVE for Meeting Join area bugs. Steps: (1) cd Q:/src/hackathon/bug-autopilot/ (2) git pull to get latest code (3) Validate configs exist and are valid JSON (4) pip install -r requirements.txt --quiet (5) Run: powershell.exe -File bugautopilot.ps1 -Once (6) Copy the newly generated HTML report from reports/ (named run-YYYYMMDD-HHMMSS.html) to Q:/src/personal_projects/virtual-office/output/scrum-master/ preserving its original filename, and also copy it as bug-autopilot-latest.html (7) Run the comparison script: python Q:/src/personal_projects/virtual-office/runner/Compare-Runs.py (8) Open the report in Edge.",
       "maxRuns": 0,
       "enabled": true,
       "saveOutput": false,
-      "description": "Runs bug-autopilot dry-run for Meeting Join bugs at 8am and 8pm daily"
+      "description": "Runs bug-autopilot live for Meeting Join bugs"
+    },
+    "ado-burndown-update": {
+      "prompt": "Run ADO autopilot burndown LIVE for both meeting-join and meeting-notes areas. Execute these commands sequentially from Q:/src/hackathon/ado-autopilot/: (1) python src/main.py update-burndown --config configs/meeting-join.json --auto-approve (2) python src/main.py update-burndown --config configs/meeting-notes.json --auto-approve. This will generate reports AND write approved burndown updates to ADO. Copy the newly generated HTML reports from reports/ folder to Q:/src/personal_projects/virtual-office/output/scrum-master/. Preserve original filenames and also copy each as burndown-meeting-join-latest.html and burndown-meeting-notes-latest.html respectively. Open both reports in Edge after completion.",
+      "maxRuns": 0,
+      "enabled": true,
+      "saveOutput": false,
+      "description": "Runs ADO autopilot burndown update (live) for Meeting Join and Meeting Notes areas"
     },
     "compare-runs": {
-      "prompt": "Compare all scrum-master dry-run reports and create GitHub issues for detected problems. Run: python Q:/src/personal_projects/virtual-office/runner/Compare-Runs.py (without --dry-run flag to actually create issues). This will parse ADO autopilot HTML reports and bug autopilot investigations.json, compare across runs, generate a summary at Q:/src/personal_projects/virtual-office/output/scrum-master/run-summaries/, and create GitHub issues in teams-microsoft/ado-autopilot and teams-microsoft/bug-autopilot repos. Issues that were already created (tracked in issue-state.json) will be skipped. Open the comparison summary in Edge after completion.",
+      "prompt": "Compare all scrum-master reports and create GitHub issues for detected problems. Run: python Q:/src/personal_projects/virtual-office/runner/Compare-Runs.py (without --dry-run flag to actually create issues). This will parse ADO autopilot HTML reports and bug autopilot investigations.json, compare across runs, generate a summary at Q:/src/personal_projects/virtual-office/output/scrum-master/run-summaries/, and create GitHub issues in teams-microsoft/ado-autopilot and teams-microsoft/bug-autopilot repos. Issues that were already created (tracked in issue-state.json) will be skipped. Open the comparison summary in Edge after completion.",
       "maxRuns": 0,
       "enabled": true,
       "saveOutput": false,
-      "description": "Compares dry-run results across runs and files GitHub issues for detected problems"
+      "description": "Compares run results across runs and files GitHub issues for detected problems"
     }
   }
 }
