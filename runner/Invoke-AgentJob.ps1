@@ -172,6 +172,76 @@ function Write-ErrorEntry {
     Add-Content -Path $ERRORS_FILE -Value $line -Encoding ASCII
 }
 
+function Repair-StuckDashboard {
+    # Scan dashboard for any job showing "running" and validate via lock file + PID.
+    # If no lock file exists or the PID is dead, reset status to "terminated".
+    # Called once at startup so stale "running" entries left by killed processes are cleared
+    # before the current invocation writes its own "running" entry.
+    if (-not (Test-Path $DASHBOARD_FILE)) { return }
+
+    $dashboard = $null
+    try {
+        $dashboard = Get-Content -Path $DASHBOARD_FILE -Raw | ConvertFrom-Json -AsHashtable
+    } catch {
+        return
+    }
+    if ($null -eq $dashboard -or -not $dashboard.ContainsKey("agents")) { return }
+
+    $changed = $false
+    foreach ($agentName in @($dashboard["agents"].Keys)) {
+        $agentData = $dashboard["agents"][$agentName]
+        if ($agentData -isnot [hashtable]) { continue }
+
+        $agentLockFile = Join-Path $STATE_DIR "agents" $agentName "lock"
+
+        foreach ($jobName in @($agentData.Keys)) {
+            $jobData = $agentData[$jobName]
+            if ($jobData -isnot [hashtable]) { continue }
+            if (-not $jobData.ContainsKey("status")) { continue }
+            if ($jobData["status"] -ne "running") { continue }
+
+            # Job is marked running -- validate the lock file
+            $lockValid = $false
+            if (Test-Path $agentLockFile) {
+                try {
+                    $lockRaw = Get-Content -Path $agentLockFile -Raw -ErrorAction SilentlyContinue
+                    $lockObj = $lockRaw.Trim() | ConvertFrom-Json
+                    if ($null -ne $lockObj.pid) {
+                        $lockPid = [int]$lockObj.pid
+                        $proc = Get-Process -Id $lockPid -ErrorAction SilentlyContinue
+                        if ($null -ne $proc) {
+                            $lockValid = $true
+                        }
+                    } else {
+                        # Lock exists but has no PID yet (race between lock write and PID update)
+                        # Treat as valid to avoid false-positive resets on concurrent starts
+                        $lockValid = $true
+                    }
+                } catch {
+                    # Malformed lock file -- treat as invalid
+                    $lockValid = $false
+                }
+            }
+
+            if (-not $lockValid) {
+                # No lock file or dead PID -- reset to terminated
+                $jobData["status"] = "terminated"
+                $jobData["updated"] = (Get-Date -Format "o")
+                $jobData["terminated_at"] = (Get-Date -Format "o")
+                $agentData[$jobName] = $jobData
+                $changed = $true
+                Write-Host "Reconcile: '$agentName/$jobName' was stuck 'running' with no live process -- reset to 'terminated'."
+            }
+        }
+        $dashboard["agents"][$agentName] = $agentData
+    }
+
+    if ($changed) {
+        $json = $dashboard | ConvertTo-Json -Depth 10
+        Write-AtomicFile -Path $DASHBOARD_FILE -Content $json
+    }
+}
+
 function Get-UnresolvedErrorCount {
     param([string]$AgentName)
     if (-not (Test-Path $ERRORS_FILE)) { return 0 }
@@ -221,6 +291,10 @@ function Set-QueueDepth {
 }
 
 # --- Main flow ---
+
+# Step 1: Reconcile any dashboard entries stuck on "running" from a prior killed process.
+# Must run before agent config is loaded so it runs even for agents that have no active lock.
+Repair-StuckDashboard
 
 # Step 2: Load and validate agent config
 $agentsFile = Join-Path $CONFIG_DIR "agents.json"
@@ -318,7 +392,7 @@ if (Test-Path $lockFile) {
 # --- Run loop (handles queue drain) ---
 $keepRunning = $true
 while ($keepRunning) {
-    # Create agent-level lock
+    # Create agent-level lock (pid added after process starts)
     $lockContent = @{ ts = (Get-Date -Format "o"); job = $Job } | ConvertTo-Json -Compress
     Write-AtomicFile -Path $lockFile -Content $lockContent
 
@@ -366,12 +440,37 @@ while ($keepRunning) {
     $exitCode = 0
     $runStart = Get-Date
     try {
+        # Build command arguments
+        $claudeArgs = @()
         if ($agentFile -and (Test-Path $agentFile)) {
-            $output = & claude --agent $agentFile $prompt 2>&1 | Out-String
+            $claudeArgs = @("--agent", $agentFile, $prompt)
         } else {
-            $output = & claude $prompt 2>&1 | Out-String
+            $claudeArgs = @($prompt)
         }
-        $exitCode = $LASTEXITCODE
+
+        # Start claude process and capture PID
+        $pinfo = New-Object System.Diagnostics.ProcessStartInfo
+        $pinfo.FileName = "claude"
+        $pinfo.Arguments = ($claudeArgs | ForEach-Object { if ($_ -match '\s') { "`"$_`"" } else { $_ } }) -join " "
+        $pinfo.RedirectStandardOutput = $true
+        $pinfo.RedirectStandardError = $true
+        $pinfo.UseShellExecute = $false
+        $pinfo.CreateNoWindow = $true
+
+        $proc = [System.Diagnostics.Process]::Start($pinfo)
+
+        # Update lock with PID
+        $lockContent = @{ ts = (Get-Date -Format "o"); job = $Job; pid = $proc.Id; run_id = $runId } | ConvertTo-Json -Compress
+        Write-AtomicFile -Path $lockFile -Content $lockContent
+
+        $output = $proc.StandardOutput.ReadToEnd()
+        $errOutput = $proc.StandardError.ReadToEnd()
+        $proc.WaitForExit()
+        $exitCode = $proc.ExitCode
+
+        if ($errOutput) {
+            $output = $output + "`n" + $errOutput
+        }
     } catch {
         $output = "ERROR: $_"
         $exitCode = 1

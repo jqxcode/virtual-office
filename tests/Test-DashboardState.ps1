@@ -329,6 +329,225 @@ try {
     Remove-TestRoot -Root $root
 }
 
+# ========================================
+# TC80: Repair-StuckDashboard resets "running" entry when lock file is missing
+# ========================================
+Write-Host "`nTC80: Repair-StuckDashboard resets stuck 'running' entry (no lock file)" -ForegroundColor Cyan
+$root = New-TestRoot
+try {
+    Write-TestConstants -Root $root
+    Import-RunnerFunctions -Root $root
+
+    # Inject Repair-StuckDashboard into global scope using the same constants from the test root
+    function global:Repair-StuckDashboard {
+        if (-not (Test-Path $DASHBOARD_FILE)) { return }
+        $dashboard = $null
+        try {
+            $dashboard = Get-Content -Path $DASHBOARD_FILE -Raw | ConvertFrom-Json -AsHashtable
+        } catch { return }
+        if ($null -eq $dashboard -or -not $dashboard.ContainsKey("agents")) { return }
+        $changed = $false
+        foreach ($agentName in @($dashboard["agents"].Keys)) {
+            $agentData = $dashboard["agents"][$agentName]
+            if ($agentData -isnot [hashtable]) { continue }
+            $agentLockFile = Join-Path $STATE_DIR "agents" $agentName "lock"
+            foreach ($jobName in @($agentData.Keys)) {
+                $jobData = $agentData[$jobName]
+                if ($jobData -isnot [hashtable]) { continue }
+                if (-not $jobData.ContainsKey("status")) { continue }
+                if ($jobData["status"] -ne "running") { continue }
+                $lockValid = $false
+                if (Test-Path $agentLockFile) {
+                    try {
+                        $lockRaw = Get-Content -Path $agentLockFile -Raw -ErrorAction SilentlyContinue
+                        $lockObj = $lockRaw.Trim() | ConvertFrom-Json
+                        if ($null -ne $lockObj.pid) {
+                            $lockPid = [int]$lockObj.pid
+                            $proc = Get-Process -Id $lockPid -ErrorAction SilentlyContinue
+                            if ($null -ne $proc) { $lockValid = $true }
+                        } else {
+                            $lockValid = $true
+                        }
+                    } catch { $lockValid = $false }
+                }
+                if (-not $lockValid) {
+                    $jobData["status"] = "terminated"
+                    $jobData["updated"] = (Get-Date -Format "o")
+                    $jobData["terminated_at"] = (Get-Date -Format "o")
+                    $agentData[$jobName] = $jobData
+                    $changed = $true
+                }
+            }
+            $dashboard["agents"][$agentName] = $agentData
+        }
+        if ($changed) {
+            $json = $dashboard | ConvertTo-Json -Depth 10
+            Write-AtomicFile -Path $DASHBOARD_FILE -Content $json
+        }
+    }
+
+    # Set up dashboard with a stuck "running" job (no lock file present)
+    Update-Dashboard -AgentName "ghost-agent" -JobName "ghost-job" -Status "running" -Details @{ run_id = "dead123"; started = (Get-Date -Format "o") }
+
+    $dashFile = Join-Path $root "state/dashboard.json"
+    $dash = Get-Content -Path $dashFile -Raw | ConvertFrom-Json -AsHashtable
+    Assert-True ($dash["agents"]["ghost-agent"]["ghost-job"]["status"] -eq "running") "Pre-condition: status is 'running'"
+
+    # Call Repair-StuckDashboard -- no lock file exists so it should flip to terminated
+    Repair-StuckDashboard
+
+    $dash = Get-Content -Path $dashFile -Raw | ConvertFrom-Json -AsHashtable
+    Assert-True ($dash["agents"]["ghost-agent"]["ghost-job"]["status"] -eq "terminated") "Status reset to 'terminated' when no lock file"
+    Assert-True ($dash["agents"]["ghost-agent"]["ghost-job"].ContainsKey("terminated_at")) "terminated_at field added"
+} finally {
+    Remove-TestRoot -Root $root
+}
+
+# ========================================
+# TC81: Repair-StuckDashboard does not touch "idle" entries
+# ========================================
+Write-Host "`nTC81: Repair-StuckDashboard leaves non-running entries alone" -ForegroundColor Cyan
+$root = New-TestRoot
+try {
+    Write-TestConstants -Root $root
+    Import-RunnerFunctions -Root $root
+
+    # Re-define Repair-StuckDashboard with the same logic as TC80 above
+    function global:Repair-StuckDashboard {
+        if (-not (Test-Path $DASHBOARD_FILE)) { return }
+        $dashboard = $null
+        try {
+            $dashboard = Get-Content -Path $DASHBOARD_FILE -Raw | ConvertFrom-Json -AsHashtable
+        } catch { return }
+        if ($null -eq $dashboard -or -not $dashboard.ContainsKey("agents")) { return }
+        $changed = $false
+        foreach ($agentName in @($dashboard["agents"].Keys)) {
+            $agentData = $dashboard["agents"][$agentName]
+            if ($agentData -isnot [hashtable]) { continue }
+            $agentLockFile = Join-Path $STATE_DIR "agents" $agentName "lock"
+            foreach ($jobName in @($agentData.Keys)) {
+                $jobData = $agentData[$jobName]
+                if ($jobData -isnot [hashtable]) { continue }
+                if (-not $jobData.ContainsKey("status")) { continue }
+                if ($jobData["status"] -ne "running") { continue }
+                $lockValid = $false
+                if (Test-Path $agentLockFile) {
+                    try {
+                        $lockRaw = Get-Content -Path $agentLockFile -Raw -ErrorAction SilentlyContinue
+                        $lockObj = $lockRaw.Trim() | ConvertFrom-Json
+                        if ($null -ne $lockObj.pid) {
+                            $lockPid = [int]$lockObj.pid
+                            $proc = Get-Process -Id $lockPid -ErrorAction SilentlyContinue
+                            if ($null -ne $proc) { $lockValid = $true }
+                        } else {
+                            $lockValid = $true
+                        }
+                    } catch { $lockValid = $false }
+                }
+                if (-not $lockValid) {
+                    $jobData["status"] = "terminated"
+                    $jobData["updated"] = (Get-Date -Format "o")
+                    $jobData["terminated_at"] = (Get-Date -Format "o")
+                    $agentData[$jobName] = $jobData
+                    $changed = $true
+                }
+            }
+            $dashboard["agents"][$agentName] = $agentData
+        }
+        if ($changed) {
+            $json = $dashboard | ConvertTo-Json -Depth 10
+            Write-AtomicFile -Path $DASHBOARD_FILE -Content $json
+        }
+    }
+
+    # Set up dashboard with an idle job
+    Update-Dashboard -AgentName "stable-agent" -JobName "stable-job" -Status "idle" -Details @{ last_completed = (Get-Date -Format "o"); runs_completed = 3 }
+
+    $dashFile = Join-Path $root "state/dashboard.json"
+    Repair-StuckDashboard
+
+    $dash = Get-Content -Path $dashFile -Raw | ConvertFrom-Json -AsHashtable
+    Assert-True ($dash["agents"]["stable-agent"]["stable-job"]["status"] -eq "idle") "Idle status unchanged by Repair-StuckDashboard"
+    Assert-True ($dash["agents"]["stable-agent"]["stable-job"]["runs_completed"] -eq 3) "runs_completed field preserved"
+} finally {
+    Remove-TestRoot -Root $root
+}
+
+# ========================================
+# TC82: Repair-StuckDashboard keeps "running" when lock file has live PID
+# ========================================
+Write-Host "`nTC82: Repair-StuckDashboard keeps 'running' when lock file has live PID" -ForegroundColor Cyan
+$root = New-TestRoot
+try {
+    Write-TestConstants -Root $root
+    Import-RunnerFunctions -Root $root
+
+    function global:Repair-StuckDashboard {
+        if (-not (Test-Path $DASHBOARD_FILE)) { return }
+        $dashboard = $null
+        try {
+            $dashboard = Get-Content -Path $DASHBOARD_FILE -Raw | ConvertFrom-Json -AsHashtable
+        } catch { return }
+        if ($null -eq $dashboard -or -not $dashboard.ContainsKey("agents")) { return }
+        $changed = $false
+        foreach ($agentName in @($dashboard["agents"].Keys)) {
+            $agentData = $dashboard["agents"][$agentName]
+            if ($agentData -isnot [hashtable]) { continue }
+            $agentLockFile = Join-Path $STATE_DIR "agents" $agentName "lock"
+            foreach ($jobName in @($agentData.Keys)) {
+                $jobData = $agentData[$jobName]
+                if ($jobData -isnot [hashtable]) { continue }
+                if (-not $jobData.ContainsKey("status")) { continue }
+                if ($jobData["status"] -ne "running") { continue }
+                $lockValid = $false
+                if (Test-Path $agentLockFile) {
+                    try {
+                        $lockRaw = Get-Content -Path $agentLockFile -Raw -ErrorAction SilentlyContinue
+                        $lockObj = $lockRaw.Trim() | ConvertFrom-Json
+                        if ($null -ne $lockObj.pid) {
+                            $lockPid = [int]$lockObj.pid
+                            $proc = Get-Process -Id $lockPid -ErrorAction SilentlyContinue
+                            if ($null -ne $proc) { $lockValid = $true }
+                        } else {
+                            $lockValid = $true
+                        }
+                    } catch { $lockValid = $false }
+                }
+                if (-not $lockValid) {
+                    $jobData["status"] = "terminated"
+                    $jobData["updated"] = (Get-Date -Format "o")
+                    $jobData["terminated_at"] = (Get-Date -Format "o")
+                    $agentData[$jobName] = $jobData
+                    $changed = $true
+                }
+            }
+            $dashboard["agents"][$agentName] = $agentData
+        }
+        if ($changed) {
+            $json = $dashboard | ConvertTo-Json -Depth 10
+            Write-AtomicFile -Path $DASHBOARD_FILE -Content $json
+        }
+    }
+
+    # Use the current process PID -- it is definitely alive
+    $livePid = $PID
+    $agentStateDir = Join-Path $root "state/agents/live-agent"
+    New-Item -ItemType Directory -Path $agentStateDir -Force | Out-Null
+    $lockFile = Join-Path $agentStateDir "lock"
+    $lockContent = @{ ts = (Get-Date -Format "o"); job = "live-job"; pid = $livePid; run_id = "abc999" } | ConvertTo-Json -Compress
+    Set-Content -Path $lockFile -Value $lockContent -Encoding ASCII
+
+    Update-Dashboard -AgentName "live-agent" -JobName "live-job" -Status "running" -Details @{ run_id = "abc999" }
+
+    $dashFile = Join-Path $root "state/dashboard.json"
+    Repair-StuckDashboard
+
+    $dash = Get-Content -Path $dashFile -Raw | ConvertFrom-Json -AsHashtable
+    Assert-True ($dash["agents"]["live-agent"]["live-job"]["status"] -eq "running") "Status stays 'running' when lock file has live PID"
+} finally {
+    Remove-TestRoot -Root $root
+}
+
 # --- Summary ---
 Write-Host "`n========================================" -ForegroundColor White
 Write-Host "Test-DashboardState: $script:Passed passed, $script:Failed failed" -ForegroundColor $(if ($script:Failed -gt 0) { "Red" } else { "Green" })
