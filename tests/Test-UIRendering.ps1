@@ -539,6 +539,181 @@ if (-not (Test-Path $AppJsFile)) {
     Assert-True ($jobStateViolations -eq 0) "No jobState.run_id/runs_completed/last_completed/queue_depth outside normalizeJobState (found $jobStateViolations)"
 }
 
+# ========================================
+# TC79: Scrum-master agent prompt includes Fundamentals area path filter
+# ========================================
+Write-Host "`nTC79: Scrum-master agent prompt includes Fundamentals area path filter" -ForegroundColor Cyan
+
+$ScrumMasterFile = "C:/Users/qitxu/.claude/agents/scrum-master.md"
+if (-not (Test-Path $ScrumMasterFile)) {
+    Write-Host "ERROR: Cannot find scrum-master.md at $ScrumMasterFile" -ForegroundColor Red
+    $script:Failed++
+} else {
+    $ScrumMasterContent = Get-Content -Path $ScrumMasterFile -Raw
+
+    # The sprint-progress section should mention Fundamentals
+    $hasFundamentals = $ScrumMasterContent -match "Fundamentals"
+    Assert-True $hasFundamentals "scrum-master.md contains 'Fundamentals' in sprint-progress section"
+
+    # Should have an instruction to exclude other sub-areas
+    $hasExcludeInstruction = $ScrumMasterContent -match "Exclude items from other sub-areas"
+    Assert-True $hasExcludeInstruction "scrum-master.md contains instruction to exclude other sub-areas"
+}
+
+# ========================================
+# TC80: app.js has agent group tab rendering
+# ========================================
+Write-Host "`nTC80: app.js has agent group tab rendering" -ForegroundColor Cyan
+
+if (-not (Test-Path $AppJsFile)) {
+    Write-Host "ERROR: Cannot find app.js at $AppJsFile" -ForegroundColor Red
+    $script:Failed++
+} else {
+    if (-not $AppJsContent) {
+        $AppJsContent = Get-Content -Path $AppJsFile -Raw
+    }
+
+    $hasAgentTab = $AppJsContent -match "agent-tab"
+    Assert-True $hasAgentTab "app.js contains 'agent-tab' class for group tabs"
+
+    $hasRenderAgentTabs = $AppJsContent -match "function renderAgentTabs"
+    Assert-True $hasRenderAgentTabs "app.js contains 'function renderAgentTabs' for group tab rendering"
+
+    $hasActiveGroup = $AppJsContent -match "activeGroup"
+    Assert-True $hasActiveGroup "app.js contains 'activeGroup' variable for tab state"
+}
+
+# ========================================
+# TC81: agents.json has group field
+# ========================================
+Write-Host "`nTC81: agents.json has group field" -ForegroundColor Cyan
+
+$AgentsJsonFile = Join-Path $ProjectRoot "config/agents.json"
+if (-not (Test-Path $AgentsJsonFile)) {
+    Write-Host "ERROR: Cannot find agents.json at $AgentsJsonFile" -ForegroundColor Red
+    $script:Failed++
+} else {
+    $AgentsJson = Get-Content -Path $AgentsJsonFile -Raw | ConvertFrom-Json
+    $allHaveGroup = $true
+    foreach ($agentName in $AgentsJson.agents.PSObject.Properties.Name) {
+        $agent = $AgentsJson.agents.$agentName
+        if (-not $agent.group) {
+            Write-Host "    Agent '$agentName' is missing 'group' field" -ForegroundColor Yellow
+            $allHaveGroup = $false
+        }
+    }
+    Assert-True $allHaveGroup "All agents in agents.json have a 'group' field"
+}
+
+# ========================================
+# TC82: activeGroup only reset when null or group missing
+# ========================================
+Write-Host "`nTC82: activeGroup only reset when null or group missing" -ForegroundColor Cyan
+
+if (-not (Test-Path $AppJsFile)) {
+    Write-Host "ERROR: Cannot find app.js at $AppJsFile" -ForegroundColor Red
+    $script:Failed++
+} else {
+    if (-not $AppJsContent) {
+        $AppJsContent = Get-Content -Path $AppJsFile -Raw
+    }
+
+    # Verify renderAgentTabs uses the guard pattern: if (!activeGroup || !groups[activeGroup])
+    $hasGuardPattern = $AppJsContent -match 'if\s*\(\s*!activeGroup\s*\|\|\s*!groups\[activeGroup\]\s*\)'
+    Assert-True $hasGuardPattern "renderAgentTabs uses guard pattern 'if (!activeGroup || !groups[activeGroup])'"
+
+    # Count all assignments to activeGroup (excluding declarations and comments)
+    # Expected: 1 declaration (var activeGroup = null), 1 guard default, 1 tab click handler, 1 URL restore = 4 total
+    $allAssignments = [regex]::Matches($AppJsContent, '(?<!//.*)\bactiveGroup\s*=\s*')
+    $assignmentCount = $allAssignments.Count
+    Assert-True ($assignmentCount -eq 4) "Exactly 4 assignments to activeGroup (declaration + guard + click + URL restore), found $assignmentCount"
+
+    # Verify no unconditional reset: activeGroup should never be set to null after declaration
+    # Remove the declaration line, then check for any "activeGroup = null"
+    $withoutDeclaration = $AppJsContent -replace 'var\s+activeGroup\s*=\s*null', ''
+    $hasUnconditionalReset = $withoutDeclaration -match 'activeGroup\s*=\s*null'
+    Assert-True (-not $hasUnconditionalReset) "No unconditional reset of activeGroup to null (besides declaration)"
+
+    # Verify poll() does not assign activeGroup
+    $pollMatch = [regex]::Match($AppJsContent, 'async function poll\s*\(\)\s*\{([\s\S]*?)\n\}')
+    if ($pollMatch.Success) {
+        $pollBody = $pollMatch.Groups[1].Value
+        $pollResetsActiveGroup = $pollBody -match 'activeGroup\s*='
+        Assert-True (-not $pollResetsActiveGroup) "poll() does not assign activeGroup"
+    } else {
+        Write-Host "    WARNING: Could not extract poll() function body" -ForegroundColor Yellow
+    }
+}
+
+# ========================================
+# TC83: app.js persists tab in URL query parameter
+# ========================================
+Write-Host "`nTC83: app.js persists tab in URL query parameter" -ForegroundColor Cyan
+
+if (-not (Test-Path $AppJsFile)) {
+    Write-Host "ERROR: Cannot find app.js at $AppJsFile" -ForegroundColor Red
+    $script:Failed++
+} else {
+    if (-not $AppJsContent) {
+        $AppJsContent = Get-Content -Path $AppJsFile -Raw
+    }
+
+    $hasSearchParamsSet = $AppJsContent -match 'searchParams\.set\("tab"'
+    Assert-True $hasSearchParamsSet "app.js writes tab to URL via searchParams.set(""tab"")"
+
+    $hasSearchParamsGet = $AppJsContent -match '\.get\("tab"\)'
+    Assert-True $hasSearchParamsGet "app.js reads tab from URL via .get(""tab"")"
+
+    $hasReplaceState = $AppJsContent -match "replaceState"
+    Assert-True $hasReplaceState "app.js updates URL without reload via replaceState"
+}
+
+# ========================================
+# TC84: app.js renders portal link when portalUrl exists
+# ========================================
+Write-Host "`nTC84: app.js renders portal link when portalUrl exists" -ForegroundColor Cyan
+
+if (-not (Test-Path $AppJsFile)) {
+    Write-Host "ERROR: Cannot find app.js at $AppJsFile" -ForegroundColor Red
+    $script:Failed++
+} else {
+    if (-not $AppJsContent) {
+        $AppJsContent = Get-Content -Path $AppJsFile -Raw
+    }
+
+    $hasPortalUrl = $AppJsContent -match "portalUrl"
+    Assert-True $hasPortalUrl "app.js contains 'portalUrl' reference"
+
+    $hasCardPortalLink = $AppJsContent -match "card-portal-link"
+    Assert-True $hasCardPortalLink "app.js contains 'card-portal-link' class for portal link element"
+}
+
+# ========================================
+# TC85: agents.json emailer has portalUrl
+# ========================================
+Write-Host "`nTC85: agents.json emailer has portalUrl" -ForegroundColor Cyan
+
+$AgentsJsonFileTC85 = Join-Path $ProjectRoot "config/agents.json"
+if (-not (Test-Path $AgentsJsonFileTC85)) {
+    Write-Host "ERROR: Cannot find agents.json at $AgentsJsonFileTC85" -ForegroundColor Red
+    $script:Failed++
+} else {
+    $AgentsJsonTC85 = Get-Content -Path $AgentsJsonFileTC85 -Raw | ConvertFrom-Json
+    $emailerAgent = $AgentsJsonTC85.agents.emailer
+    $hasPortalUrlField = $null -ne $emailerAgent.portalUrl -and $emailerAgent.portalUrl -ne ""
+    Assert-True $hasPortalUrlField "emailer agent in agents.json has a non-empty portalUrl field"
+
+    # Verify scrum-master does NOT have portalUrl
+    $scrumMasterAgent = $AgentsJsonTC85.agents."scrum-master"
+    $scrumMasterHasPortal = $null -ne ($scrumMasterAgent.PSObject.Properties | Where-Object { $_.Name -eq "portalUrl" })
+    Assert-True (-not $scrumMasterHasPortal) "scrum-master agent does NOT have portalUrl field"
+
+    # Verify bug-killer does NOT have portalUrl
+    $bugKillerAgent = $AgentsJsonTC85.agents."bug-killer"
+    $bugKillerHasPortal = $null -ne ($bugKillerAgent.PSObject.Properties | Where-Object { $_.Name -eq "portalUrl" })
+    Assert-True (-not $bugKillerHasPortal) "bug-killer agent does NOT have portalUrl field"
+}
+
 # --- Summary ---
 Write-Host "`n========================================" -ForegroundColor White
 Write-Host "Test-UIRendering: $script:Passed passed, $script:Failed failed" -ForegroundColor $(if ($script:Failed -gt 0) { "Red" } else { "Green" })

@@ -3,8 +3,8 @@
     {
       "agent": "scrum-master",
       "job": "sprint-progress",
-      "cron": "*/5 * * * *",
-      "description": "Sprint progress update every 5 minutes"
+      "cron": "0 7 * * 1-5",
+      "description": "Sprint progress report weekday mornings at 7am"
     },
     {
       "agent": "scrum-master",
@@ -29,6 +29,30 @@
       "job": "dry-run-bug-autopilot",
       "cron": "0 20 * * *",
       "description": "Bug autopilot dry-run at 8pm daily"
+    },
+    {
+      "agent": "scrum-master",
+      "job": "compare-runs",
+      "cron": "0 11 * * *",
+      "description": "Compare dry-run results and file GitHub issues at 11am daily"
+    },
+    {
+      "agent": "bug-killer",
+      "job": "scan-and-fix",
+      "cron": "0 10 * * *",
+      "description": "Bug killer scan at 10am daily"
+    },
+    {
+      "agent": "bug-killer",
+      "job": "scan-and-fix",
+      "cron": "0 22 * * *",
+      "description": "Bug killer scan at 10pm daily"
+    },
+    {
+      "agent": "emailer",
+      "job": "scan-all-mailboxes",
+      "cron": "0 7 * * *",
+      "description": "Gmail scan all mailboxes at 7am daily"
     }
   ]
 }

@@ -1,0 +1,10 @@
+{
+  "jobs": {
+    "scan-and-fix": {
+      "prompt": "Scan repos for open bugs assigned to me, pick the highest-priority unfixed bug, analyze the root cause, implement a fix, and submit a PR. Follow the instructions in your agent file.",
+      "maxRuns": 0,
+      "enabled": true,
+      "description": "Scans repos for assigned bugs, analyzes root cause, creates fix PRs"
+    }
+  }
+}

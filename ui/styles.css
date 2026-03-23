@@ -89,6 +89,38 @@ body {
   white-space: nowrap;
 }
 
+/* === Agent Tabs === */
+.agent-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.agent-tab {
+  padding: 0.5rem 1.2rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px 8px 0 0;
+  background: #f9fafb;
+  color: #6b7280;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  border-bottom: 2px solid transparent;
+}
+
+.agent-tab:hover {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.agent-tab.active {
+  background: #ffffff;
+  color: #1f2937;
+  border-bottom-color: #3b82f6;
+  border-bottom-width: 2px;
+}
+
 /* === Agent Grid === */
 .agent-grid {
   display: grid;
@@ -613,6 +645,27 @@ body {
 
 .footer-report-link:hover {
   text-decoration: underline;
+}
+
+/* === Portal Link === */
+.card-portal-link {
+  display: block;
+  text-align: center;
+  margin-top: 0.5rem;
+  padding: 0.45rem 0;
+  background: #eff6ff;
+  color: #2563eb;
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 0.15s;
+}
+
+.card-portal-link:hover {
+  background: #dbeafe;
+  text-decoration: none;
 }
 
 /* === Running Modal === */
