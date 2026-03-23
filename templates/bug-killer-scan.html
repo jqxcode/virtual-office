@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bug Killer Scan - {{TIMESTAMP}}</title>
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #1a1a2e; color: #e0e0e0; margin: 0; padding: 24px; }
+    .container { max-width: 900px; margin: 0 auto; }
+    h1 { color: #00d4ff; font-size: 1.8rem; margin-bottom: 4px; }
+    .subtitle { color: #888; font-size: 0.9rem; margin-bottom: 24px; }
+    .card { background: #16213e; border: 1px solid #0f3460; border-radius: 10px; padding: 20px; margin-bottom: 20px; }
+    .card h2 { color: #00d4ff; font-size: 1.1rem; margin: 0 0 12px 0; border-bottom: 1px solid #0f3460; padding-bottom: 8px; }
+    .label { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 0.78rem; font-weight: 600; margin-right: 6px; }
+    .label-bug { background: #c0392b; color: #fff; }
+    .label-enhancement { background: #2980b9; color: #fff; }
+    .label-unlabeled { background: #555; color: #ccc; }
+    .meta { display: flex; gap: 24px; flex-wrap: wrap; margin-bottom: 12px; }
+    .meta-item { font-size: 0.88rem; color: #aaa; }
+    .meta-item strong { color: #e0e0e0; }
+    .badge { display: inline-block; padding: 3px 12px; border-radius: 20px; font-size: 0.82rem; font-weight: 700; }
+    .badge-success { background: #1e8449; color: #fff; }
+    .badge-failed { background: #922b21; color: #fff; }
+    .badge-skipped { background: #7d6608; color: #fff; }
+    .code { font-family: 'Consolas', 'Courier New', monospace; background: #0d1b2a; border: 1px solid #0f3460; border-radius: 6px; padding: 12px 16px; font-size: 0.85rem; overflow-x: auto; margin: 8px 0; line-height: 1.5; white-space: pre; }
+    .code .old { color: #e74c3c; }
+    .code .new { color: #2ecc71; }
+    a { color: #00d4ff; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .result-bar { display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: #0d1b2a; border-radius: 8px; border-left: 4px solid #1e8449; }
+    .result-bar.failed { border-left-color: #922b21; }
+    .result-bar.skipped { border-left-color: #7d6608; }
+    ul { margin: 8px 0; padding-left: 20px; line-height: 1.8; }
+    .section-title { color: #a0c4ff; font-size: 0.9rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin: 16px 0 8px 0; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+    td { padding: 6px 12px; border-bottom: 1px solid #0f3460; }
+    td:first-child { color: #aaa; width: 120px; }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <h1>Bug Killer Scan Report</h1>
+  <div class="subtitle">{{TIMESTAMP}}</div>
+
+  <!-- ===== SECTION 1: Summary ===== -->
+  <div class="card">
+    <h2>Summary</h2>
+    <table>
+      <tr><td>Repo</td><td><strong>{{REPO_NAME}}</strong></td></tr>
+      <tr><td>Issue</td><td><a href="{{ISSUE_URL}}">#{{ISSUE_NUMBER}}</a> — {{ISSUE_TITLE}} {{LABELS}}</td></tr>
+      <tr><td>Result</td><td><span class="badge {{RESULT_CLASS}}">{{RESULT}}</span></td></tr>
+      <!-- Include PR row only if a PR was created -->
+      <tr><td>PR</td><td><a href="{{PR_URL}}">{{PR_DISPLAY}}</a></td></tr>
+      <tr><td>Branch</td><td><code>{{BRANCH}}</code></td></tr>
+    </table>
+  </div>
+
+  <!-- ===== SECTION 2: Root Cause ===== -->
+  <div class="card">
+    <h2>Root Cause</h2>
+    <!-- Plain text or HTML explanation of what caused the bug -->
+    <p>{{ROOT_CAUSE}}</p>
+  </div>
+
+  <!-- ===== SECTION 3: Fix ===== -->
+  <div class="card">
+    <h2>Fix</h2>
+    <!-- Description of what was changed -->
+    <p>{{FIX_DESCRIPTION}}</p>
+    <!-- Code diff or key changes -->
+    <div class="code">{{CODE_DIFF}}</div>
+  </div>
+
+  <!-- ===== SECTION 4: Validation ===== -->
+  <div class="card">
+    <h2>Validation</h2>
+    <ul>
+      <!-- One <li> per test or check performed -->
+      {{VALIDATION_ITEMS}}
+    </ul>
+  </div>
+
+  <!-- ===== SECTION 5: Notes (optional) ===== -->
+  <!-- Only include this section if there are additional notes -->
+  <div class="card">
+    <h2>Notes</h2>
+    <p>{{NOTES}}</p>
+  </div>
+
+  <!-- ===== SECTION 6: Teams Notification (optional) ===== -->
+  <!-- Only include if the report was posted to a Teams channel -->
+  <div class="card">
+    <h2>Teams Notification</h2>
+    <table>
+      <tr><td>Channel</td><td><strong>{{TEAMS_CHANNEL}}</strong></td></tr>
+      <tr><td>Message</td><td><a href="{{TEAMS_MESSAGE_URL}}">View in Teams</a></td></tr>
+    </table>
+  </div>
+
+</div>
+</body>
+</html>

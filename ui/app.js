@@ -6,15 +6,32 @@ var CONFIG = {
   API_BASE: ""
 };
 
+// --- Agent color map ---
+var AGENT_COLORS = {
+  "scrum-master": "#3b82f6",   // blue
+  "bug-killer": "#ef4444",     // red
+  "emailer": "#22c55e"         // green
+};
+function getAgentColor(name) {
+  if (AGENT_COLORS[name]) return AGENT_COLORS[name];
+  // Generate a consistent color from name hash for unknown agents
+  var hash = 0;
+  for (var i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  var hue = Math.abs(hash) % 360;
+  return "hsl(" + hue + ", 70%, 65%)";
+}
+
 // --- State ---
 var lastDashboardJSON = "";
 var lastEventsJSON = "";
 var isConnected = false;
-var agentConfig = null; // loaded once from /api/config
+var agentConfig = null;
 var agentErrors = {};
 var latestEvents = [];
-var activeGroup = null; // current agent group tab
-var lastDashboard = null; // cached for re-render on tab switch
+var allEvents = [];
+var activeGroup = null;
+var activeTopTab = "agents";
+var lastDashboard = null;
 
 // --- Fetch helpers ---
 
@@ -36,6 +53,12 @@ async function fetchEvents() {
   return await response.json();
 }
 
+async function fetchAllEvents() {
+  var response = await fetch(CONFIG.API_BASE + "/api/events?limit=all", { cache: "no-store" });
+  if (!response.ok) throw new Error("HTTP " + response.status);
+  return await response.json();
+}
+
 async function fetchErrors() {
   var response = await fetch(CONFIG.API_BASE + "/api/errors", { cache: "no-store" });
   if (!response.ok) throw new Error("HTTP " + response.status);
@@ -52,34 +75,25 @@ function stripOutputPrefix(path) {
 }
 
 function getReportHref(lastOutput) {
-  var outputPath = lastOutput;
-  if (outputPath && outputPath.startsWith("output/")) {
-    outputPath = outputPath.substring("output/".length);
-  }
-  var fullPath = "Q:/src/personal_projects/virtual-office/output/" + outputPath;
-  if (fullPath.endsWith(".html")) {
-    return "file:///" + fullPath.replace(/\\/g, "/");
-  }
-  return "vscode://file/" + fullPath.replace(/\\/g, "/");
+  if (!lastOutput) return "#";
+  var outputPath = stripOutputPrefix(lastOutput);
+  return "/api/output/" + outputPath.replace(/\\/g, "/");
 }
 
 // --- Time formatting ---
 
 function formatTimeAgo(timestamp) {
+  // Detailed PST timestamp: "Mar 22 10:30 PM" for today, "Mar 20 3:15 PM" for older
   if (!timestamp) return "never";
-  var now = Date.now();
-  var then = new Date(timestamp).getTime();
-  var diffMs = now - then;
-  if (isNaN(diffMs) || diffMs < 0) return "just now";
-
-  var seconds = Math.floor(diffMs / 1000);
-  if (seconds < 60) return seconds + "s ago";
-  var minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return minutes + "m ago";
-  var hours = Math.floor(minutes / 60);
-  if (hours < 24) return hours + "h ago";
-  var days = Math.floor(hours / 24);
-  return days + "d ago";
+  var d = new Date(timestamp);
+  if (isNaN(d.getTime())) return "unknown";
+  var opts = { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true, timeZone: "America/Los_Angeles" };
+  var now = new Date();
+  // Add year if not current year
+  if (d.getFullYear() !== now.getFullYear()) {
+    opts.year = "numeric";
+  }
+  return d.toLocaleString("en-US", opts) + " PST";
 }
 
 function formatTimestamp(timestamp) {
@@ -103,6 +117,39 @@ function normalizeJobState(raw) {
   };
 }
 
+// --- Top-level tab navigation ---
+
+function switchTopTab(tabName) {
+  activeTopTab = tabName;
+  document.querySelectorAll(".top-tab").forEach(function(btn) {
+    btn.classList.toggle("active", btn.dataset.tab === tabName);
+  });
+  document.querySelectorAll(".view").forEach(function(v) {
+    v.style.display = "none";
+    v.classList.remove("active");
+  });
+  var target = document.getElementById("view-" + tabName);
+  if (target) {
+    target.style.display = "";
+    target.classList.add("active");
+  }
+
+  // Update URL
+  var url = new URL(window.location);
+  url.searchParams.set("view", tabName);
+  if (tabName !== "agents") {
+    url.searchParams.delete("tab");
+  } else if (activeGroup) {
+    url.searchParams.set("tab", activeGroup);
+  }
+  window.history.replaceState({}, "", url);
+
+  // Load events when switching to events tab
+  if (tabName === "events" && allEvents.length === 0) {
+    loadAllEvents();
+  }
+}
+
 // --- Render agents ---
 
 function getAgentStatus(agentData) {
@@ -112,9 +159,8 @@ function getAgentStatus(agentData) {
 }
 
 function getAgentIcon(agentData) {
-  // Use icon from data or default based on name
   if (agentData.icon) return agentData.icon;
-  return "\uD83E\uDD16"; // robot emoji
+  return "\uD83E\uDD16";
 }
 
 function renderAgentCard(name, agentData) {
@@ -204,10 +250,9 @@ function renderAgentCard(name, agentData) {
     });
   }
 
-  // Capabilities = ALL jobs (count never changes); active jobs shown separately
+  // Jobs list
   var jobs = agentData.jobs || [];
   var activeJobs = [];
-  var capabilities = jobs; // always the full list
   jobs.forEach(function (job) {
     if (job.status === "running" || job.status === "queued" || job.status === "pending" ||
         job.status === "completed" || job.status === "done" ||
@@ -216,7 +261,6 @@ function renderAgentCard(name, agentData) {
     }
   });
 
-  // Show active jobs directly on card
   if (activeJobs.length > 0) {
     var ul = document.createElement("ul");
     ul.className = "job-list";
@@ -272,7 +316,7 @@ function renderAgentCard(name, agentData) {
         var reportLink = document.createElement("a");
         reportLink.className = "report-link";
         reportLink.href = getReportHref(job.lastOutput);
-        reportLink.target = "";
+        reportLink.target = "_blank";
         reportLink.textContent = "View";
         reportLink.title = "View latest report" + (job.lastOutputTime ? " (" + formatTimeAgo(job.lastOutputTime) + ")" : "");
         reportLink.addEventListener("click", function(e) { e.stopPropagation(); });
@@ -284,7 +328,8 @@ function renderAgentCard(name, agentData) {
     card.appendChild(ul);
   }
 
-  // Capabilities shown on hover via tooltip
+  // Capabilities tooltip
+  var capabilities = jobs;
   if (capabilities.length > 0) {
     var capCount = document.createElement("div");
     capCount.className = "capabilities-hint";
@@ -302,10 +347,10 @@ function renderAgentCard(name, agentData) {
       var item = document.createElement("div");
       item.className = "tooltip-item";
 
-      var jobName = document.createElement("span");
-      jobName.className = "tooltip-job-name";
-      jobName.textContent = job.name || job.job || "unknown";
-      item.appendChild(jobName);
+      var jn = document.createElement("span");
+      jn.className = "tooltip-job-name";
+      jn.textContent = job.name || job.job || "unknown";
+      item.appendChild(jn);
 
       if (job.description) {
         var desc = document.createElement("span");
@@ -364,8 +409,9 @@ function renderAgentCard(name, agentData) {
     var footerLink = document.createElement("a");
     footerLink.className = "footer-report-link";
     footerLink.href = getReportHref(latestOutput);
-    footerLink.target = "";
+    footerLink.target = "_blank";
     footerLink.textContent = "Open";
+    footerLink.addEventListener("click", function(e) { e.stopPropagation(); });
     footer.appendChild(footerLink);
     card.appendChild(footer);
   }
@@ -374,7 +420,6 @@ function renderAgentCard(name, agentData) {
 }
 
 function mergeConfigAndDashboard(config, dashboard) {
-  // Start with all agents from config, overlay with dashboard state
   var merged = {};
   var AGENT_META_KEYS = ["status", "activeJob", "errorCount", "lastError", "updated"];
 
@@ -394,7 +439,6 @@ function mergeConfigAndDashboard(config, dashboard) {
         lastError: null,
         jobs: []
       };
-      // Add jobs from config as idle
       if (cfg.jobs) {
         Object.keys(cfg.jobs).forEach(function (jobName) {
           merged[name].jobs.push({
@@ -415,7 +459,6 @@ function mergeConfigAndDashboard(config, dashboard) {
     });
   }
 
-  // Overlay with dashboard state
   if (dashboard && dashboard.agents) {
     Object.keys(dashboard.agents).forEach(function (name) {
       var state = dashboard.agents[name];
@@ -432,21 +475,15 @@ function mergeConfigAndDashboard(config, dashboard) {
         };
       }
 
-      // Copy agent-level meta fields
       if (typeof state.errorCount === "number") merged[name].errorCount = state.errorCount;
       if (state.lastError) merged[name].lastError = state.lastError;
-
-      // Structured format: state.status + state.activeJob + state.jobs
       if (state.status) merged[name].status = state.status;
       if (state.activeJob) merged[name].running_job = { job: state.activeJob };
 
-      // Collect job data from either structured (state.jobs) or flat format
       var jobsSource = {};
       if (state.jobs && typeof state.jobs === "object") {
-        // Structured format: jobs nested under "jobs" key
         jobsSource = state.jobs;
       } else {
-        // Flat format: job data sits directly on agent object as named keys
         Object.keys(state).forEach(function (key) {
           if (AGENT_META_KEYS.indexOf(key) === -1 &&
               typeof state[key] === "object" && state[key] !== null &&
@@ -456,21 +493,17 @@ function mergeConfigAndDashboard(config, dashboard) {
         });
       }
 
-      // Merge each job using normalizeJobState
       Object.keys(jobsSource).forEach(function (jobName) {
         var normalized = normalizeJobState(jobsSource[jobName]);
 
-        // Bubble up running status to agent level
         if (normalized.status === "running") {
           merged[name].status = "busy";
           merged[name].running_job = { job: jobName, run: normalized.runId };
         }
 
-        // Find existing job from config or create new
         var found = false;
         merged[name].jobs.forEach(function (j, i) {
           if (j.name === jobName) {
-            // Preserve config-only fields (description, enabled)
             merged[name].jobs[i].status = normalized.status;
             merged[name].jobs[i].started = normalized.started;
             merged[name].jobs[i].runId = normalized.runId;
@@ -498,12 +531,10 @@ function mergeConfigAndDashboard(config, dashboard) {
           });
         }
 
-        // Bubble up last_completed (most recent across all jobs)
         if (normalized.lastCompleted &&
             (!merged[name].last_completed || normalized.lastCompleted > merged[name].last_completed)) {
           merged[name].last_completed = normalized.lastCompleted;
         }
-        // Accumulate queue depth
         if (normalized.queueDepth) {
           merged[name].queue_depth = (merged[name].queue_depth || 0) + normalized.queueDepth;
         }
@@ -512,6 +543,8 @@ function mergeConfigAndDashboard(config, dashboard) {
   }
   return merged;
 }
+
+// --- Running Modal ---
 
 function showRunningModal(agentName, agentData) {
   var existing = document.getElementById("running-modal-overlay");
@@ -535,7 +568,6 @@ function showRunningModal(agentName, agentData) {
   var modal = document.createElement("div");
   modal.className = "running-modal";
 
-  // Header
   var header = document.createElement("div");
   header.className = "modal-header";
   var title = document.createElement("span");
@@ -558,7 +590,7 @@ function showRunningModal(agentName, agentData) {
   body.style.overflowY = "auto";
   body.style.flex = "1";
 
-  // --- Status section ---
+  // Status section
   var statusSection = document.createElement("div");
   statusSection.className = "running-section";
   var statusTitle = document.createElement("div");
@@ -566,18 +598,14 @@ function showRunningModal(agentName, agentData) {
   statusTitle.textContent = "Status";
   statusSection.appendChild(statusTitle);
 
-  // Find the running job data from merged jobs array
   var runId = "";
   var startedTime = null;
-  var runningJobData = null;
   if (agentData.running_job) {
     runId = agentData.running_job.run || "";
   }
-  // Look through jobs for the running one
   var jobs = agentData.jobs || [];
   jobs.forEach(function(j) {
     if (j.status === "running") {
-      runningJobData = j;
       if (j.runId) runId = j.runId;
       if (j.started) startedTime = j.started;
     }
@@ -621,7 +649,7 @@ function showRunningModal(agentName, agentData) {
   statusSection.appendChild(durationRow);
   body.appendChild(statusSection);
 
-  // --- Stats section ---
+  // Stats section
   var statsSection = document.createElement("div");
   statsSection.className = "running-section";
   var statsTitle = document.createElement("div");
@@ -673,7 +701,7 @@ function showRunningModal(agentName, agentData) {
     statsSection.appendChild(row);
   });
 
-  // Last Output row (with link if available)
+  // Last Output row
   var outputRow = document.createElement("div");
   outputRow.className = "running-field";
   var outputLabel = document.createElement("span");
@@ -683,7 +711,7 @@ function showRunningModal(agentName, agentData) {
   if (lastOutputFile) {
     var outputLink = document.createElement("a");
     outputLink.href = getReportHref(lastOutputFile);
-    outputLink.target = "";
+    outputLink.target = "_blank";
     outputLink.textContent = "View Report";
     outputLink.style.color = "#2563eb";
     outputLink.style.fontWeight = "600";
@@ -699,7 +727,7 @@ function showRunningModal(agentName, agentData) {
   statsSection.appendChild(outputRow);
   body.appendChild(statsSection);
 
-  // --- Recent Events section ---
+  // Recent Events section
   var eventsSection = document.createElement("div");
   eventsSection.className = "running-section";
   var eventsTitle = document.createElement("div");
@@ -711,9 +739,7 @@ function showRunningModal(agentName, agentData) {
   eventsContainer.className = "running-events";
 
   var agentEvents = latestEvents.filter(function(evt) {
-    var evtAgent = evt.agent || evt.message || evt.detail || evt.msg || "";
-    return evtAgent.indexOf(agentName) !== -1 ||
-           (evt.agent && evt.agent === agentName);
+    return evt.agent === agentName;
   });
 
   var recentEvents = agentEvents.slice(-10);
@@ -761,8 +787,9 @@ function showRunningModal(agentName, agentData) {
   document.body.appendChild(overlay);
 }
 
+// --- Error Modal ---
+
 function showErrorModal(agentName, errors) {
-  // Remove existing modal if any
   var existing = document.getElementById("error-modal-overlay");
   if (existing) existing.remove();
 
@@ -776,7 +803,6 @@ function showErrorModal(agentName, errors) {
   var modal = document.createElement("div");
   modal.className = "error-modal";
 
-  // Header
   var header = document.createElement("div");
   header.className = "modal-header";
   var title = document.createElement("span");
@@ -790,7 +816,6 @@ function showErrorModal(agentName, errors) {
   header.appendChild(closeBtn);
   modal.appendChild(header);
 
-  // Error list
   var list = document.createElement("div");
   list.className = "error-list";
 
@@ -827,7 +852,6 @@ function showErrorModal(agentName, errors) {
 
     row.appendChild(summary);
 
-    // Expandable detail
     var detail = document.createElement("div");
     detail.className = "error-detail";
     detail.style.display = "none";
@@ -855,21 +879,18 @@ function showErrorModal(agentName, errors) {
       detail.appendChild(line);
     });
 
-    // Mark resolved button
     if (!err.resolved) {
       var resolveBtn = document.createElement("button");
       resolveBtn.className = "resolve-btn";
       resolveBtn.textContent = "Mark Resolved";
       resolveBtn.addEventListener("click", function() {
-        // For now just visually resolve (full impl would POST to server)
         row.classList.add("resolved");
         err.resolved = true;
-        // Update badge count
-        var badge = document.querySelector("[data-agent='" + agentName + "'] .error-badge");
-        if (badge) {
+        var badge2 = document.querySelector("[data-agent='" + agentName + "'] .error-badge");
+        if (badge2) {
           var remaining = errors.filter(function(e) { return !e.resolved; }).length;
-          if (remaining === 0) { badge.remove(); }
-          else { badge.textContent = remaining + (remaining === 1 ? " error" : " errors"); }
+          if (remaining === 0) { badge2.remove(); }
+          else { badge2.textContent = remaining + (remaining === 1 ? " error" : " errors"); }
         }
       });
       detail.appendChild(resolveBtn);
@@ -884,6 +905,8 @@ function showErrorModal(agentName, errors) {
   document.body.appendChild(overlay);
 }
 
+// --- Agent group tabs ---
+
 function getAgentGroup(name) {
   if (agentConfig && agentConfig.agents && agentConfig.agents[name] && agentConfig.agents[name].group) {
     return agentConfig.agents[name].group;
@@ -895,7 +918,6 @@ function renderAgentTabs(agents) {
   var tabsEl = document.getElementById("agent-tabs");
   if (!tabsEl) return [];
 
-  // Collect groups preserving config order
   var groups = {};
   var groupOrder = [];
   Object.keys(agents).forEach(function(name) {
@@ -907,10 +929,8 @@ function renderAgentTabs(agents) {
     groups[group].push(name);
   });
 
-  // Default to first group if activeGroup is invalid
   if (!activeGroup || !groups[activeGroup]) activeGroup = groupOrder[0];
 
-  // Render tabs
   tabsEl.innerHTML = "";
   groupOrder.forEach(function(groupName) {
     var tab = document.createElement("button");
@@ -926,51 +946,410 @@ function renderAgentTabs(agents) {
     tabsEl.appendChild(tab);
   });
 
-  // Update section title
-  var titleEl = document.getElementById("agent-section-title");
-  if (titleEl) titleEl.textContent = activeGroup;
-
   return groups[activeGroup] || [];
 }
 
+// --- Mission Control: Stats ---
+
+function computeStats(events, agents) {
+  var now = new Date();
+  var todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+
+  // Get Monday of current week at midnight
+  var dayOfWeek = now.getDay();
+  var daysSinceMonday = (dayOfWeek === 0) ? 6 : (dayOfWeek - 1);
+  var mondayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysSinceMonday).getTime();
+
+  var completedToday = 0;
+  var completedWeek = 0;
+  var failedToday = 0;
+  var failedWeek = 0;
+
+  var completedOrFailedRunIds = {};
+  var startedEvents = [];
+  var twoHoursAgo = now.getTime() - (2 * 60 * 60 * 1000);
+
+  if (Array.isArray(events)) {
+    events.forEach(function(evt) {
+      var evtType = evt.event || evt.type || "";
+      var evtTime = new Date(evt.timestamp || evt.ts || evt.time).getTime();
+      if (isNaN(evtTime)) return;
+
+      var runId = (evt.details && evt.details.run_id) ? evt.details.run_id : null;
+
+      if (evtType === "completed") {
+        if (evtTime >= todayMidnight) completedToday++;
+        if (evtTime >= mondayMidnight) completedWeek++;
+        if (runId) completedOrFailedRunIds[runId] = true;
+      } else if (evtType === "failed") {
+        if (evtTime >= todayMidnight) failedToday++;
+        if (evtTime >= mondayMidnight) failedWeek++;
+        if (runId) completedOrFailedRunIds[runId] = true;
+      } else if (evtType === "started") {
+        startedEvents.push({ runId: runId, time: evtTime });
+      }
+    });
+  }
+
+  // Count stalled jobs: started with no matching completed/failed and older than 2 hours
+  var stalledToday = 0;
+  var stalledWeek = 0;
+  startedEvents.forEach(function(se) {
+    if (se.runId && !completedOrFailedRunIds[se.runId] && se.time < twoHoursAgo) {
+      if (se.time >= todayMidnight) stalledToday++;
+      if (se.time >= mondayMidnight) stalledWeek++;
+    }
+  });
+
+  // Include stalled in failed totals
+  var explicitFailedToday = failedToday;
+  var explicitFailedWeek = failedWeek;
+  failedToday += stalledToday;
+  failedWeek += stalledWeek;
+
+  var agentsActive = 0;
+  var agentsTotal = 0;
+  if (agents && typeof agents === "object") {
+    var agentNames = Object.keys(agents);
+    agentsTotal = agentNames.length;
+    agentNames.forEach(function(name) {
+      if (agents[name].status === "busy") agentsActive++;
+    });
+  }
+
+  var elCompletedToday = document.getElementById("stat-completed-today");
+  var elCompletedWeek = document.getElementById("stat-completed-week");
+  var elFailedToday = document.getElementById("stat-failed-today");
+  var elFailedWeek = document.getElementById("stat-failed-week");
+  var elAgentsActive = document.getElementById("stat-agents-active");
+  var elAgentsTotal = document.getElementById("stat-agents-total");
+  var elHeartbeat = document.getElementById("stat-heartbeat");
+  var elHeartbeatTime = document.getElementById("stat-heartbeat-time");
+
+  if (elCompletedToday) elCompletedToday.textContent = completedToday + " today";
+  if (elCompletedWeek) elCompletedWeek.textContent = completedWeek + " this week";
+  if (elFailedToday) elFailedToday.textContent = failedToday + " today" + (stalledToday > 0 ? " (" + explicitFailedToday + " failed + " + stalledToday + " stalled)" : "");
+  if (elFailedWeek) elFailedWeek.textContent = failedWeek + " this week" + (stalledWeek > 0 ? " (" + explicitFailedWeek + " failed + " + stalledWeek + " stalled)" : "");
+  if (elAgentsActive) elAgentsActive.textContent = String(agentsActive);
+  if (elAgentsTotal) elAgentsTotal.textContent = agentsTotal + " total";
+  if (elHeartbeat) elHeartbeat.textContent = isConnected ? "Operational" : "Disconnected";
+  if (elHeartbeatTime) elHeartbeatTime.textContent = isConnected ? new Date().toLocaleTimeString() : "--";
+}
+
+// --- Mission Control: Agent List (left column) ---
+
+function renderAgentList(agents) {
+  var listEl = document.getElementById("agent-list");
+  if (!listEl) return;
+  listEl.innerHTML = "";
+
+  var busyCount = 0;
+  var agentNames = Object.keys(agents);
+
+  agentNames.forEach(function(name) {
+    var agentData = agents[name];
+    var status = getAgentStatus(agentData);
+    if (status === "busy") busyCount++;
+
+    var card = document.createElement("div");
+    card.className = "agent-list-card " + status;
+    card.dataset.agent = name;
+
+    // Top row: name + status badge
+    var topRow = document.createElement("div");
+    topRow.className = "agent-list-top";
+
+    var nameEl = document.createElement("span");
+    nameEl.className = "agent-list-name";
+    nameEl.textContent = agentData.display_name || name;
+    nameEl.style.color = getAgentColor(name);
+    topRow.appendChild(nameEl);
+
+    var statusBadge = document.createElement("span");
+    if (status === "busy") {
+      statusBadge.className = "agent-list-status working";
+      statusBadge.textContent = "Working";
+    } else if (status === "disabled") {
+      statusBadge.className = "agent-list-status disabled-status";
+      statusBadge.textContent = "Disabled";
+    } else {
+      statusBadge.className = "agent-list-status idle-status";
+      statusBadge.textContent = "Idle";
+    }
+    topRow.appendChild(statusBadge);
+    card.appendChild(topRow);
+
+    // Activity line
+    var activityLine = document.createElement("div");
+    activityLine.className = "agent-list-activity";
+
+    if (status === "busy" && agentData.running_job) {
+      var runJobName = agentData.running_job.job || agentData.running_job.name || "unknown";
+      var actText = "Running: " + runJobName;
+      // Calculate elapsed time
+      var startedTime = null;
+      var agentJobs = agentData.jobs || [];
+      agentJobs.forEach(function(j) {
+        if (j.status === "running" && j.started) {
+          startedTime = j.started;
+        }
+      });
+      if (startedTime) {
+        var elapsed = Math.max(0, Math.floor((Date.now() - new Date(startedTime).getTime()) / 1000));
+        var em = Math.floor(elapsed / 60);
+        var es = elapsed % 60;
+        actText += " (" + em + "m " + (es < 10 ? "0" : "") + es + "s)";
+      }
+      activityLine.textContent = actText;
+    } else if (agentData.last_completed) {
+      // Find the last completed job's description
+      var lastJobDesc = "";
+      var agentJobs2 = agentData.jobs || [];
+      agentJobs2.forEach(function(j) {
+        if (j.lastCompleted && j.lastCompleted === agentData.last_completed && j.description) {
+          lastJobDesc = j.description;
+        }
+      });
+      if (lastJobDesc) {
+        activityLine.textContent = lastJobDesc + " \u2022 " + formatTimeAgo(agentData.last_completed);
+      } else {
+        activityLine.textContent = "Last completed " + formatTimeAgo(agentData.last_completed);
+      }
+    } else {
+      activityLine.textContent = agentData.description || "No recent activity";
+    }
+    card.appendChild(activityLine);
+
+    // Timestamp line
+    var tsLine = document.createElement("div");
+    tsLine.className = "agent-list-timestamp";
+    if (agentData.last_completed) {
+      tsLine.textContent = formatTimestamp(agentData.last_completed);
+    } else {
+      tsLine.textContent = "";
+    }
+    card.appendChild(tsLine);
+
+    // Click handler
+    if (status === "busy") {
+      card.style.cursor = "pointer";
+      card.addEventListener("click", function() {
+        showRunningModal(name, agentData);
+      });
+    }
+
+    listEl.appendChild(card);
+  });
+
+  var badgeEl = document.getElementById("active-agents-badge");
+  if (badgeEl) badgeEl.textContent = busyCount + " busy";
+}
+
+// --- Mission Control: Activity Feed (right column) ---
+
+function renderActivityFeed(events) {
+  var feedEl = document.getElementById("activity-feed");
+  if (!feedEl) return;
+  feedEl.innerHTML = "";
+
+  if (!Array.isArray(events) || events.length === 0) {
+    var empty = document.createElement("div");
+    empty.className = "placeholder-message";
+    empty.textContent = "No recent events";
+    feedEl.appendChild(empty);
+    return;
+  }
+
+  // Take last 15, newest first
+  var recent = events.slice(-15).reverse();
+
+  recent.forEach(function(evt) {
+    var entry = document.createElement("div");
+    entry.className = "activity-entry";
+
+    var ts = document.createElement("span");
+    ts.className = "activity-timestamp";
+    ts.textContent = formatTimeAgo(evt.timestamp || evt.ts || evt.time);
+    entry.appendChild(ts);
+
+    var evtType = evt.event || evt.type || "info";
+    var typeBadge = document.createElement("span");
+    typeBadge.className = "activity-type-badge " + eventTypeClass(evtType);
+    typeBadge.textContent = evtType;
+    entry.appendChild(typeBadge);
+
+    var desc = document.createElement("span");
+    desc.className = "activity-description";
+    var agentName = evt.agent || "unknown";
+    var jobName = evt.job || "unknown";
+    var details = evt.details || {};
+
+    var agentSpan = document.createElement("span");
+    agentSpan.style.color = getAgentColor(agentName);
+    agentSpan.style.fontWeight = "600";
+    agentSpan.textContent = agentName;
+
+    var restText = "";
+    if (evtType === "completed") {
+      var durationStr = details.duration ? details.duration : "";
+      var exitStr = details.exit_code !== undefined ? "exit:" + details.exit_code : "";
+      var parts = [durationStr, exitStr].filter(function(p) { return p; });
+      restText = " completed " + jobName + (parts.length ? " (" + parts.join(", ") + ")" : "");
+    } else if (evtType === "started") {
+      var runStr = details.run_id ? "run:" + details.run_id : "";
+      restText = " started " + jobName + (runStr ? " (" + runStr + ")" : "");
+    } else if (evtType === "failed") {
+      var fParts = [];
+      if (details.exit_code !== undefined) fParts.push("exit:" + details.exit_code);
+      if (details.duration) fParts.push(details.duration);
+      restText = " failed " + jobName + (fParts.length ? " (" + fParts.join(", ") + ")" : "");
+    } else if (evtType === "queued") {
+      var qStr = details.queue_depth !== undefined ? "queue:" + details.queue_depth : "";
+      restText = " queued " + jobName + (qStr ? " (" + qStr + ")" : "");
+    } else if (evtType === "stale_lock_cleared") {
+      desc.appendChild(document.createTextNode("Stale lock cleared for "));
+      desc.appendChild(agentSpan);
+      desc.appendChild(document.createTextNode("/" + jobName));
+      entry.appendChild(desc);
+      feedEl.appendChild(entry);
+      return;
+    } else if (evtType === "schedule_registered") {
+      desc.appendChild(document.createTextNode("Schedule registered for "));
+      desc.appendChild(agentSpan);
+      desc.appendChild(document.createTextNode("/" + jobName));
+      entry.appendChild(desc);
+      feedEl.appendChild(entry);
+      return;
+    } else if (evtType === "schedule_removed") {
+      desc.appendChild(document.createTextNode("Schedule removed for "));
+      desc.appendChild(agentSpan);
+      desc.appendChild(document.createTextNode("/" + jobName));
+      entry.appendChild(desc);
+      feedEl.appendChild(entry);
+      return;
+    } else {
+      restText = " " + evtType + " " + jobName;
+    }
+
+    desc.appendChild(agentSpan);
+    desc.appendChild(document.createTextNode(restText));
+
+    entry.appendChild(desc);
+    feedEl.appendChild(entry);
+  });
+}
+
+// --- Render agents (main view) ---
+
 function renderAgents(dashboard) {
   lastDashboard = dashboard;
-  var grid = document.getElementById("agent-grid");
   var agents = mergeConfigAndDashboard(agentConfig, dashboard);
   var agentNames = Object.keys(agents);
 
   if (agentNames.length === 0) {
-    grid.innerHTML = '<div class="placeholder-message">No agents configured</div>';
+    var listEl = document.getElementById("agent-list");
+    if (listEl) listEl.innerHTML = '<div class="placeholder-message">No agents configured</div>';
     return;
   }
 
-  // Render tabs and get filtered agent names for active group
   var visibleNames = renderAgentTabs(agents);
 
-  // Rebuild grid with only visible agents
-  grid.innerHTML = "";
-  visibleNames.forEach(function (name) {
-    var card = renderAgentCard(name, agents[name]);
-    grid.appendChild(card);
+  // Build filtered agents object for the active group
+  var filteredAgents = {};
+  visibleNames.forEach(function(name) {
+    filteredAgents[name] = agents[name];
+  });
+
+  // Render Mission Control left column
+  renderAgentList(filteredAgents);
+
+  // Render Mission Control right column — filtered to active group's agents
+  var groupAgentNames = visibleNames;
+  var groupEvents = latestEvents.filter(function(evt) {
+    var evtAgent = evt.agent || "";
+    return groupAgentNames.indexOf(evtAgent) !== -1;
+  });
+  renderActivityFeed(groupEvents);
+
+  // Compute stats using all agents (not just filtered)
+  computeStats(latestEvents, agents);
+}
+
+// --- Event Log (full page) ---
+
+async function loadAllEvents() {
+  try {
+    allEvents = await fetchAllEvents();
+    populateAgentFilter();
+    renderFilteredEvents();
+  } catch (e) {
+    console.warn("Failed to load all events:", e.message);
+  }
+}
+
+function populateAgentFilter() {
+  var select = document.getElementById("filter-agent");
+  if (!select) return;
+  var agents = {};
+  allEvents.forEach(function(evt) {
+    if (evt.agent) agents[evt.agent] = true;
+  });
+  // Preserve current selection
+  var current = select.value;
+  // Clear options after "All Agents"
+  while (select.options.length > 1) select.remove(1);
+  Object.keys(agents).sort().forEach(function(name) {
+    var opt = document.createElement("option");
+    opt.value = name;
+    opt.textContent = name;
+    select.appendChild(opt);
+  });
+  select.value = current;
+}
+
+function getFilteredEvents() {
+  var agentFilter = document.getElementById("filter-agent").value;
+  var typeFilter = document.getElementById("filter-event-type").value;
+  var timeFilter = document.getElementById("filter-time").value;
+
+  var now = Date.now();
+  var timeMs = 0;
+  if (timeFilter === "1h") timeMs = 3600000;
+  else if (timeFilter === "6h") timeMs = 21600000;
+  else if (timeFilter === "24h") timeMs = 86400000;
+  else if (timeFilter === "7d") timeMs = 604800000;
+
+  return allEvents.filter(function(evt) {
+    if (agentFilter && evt.agent !== agentFilter) return false;
+    var evtType = evt.type || evt.event || "";
+    if (typeFilter && evtType !== typeFilter) return false;
+    if (timeMs) {
+      var evtTime = new Date(evt.timestamp || evt.ts || evt.time).getTime();
+      if (now - evtTime > timeMs) return false;
+    }
+    return true;
   });
 }
 
-// --- Render events ---
+function renderFilteredEvents() {
+  var filtered = getFilteredEvents();
+  var log = document.getElementById("event-log-full");
+  var countEl = document.getElementById("event-count");
 
-function eventTypeClass(type) {
-  if (!type) return "";
-  return type.replace(/_/g, "-").toLowerCase();
-}
+  if (countEl) {
+    countEl.textContent = filtered.length + " event" + (filtered.length !== 1 ? "s" : "");
+  }
 
-function renderEvents(events) {
-  var log = document.getElementById("event-log");
-  if (!events || events.length === 0) {
-    log.innerHTML = '<div class="placeholder-message">No events yet</div>';
+  if (!filtered || filtered.length === 0) {
+    log.innerHTML = '<div class="placeholder-message">No events match filters</div>';
     return;
   }
 
   log.innerHTML = "";
-  events.forEach(function (evt) {
+
+  // Show newest first
+  var reversed = filtered.slice().reverse();
+  reversed.forEach(function (evt) {
     var row = document.createElement("div");
     row.className = "event-row";
 
@@ -979,27 +1358,42 @@ function renderEvents(events) {
     time.textContent = formatTimestamp(evt.timestamp || evt.ts || evt.time);
     row.appendChild(time);
 
+    var evtType = evt.type || evt.event || "info";
     var type = document.createElement("span");
-    type.className = "event-type " + eventTypeClass(evt.type || evt.event);
-    type.textContent = evt.type || evt.event || "info";
+    type.className = "event-type " + eventTypeClass(evtType);
+    type.textContent = evtType;
     row.appendChild(type);
+
+    var agent = document.createElement("span");
+    agent.className = "event-agent";
+    agent.textContent = evt.agent || "";
+    row.appendChild(agent);
+
+    var job = document.createElement("span");
+    job.className = "event-job-name";
+    job.textContent = evt.job || "";
+    row.appendChild(job);
 
     var detail = document.createElement("span");
     detail.className = "event-detail";
-    var detailText = evt.message || evt.detail || evt.msg || "";
-    if (!detailText && evt.agent) {
-      detailText = evt.agent;
-      if (evt.job) detailText += " - " + evt.job;
+    var detailParts = [];
+    if (evt.details) {
+      if (evt.details.run_id) detailParts.push("run:" + evt.details.run_id);
+      if (evt.details.duration) detailParts.push(evt.details.duration);
+      if (evt.details.exit_code !== undefined) detailParts.push("exit:" + evt.details.exit_code);
+      if (evt.details.queue_depth !== undefined) detailParts.push("queue:" + evt.details.queue_depth);
     }
-    detail.textContent = detailText;
-    detail.title = detailText;
+    detail.textContent = detailParts.join(" | ");
+    detail.title = JSON.stringify(evt.details || {});
     row.appendChild(detail);
 
     log.appendChild(row);
   });
+}
 
-  // Auto-scroll to bottom
-  log.scrollTop = log.scrollHeight;
+function eventTypeClass(type) {
+  if (!type) return "";
+  return type.replace(/_/g, "-").toLowerCase();
 }
 
 // --- Connection indicator ---
@@ -1025,30 +1419,50 @@ function updateTimestamp() {
 // --- Polling ---
 
 async function poll() {
-  try {
-    var dashboard = await fetchDashboard();
-    var dashJSON = JSON.stringify(dashboard);
-    if (dashJSON !== lastDashboardJSON) {
-      lastDashboardJSON = dashJSON;
-      renderAgents(dashboard);
-    }
-    setConnected(true);
-    updateTimestamp();
-  } catch (e) {
-    setConnected(false);
-    console.warn("Dashboard fetch failed:", e.message);
-  }
-
+  // Fetch events FIRST so latestEvents is populated before renderAgents
   try {
     var events = await fetchEvents();
     latestEvents = events;
     var evtJSON = JSON.stringify(events);
     if (evtJSON !== lastEventsJSON) {
       lastEventsJSON = evtJSON;
-      renderEvents(events);
+      if (activeTopTab === "events") {
+        allEvents = await fetchAllEvents();
+        populateAgentFilter();
+        renderFilteredEvents();
+      }
     }
   } catch (e) {
     console.warn("Events fetch failed:", e.message);
+  }
+
+  try {
+    var dashboard = await fetchDashboard();
+    var dashJSON = JSON.stringify(dashboard);
+    if (dashJSON !== lastDashboardJSON) {
+      lastDashboardJSON = dashJSON;
+      renderAgents(dashboard);
+    } else if (activeTopTab === "agents" && lastDashboard) {
+      // Even if dashboard unchanged, refresh activity feed with latest events
+      var mergedAgents = mergeConfigAndDashboard(agentConfig, lastDashboard);
+      // Filter events to active group
+      var visNames = [];
+      if (agentConfig && agentConfig.agents) {
+        Object.keys(agentConfig.agents).forEach(function(n) {
+          if (getAgentGroup(n) === activeGroup) visNames.push(n);
+        });
+      }
+      var grpEvts = latestEvents.filter(function(evt) {
+        return visNames.indexOf(evt.agent || "") !== -1;
+      });
+      renderActivityFeed(grpEvts);
+      computeStats(latestEvents, mergedAgents);
+    }
+    setConnected(true);
+    updateTimestamp();
+  } catch (e) {
+    setConnected(false);
+    console.warn("Dashboard fetch failed:", e.message);
   }
 
   try {
@@ -1069,25 +1483,48 @@ async function poll() {
 }
 
 async function startPolling() {
-  // Restore active tab from URL query parameter (survives F5 refresh)
+  // Restore state from URL
   var urlParams = new URLSearchParams(window.location.search);
+  var viewParam = urlParams.get("view");
   var tabParam = urlParams.get("tab");
   if (tabParam) {
     activeGroup = tabParam;
   }
-  // Load config once (agent registry + job definitions)
+  if (viewParam && (viewParam === "agents" || viewParam === "events")) {
+    activeTopTab = viewParam;
+    switchTopTab(viewParam);
+  }
+
+  // Load config
   try {
     agentConfig = await fetchConfig();
   } catch (e) {
     console.warn("Config fetch failed, will retry on next poll:", e.message);
   }
+
   // Initial fetch
   poll();
-  // Repeat
   setInterval(poll, CONFIG.POLL_INTERVAL);
 }
 
 // --- Init ---
 document.addEventListener("DOMContentLoaded", function () {
+  // Top tab click handlers
+  document.querySelectorAll(".top-tab").forEach(function(btn) {
+    btn.addEventListener("click", function() {
+      switchTopTab(btn.dataset.tab);
+    });
+  });
+
+  // Event filter change handlers
+  ["filter-agent", "filter-event-type", "filter-time"].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) {
+      el.addEventListener("change", function() {
+        renderFilteredEvents();
+      });
+    }
+  });
+
   startPolling();
 });

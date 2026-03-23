@@ -70,8 +70,21 @@ function ConvertFrom-CronToTrigger {
 
     $daysOfWeek = @()
     if ($dowField -ne '*') {
-        $dowParts = $dowField -split ','
-        foreach ($d in $dowParts) {
+        # Expand range patterns like 1-5 to 1,2,3,4,5
+        $expandedParts = @()
+        foreach ($segment in ($dowField -split ',')) {
+            $segment = $segment.Trim()
+            if ($segment -match '^(\d+)-(\d+)$') {
+                $start = [int]$Matches[1]
+                $end = [int]$Matches[2]
+                for ($i = $start; $i -le $end; $i++) {
+                    $expandedParts += "$i"
+                }
+            } else {
+                $expandedParts += $segment
+            }
+        }
+        foreach ($d in $expandedParts) {
             $key = $d.Trim().ToUpper()
             if ($dowMap.ContainsKey($key)) {
                 $daysOfWeek += $dowMap[$key]

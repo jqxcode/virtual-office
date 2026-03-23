@@ -261,26 +261,31 @@ if (-not $prompt) {
 
 # Ensure state directory
 $stateDir = Ensure-StateDir -AgentName $Agent -JobName $Job
-$lockFile = Join-Path $stateDir "lock"
 $queueFile = Join-Path $stateDir "queue"
 $counterFile = Join-Path $stateDir "counter.json"
 
-# Step 4: Check lock
-if (Test-Path $lockFile) {
-    # Check if lock is stale
-    $lockContent = Get-Content -Path $lockFile -Raw -ErrorAction SilentlyContinue
-    $staleLockTimeout = $DEFAULT_STALE_LOCK_TIMEOUT_MINUTES
-    # Check for per-agent override
-    if ($agentsConfig[$Agent].ContainsKey("staleLockTimeoutMinutes")) {
-        $staleLockTimeout = [int]$agentsConfig[$Agent]["staleLockTimeoutMinutes"]
-    }
+# Step 4: Agent-level lock -- only one job per agent at a time
+$agentStateDir = Join-Path $STATE_DIR "agents" $Agent
+if (-not (Test-Path $agentStateDir)) {
+    New-Item -ItemType Directory -Path $agentStateDir -Force | Out-Null
+}
+$lockFile = Join-Path $agentStateDir "lock"
 
+$staleLockTimeout = $DEFAULT_STALE_LOCK_TIMEOUT_MINUTES
+if ($agentsConfig[$Agent].ContainsKey("staleLockTimeoutMinutes")) {
+    $staleLockTimeout = [int]$agentsConfig[$Agent]["staleLockTimeoutMinutes"]
+}
+
+if (Test-Path $lockFile) {
+    $lockContent = Get-Content -Path $lockFile -Raw -ErrorAction SilentlyContinue
     $lockAge = $null
+    $lockedByJob = "unknown"
     try {
-        $lockTime = [DateTime]::Parse($lockContent.Trim())
+        $parsed = $lockContent.Trim() | ConvertFrom-Json
+        $lockTime = [DateTime]::Parse($parsed.ts)
         $lockAge = (Get-Date) - $lockTime
+        $lockedByJob = $parsed.job
     } catch {
-        # If lock content is not a valid timestamp, treat as stale
         $lockAge = [TimeSpan]::FromMinutes($staleLockTimeout + 1)
     }
 
@@ -288,24 +293,24 @@ if (Test-Path $lockFile) {
         # Stale lock -- force clear
         Remove-Item -Path $lockFile -Force
         Write-Event -AgentName $Agent -JobName $Job -Event "stale_lock_cleared" -Details @{
+            locked_by_job = $lockedByJob
             lock_age_minutes = [math]::Round($lockAge.TotalMinutes)
             timeout_minutes = $staleLockTimeout
         }
         Write-AuditEntry -Action "stale_lock_cleared" -AgentName $Agent -JobName $Job -RunId "N/A" -Details @{
+            locked_by_job = $lockedByJob
             lock_age_minutes = [math]::Round($lockAge.TotalMinutes)
-            timeout_minutes = $staleLockTimeout
         }
-        Write-Host "Stale lock cleared for '$Job' on agent '$Agent' (age: $([math]::Round($lockAge.TotalMinutes))m, timeout: ${staleLockTimeout}m)."
-        # Fall through to normal run flow below
+        Write-Host "Stale lock cleared for '$Agent' (was held by '$lockedByJob', age: $([math]::Round($lockAge.TotalMinutes))m, timeout: ${staleLockTimeout}m)."
     } else {
-        # Lock is fresh -- queue this request
+        # Agent is busy -- queue this job
         $depth = Get-QueueDepth -QueueFile $queueFile
         $depth++
         Set-QueueDepth -QueueFile $queueFile -Depth $depth
-        Write-Host "Job '$Job' for agent '$Agent' is locked. Queued (depth: $depth)."
-        Write-AuditEntry -Action "queued" -AgentName $Agent -JobName $Job -RunId "" -Details @{ queue_depth = $depth }
-        Write-Event -AgentName $Agent -JobName $Job -Event "queued" -Details @{ queue_depth = $depth }
-        Update-Dashboard -AgentName $Agent -JobName $Job -Status "queued" -Details @{ queue_depth = $depth }
+        Write-Host "Agent '$Agent' is busy (running '$lockedByJob'). Queued '$Job' (depth: $depth)."
+        Write-AuditEntry -Action "queued" -AgentName $Agent -JobName $Job -RunId "" -Details @{ queue_depth = $depth; locked_by_job = $lockedByJob }
+        Write-Event -AgentName $Agent -JobName $Job -Event "queued" -Details @{ queue_depth = $depth; locked_by_job = $lockedByJob }
+        Update-Dashboard -AgentName $Agent -JobName $Job -Status "queued" -Details @{ queue_depth = $depth; blocked_by = $lockedByJob }
         exit 0
     }
 }
@@ -313,8 +318,9 @@ if (Test-Path $lockFile) {
 # --- Run loop (handles queue drain) ---
 $keepRunning = $true
 while ($keepRunning) {
-    # Create lock
-    Write-AtomicFile -Path $lockFile -Content (Get-Date -Format "o")
+    # Create agent-level lock
+    $lockContent = @{ ts = (Get-Date -Format "o"); job = $Job } | ConvertTo-Json -Compress
+    Write-AtomicFile -Path $lockFile -Content $lockContent
 
     # Step 5: Check counter / maxRuns
     $maxRuns = 0
@@ -347,8 +353,13 @@ while ($keepRunning) {
     # Step 8: Invoke claude
     $agentDef = $agentsConfig[$Agent]
     $agentFile = $null
-    if ($agentDef.ContainsKey("agent_file")) {
-        $agentFile = Join-Path $PROJECT_ROOT $agentDef["agent_file"]
+    if ($agentDef.ContainsKey("agentFile")) {
+        $rawPath = $agentDef["agentFile"]
+        if ($rawPath.StartsWith("~/")) {
+            $agentFile = Join-Path $HOME $rawPath.Substring(2)
+        } else {
+            $agentFile = Join-Path $PROJECT_ROOT $rawPath
+        }
     }
 
     $output = ""
@@ -384,19 +395,37 @@ while ($keepRunning) {
             -Duration $runDuration
     }
 
-    # Step 9: Save output
+    # Step 9: Save output (skip if saveOutput is false in job config)
+    $saveOutput = -not ($jobDef.ContainsKey("saveOutput") -and $jobDef["saveOutput"] -eq $false)
     $outputAgentDir = Join-Path $OUTPUT_DIR $Agent
-    if (-not (Test-Path $outputAgentDir)) {
-        New-Item -ItemType Directory -Path $outputAgentDir -Force | Out-Null
-    }
     $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
-    $outputFile = Join-Path $outputAgentDir "$Job-$timestamp.md"
-    $latestFile = Join-Path $outputAgentDir "$Job-latest.md"
-    Write-AtomicFile -Path $outputFile -Content $output -Encoding ([System.Text.Encoding]::UTF8)
-    Write-AtomicFile -Path $latestFile -Content $output -Encoding ([System.Text.Encoding]::UTF8)
+    $outputFile = $null
+    $relOutputPath = $null
+    if ($saveOutput) {
+        if (-not (Test-Path $outputAgentDir)) {
+            New-Item -ItemType Directory -Path $outputAgentDir -Force | Out-Null
+        }
+        $outputFile = Join-Path $outputAgentDir "$Job-$timestamp.md"
+        $latestFile = Join-Path $outputAgentDir "$Job-latest.md"
+        Write-AtomicFile -Path $outputFile -Content $output -Encoding ([System.Text.Encoding]::UTF8)
+        Write-AtomicFile -Path $latestFile -Content $output -Encoding ([System.Text.Encoding]::UTF8)
+        $relOutputPath = "output/$Agent/$Job-$timestamp.md"
+    }
 
-    # Step 9b: Compute relative output path and track in dashboard
-    $relOutputPath = "output/$Agent/$Job-$timestamp.md"
+    # Step 9b: Find the latest HTML report if runner output was not saved
+    if (-not $relOutputPath -and (Test-Path $outputAgentDir)) {
+        $latestHtml = Get-ChildItem -Path $outputAgentDir -Filter "*-latest.html" -File -ErrorAction SilentlyContinue |
+            Sort-Object LastWriteTime -Descending | Select-Object -First 1
+        if (-not $latestHtml) {
+            # Also check parent output dir (e.g. sprint-progress-latest.html)
+            $latestHtml = Get-ChildItem -Path $OUTPUT_DIR -Filter "*-latest.html" -File -ErrorAction SilentlyContinue |
+                Sort-Object LastWriteTime -Descending | Select-Object -First 1
+        }
+        if ($latestHtml) {
+            $relOutputPath = $latestHtml.FullName.Replace($PROJECT_ROOT, "").TrimStart("/\").Replace("\", "/")
+            $outputFile = $latestHtml.FullName
+        }
+    }
     $outputWriteTime = Get-Date -Format "o"
 
     # Step 10: Increment counter, write audit/event
@@ -407,23 +436,53 @@ while ($keepRunning) {
     Write-AtomicFile -Path $counterFile -Content $counterJson
 
     $completedAction = if ($exitCode -eq 0) { "completed" } else { "failed" }
-    Write-AuditEntry -Action $completedAction -AgentName $Agent -JobName $Job -RunId $runId -Details @{ exit_code = $exitCode; output_file = $outputFile; duration = $runDuration }
+    $auditOutputFile = if ($outputFile) { $outputFile } else { "(not saved)" }
+    Write-AuditEntry -Action $completedAction -AgentName $Agent -JobName $Job -RunId $runId -Details @{ exit_code = $exitCode; output_file = $auditOutputFile; duration = $runDuration }
     Write-Event -AgentName $Agent -JobName $Job -Event $completedAction -Details @{ run_id = $runId; exit_code = $exitCode; duration = $runDuration }
 
-    Write-Host "Job '$Job' for agent '$Agent' $completedAction (run: $runId, output: $outputFile, duration: $runDuration)"
+    Write-Host "Job '$Job' for agent '$Agent' $completedAction (run: $runId, output: $auditOutputFile, duration: $runDuration)"
 
     # Step 11: Remove lock
     if (Test-Path $lockFile) { Remove-Item -Path $lockFile -Force }
 
-    # Step 12: Check queue
+    # Step 12: Check queues across ALL jobs for this agent, not just the current job
+    $keepRunning = $false
+
+    # First check own queue
     $depth = Get-QueueDepth -QueueFile $queueFile
     if ($depth -gt 0) {
         $depth--
         Set-QueueDepth -QueueFile $queueFile -Depth $depth
-        Write-Host "Draining queue (remaining: $depth). Re-running..."
+        Write-Host "Draining own queue for '$Job' (remaining: $depth). Re-running..."
         $keepRunning = $true
     } else {
-        $keepRunning = $false
+        # Check other jobs for this agent that may have been queued
+        $agentJobDirs = Get-ChildItem -Path (Join-Path $STATE_DIR "agents" $Agent) -Directory -ErrorAction SilentlyContinue
+        foreach ($jobDir in $agentJobDirs) {
+            $otherQueueFile = Join-Path $jobDir.FullName "queue"
+            $otherDepth = Get-QueueDepth -QueueFile $otherQueueFile
+            if ($otherDepth -gt 0) {
+                $otherJobName = $jobDir.Name
+                $otherDepth--
+                Set-QueueDepth -QueueFile $otherQueueFile -Depth $otherDepth
+                Write-Host "Draining queued job '$otherJobName' for agent '$Agent' (remaining: $otherDepth)."
+
+                # Switch to the queued job: reload its config and prompt
+                $otherJobDef = $jobsConfig[$otherJobName]
+                if ($otherJobDef -and (-not $otherJobDef.ContainsKey("enabled") -or $otherJobDef["enabled"])) {
+                    $Job = $otherJobName
+                    $jobDef = $otherJobDef
+                    $prompt = $otherJobDef["prompt"]
+                    $stateDir = Ensure-StateDir -AgentName $Agent -JobName $Job
+                    $queueFile = Join-Path $stateDir "queue"
+                    $counterFile = Join-Path $stateDir "counter.json"
+                    $keepRunning = $true
+                    break
+                } else {
+                    Write-Host "Queued job '$otherJobName' is disabled or missing. Skipping."
+                }
+            }
+        }
     }
 }
 

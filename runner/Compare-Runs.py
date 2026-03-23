@@ -14,6 +14,7 @@ from pathlib import Path
 OUTPUT_DIR = Path(__file__).resolve().parent.parent / "output" / "scrum-master"
 SUMMARIES_DIR = OUTPUT_DIR / "run-summaries"
 STATE_FILE = SUMMARIES_DIR / "issue-state.json"
+STATS_FILE = SUMMARIES_DIR / "run-stats-latest.json"
 
 # ── HTML parsers ──────────────────────────────────────────────────────────────
 
@@ -442,6 +443,68 @@ def create_github_issue(repo, title, body, dry_run=False):
         return None
 
 
+# ── Run stats persistence (for delta computation) ────────────────────────────
+
+def build_run_stats(ado_reports, bug_reports):
+    """Build a stats dict from current parsed reports, for saving and delta comparison."""
+    stats = {"ado": {}, "bug": {}}
+
+    for r in ado_reports:
+        rtype = r.get("report_type", "unknown")
+        c = r["cards"]
+        stats["ado"][rtype] = {
+            "total": c.get("total", 0),
+            "updated": c.get("updated", 0),
+            "skipped": c.get("skipped", 0),
+            "low_confidence": c.get("low_confidence", 0),
+            "no_change": c.get("no_change", 0),
+        }
+
+    # Aggregate bug stats (usually one report, but handle multiple)
+    bug_total = sum(r["cards"].get("total", 0) for r in bug_reports)
+    bug_needs_human = sum(r["cards"].get("needs_human", 0) for r in bug_reports)
+    bug_routed = sum(r["cards"].get("routed", 0) for r in bug_reports)
+    bug_fix = sum(r["cards"].get("fix_identified", 0) for r in bug_reports)
+    stats["bug"] = {
+        "total": bug_total,
+        "needs_human": bug_needs_human,
+        "routed": bug_routed,
+        "fix_identified": bug_fix,
+    }
+
+    return stats
+
+
+def load_previous_stats():
+    """Load the previous run's stats from disk. Returns None if unavailable."""
+    if STATS_FILE.exists():
+        try:
+            return json.loads(STATS_FILE.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            return None
+    return None
+
+
+def save_run_stats(stats):
+    """Atomically persist current run stats for next comparison."""
+    SUMMARIES_DIR.mkdir(parents=True, exist_ok=True)
+    tmp = STATS_FILE.with_suffix(".tmp")
+    tmp.write_text(json.dumps(stats, indent=2), encoding="utf-8")
+    tmp.replace(STATS_FILE)
+
+
+def _delta_html(current, previous):
+    """Return an HTML snippet like '+2' / '-1' / '' for the delta between two numbers."""
+    if previous is None:
+        return ""
+    diff = current - previous
+    if diff == 0:
+        return ""
+    color = "#198754" if diff > 0 else "#dc3545"
+    sign = "+" if diff > 0 else ""
+    return f' <span style="font-size:13px;color:{color};font-weight:600">{sign}{diff}</span>'
+
+
 # ── Summary generation ────────────────────────────────────────────────────────
 
 def generate_summary(ado_reports, bug_reports, issues, state, new_issues_created):
@@ -449,18 +512,32 @@ def generate_summary(ado_reports, bug_reports, issues, state, new_issues_created
     now = datetime.now()
     ts = now.strftime("%Y%m%d-%H%M%S")
 
-    # Aggregate ADO stats
+    # Build and persist current stats; load previous for deltas
+    current_stats = build_run_stats(ado_reports, bug_reports)
+    prev_stats = load_previous_stats()
+    save_run_stats(current_stats)
+
+    # Group ADO reports by type
+    ado_by_type = {}
+    for r in ado_reports:
+        rtype = r.get("report_type", "unknown")
+        ado_by_type.setdefault(rtype, []).append(r)
+
+    # Aggregate ADO stats (across all types, for the overall issues section)
     total_features = sum(r["cards"].get("total", 0) for r in ado_reports)
     total_updated = sum(r["cards"].get("updated", 0) for r in ado_reports)
     total_skipped = sum(r["cards"].get("skipped", 0) for r in ado_reports)
     total_low_conf = sum(r["cards"].get("low_confidence", 0) for r in ado_reports)
     total_no_change = sum(r["cards"].get("no_change", 0) for r in ado_reports)
 
-    # Bug stats from latest
-    bug_total = sum(r["cards"].get("total", 0) for r in bug_reports)
-    bug_needs_human = sum(r["cards"].get("needs_human", 0) for r in bug_reports)
-    bug_routed = sum(r["cards"].get("routed", 0) for r in bug_reports)
-    bug_fix = sum(r["cards"].get("fix_identified", 0) for r in bug_reports)
+    # Bug stats
+    bug_total = current_stats["bug"]["total"]
+    bug_needs_human = current_stats["bug"]["needs_human"]
+    bug_routed = current_stats["bug"]["routed"]
+    bug_fix = current_stats["bug"]["fix_identified"]
+
+    # Previous bug stats for delta
+    prev_bug = prev_stats.get("bug", {}) if prev_stats else {}
 
     # ── Markdown summary ──
     md_lines = [
@@ -469,18 +546,22 @@ def generate_summary(ado_reports, bug_reports, issues, state, new_issues_created
         "",
         "## ADO Autopilot (Status Tweets)",
         "",
-        f"**Reports analyzed**: {len(ado_reports)}",
     ]
-    for r in ado_reports:
-        md_lines.append(f"- `{Path(r['path']).name}` ({r['report_type']})")
-    md_lines += [
-        f"- Total features: {total_features}",
-        f"- Updated: {total_updated}",
-        f"- Skipped: {total_skipped}",
-        f"- No change: {total_no_change}",
-        f"- Low confidence: {total_low_conf}",
-        "",
-    ]
+    type_labels = {"meeting-join": "Meeting Join", "meeting-notes": "Meeting Notes"}
+    for rtype in ["meeting-join", "meeting-notes"]:
+        reports = ado_by_type.get(rtype, [])
+        if not reports:
+            continue
+        label = type_labels.get(rtype, rtype)
+        md_lines.append(f"### {label}")
+        for r in reports:
+            c = r["cards"]
+            md_lines.append(f"- Total features: {c.get('total', 0)}")
+            md_lines.append(f"- Updated: {c.get('updated', 0)}")
+            md_lines.append(f"- Skipped: {c.get('skipped', 0)}")
+            md_lines.append(f"- No change: {c.get('no_change', 0)}")
+            md_lines.append(f"- Low confidence: {c.get('low_confidence', 0)}")
+        md_lines.append("")
 
     ado_issues = [i for i in issues if "ado-autopilot" in i["key"]]
     if ado_issues:
@@ -495,7 +576,6 @@ def generate_summary(ado_reports, bug_reports, issues, state, new_issues_created
     md_lines += [
         "## Bug Autopilot (Investigations)",
         "",
-        f"**Reports analyzed**: {len(bug_reports)}",
         f"- Total bugs: {bug_total}",
         f"- Needs human: {bug_needs_human}",
         f"- Routed: {bug_routed}",
@@ -523,6 +603,17 @@ def generate_summary(ado_reports, bug_reports, issues, state, new_issues_created
 
     md_content = "\n".join(md_lines) + "\n"
 
+    # ── Helper: render a row of summary cards with optional deltas ──
+    def _card(value, label, color=None, prev_value=None):
+        style = f' style="color:{color}"' if color else ""
+        delta = _delta_html(value, prev_value)
+        return (
+            f'<div class="card">'
+            f'<div class="num"{style}>{value}{delta}</div>'
+            f'<div class="lbl">{label}</div>'
+            f'</div>'
+        )
+
     # ── HTML summary ──
     html_content = f"""<!DOCTYPE html>
 <html lang="en">
@@ -538,6 +629,7 @@ def generate_summary(ado_reports, bug_reports, issues, state, new_issues_created
     .card .num {{ font-size: 28px; font-weight: 700; }}
     .card .lbl {{ font-size: 11px; color: #6c757d; margin-top: 2px; text-transform: uppercase; letter-spacing: .4px; }}
     h2 {{ font-size: 17px; margin-top: 28px; border-bottom: 2px solid #dee2e6; padding-bottom: 6px; }}
+    h3 {{ font-size: 15px; margin-top: 18px; color: #495057; }}
     .issue {{ background: #fff; border: 1px solid #e9ecef; border-radius: 8px; padding: 14px 18px; margin-bottom: 10px; }}
     .issue.new {{ border-left: 4px solid #fd7e14; }}
     .issue.tracked {{ border-left: 4px solid #198754; }}
@@ -545,41 +637,68 @@ def generate_summary(ado_reports, bug_reports, issues, state, new_issues_created
     .issue .status {{ font-size: 12px; color: #6c757d; margin-top: 4px; }}
     .issue a {{ color: #0d6efd; text-decoration: none; }}
     .section {{ margin-bottom: 32px; }}
+    .subsection {{ margin-left: 16px; margin-bottom: 16px; }}
+    .report-file {{ font-size: 13px; color: #6c757d; margin-bottom: 8px; }}
+    .delta-note {{ font-size: 12px; color: #6c757d; margin-bottom: 12px; font-style: italic; }}
   </style>
 </head>
 <body>
   <h1>Scrum-Master Run Comparison</h1>
   <div class="meta">Generated {now.strftime('%Y-%m-%d %H:%M')} &bull; {len(ado_reports)} ADO reports, {len(bug_reports)} bug reports</div>
-
-  <div class="cards">
-    <div class="card"><div class="num">{total_features}</div><div class="lbl">Features</div></div>
-    <div class="card"><div class="num" style="color:#198754">{total_updated}</div><div class="lbl">Updated</div></div>
-    <div class="card"><div class="num" style="color:#fd7e14">{total_low_conf}</div><div class="lbl">Low Conf</div></div>
-    <div class="card"><div class="num" style="color:#856404">{total_skipped}</div><div class="lbl">Skipped</div></div>
-    <div class="card"><div class="num">{bug_total}</div><div class="lbl">Bugs</div></div>
-    <div class="card"><div class="num" style="color:#856404">{bug_needs_human}</div><div class="lbl">Needs Human</div></div>
-    <div class="card"><div class="num" style="color:#198754">{bug_routed + bug_fix}</div><div class="lbl">Actionable</div></div>
-  </div>
-
-  <div class="cards">
-    <div class="card"><div class="num">{len(issues)}</div><div class="lbl">Issues Detected</div></div>
-    <div class="card"><div class="num" style="color:#fd7e14">{len(new_issues_created)}</div><div class="lbl">New Issues</div></div>
-    <div class="card"><div class="num" style="color:#198754">{len(issues) - len(new_issues_created)}</div><div class="lbl">Already Tracked</div></div>
-  </div>
-
-  <h2>ADO Autopilot</h2>
-  <div class="section">
 """
-    for r in ado_reports:
-        name = Path(r["path"]).name
-        c = r["cards"]
-        html_content += f'    <div style="font-size:13px;margin-bottom:6px"><code>{name}</code> &mdash; {c.get("total",0)} features, {c.get("updated",0)} updated, {c.get("skipped",0)} skipped, {c.get("low_confidence",0)} low conf</div>\n'
-    html_content += "  </div>\n\n  <h2>Bug Autopilot</h2>\n  <div class=\"section\">\n"
+
+    if prev_stats:
+        html_content += '  <div class="delta-note">Deltas shown relative to previous run</div>\n'
+
+    # ── ADO Autopilot section ──
+    html_content += '\n  <h2>ADO Autopilot</h2>\n  <div class="section">\n'
+
+    for rtype in ["meeting-join", "meeting-notes"]:
+        reports = ado_by_type.get(rtype, [])
+        if not reports:
+            continue
+        label = type_labels.get(rtype, rtype)
+        cur = current_stats["ado"].get(rtype, {})
+        prev = prev_stats.get("ado", {}).get(rtype, {}) if prev_stats else {}
+        prev_or_none = lambda key, _p=prev: _p.get(key) if _p else None
+
+        html_content += f'    <h3>{label}</h3>\n'
+        html_content += '    <div class="subsection">\n'
+        for r in reports:
+            html_content += f'      <div class="report-file"><code>{Path(r["path"]).name}</code></div>\n'
+        html_content += '      <div class="cards">\n'
+        html_content += f'        {_card(cur.get("total", 0), "Features", prev_value=prev_or_none("total"))}\n'
+        html_content += f'        {_card(cur.get("updated", 0), "Updated", "#198754", prev_or_none("updated"))}\n'
+        html_content += f'        {_card(cur.get("skipped", 0), "Skipped", "#856404", prev_or_none("skipped"))}\n'
+        html_content += f'        {_card(cur.get("low_confidence", 0), "Low Conf", "#fd7e14", prev_or_none("low_confidence"))}\n'
+        html_content += f'        {_card(cur.get("no_change", 0), "No Change", None, prev_or_none("no_change"))}\n'
+        html_content += '      </div>\n'
+        html_content += '    </div>\n'
+
+    html_content += '  </div>\n'
+
+    # ── Bug Autopilot section ──
+    html_content += '\n  <h2>Bug Autopilot</h2>\n  <div class="section">\n'
     for r in bug_reports:
-        name = Path(r["path"]).name
-        c = r["cards"]
-        html_content += f'    <div style="font-size:13px;margin-bottom:6px"><code>{name}</code> &mdash; {c.get("total",0)} bugs, {c.get("needs_human",0)} needs human, {c.get("routed",0)} routed, {c.get("fix_identified",0)} fix identified</div>\n'
-    html_content += "  </div>\n\n  <h2>Detected Issues</h2>\n  <div class=\"section\">\n"
+        html_content += f'    <div class="report-file"><code>{Path(r["path"]).name}</code></div>\n'
+    html_content += '    <div class="cards">\n'
+    html_content += f'      {_card(bug_total, "Total Bugs", prev_value=prev_bug.get("total"))}\n'
+    html_content += f'      {_card(bug_needs_human, "Needs Human", "#856404", prev_bug.get("needs_human"))}\n'
+    html_content += f'      {_card(bug_routed, "Routed", "#198754", prev_bug.get("routed"))}\n'
+    html_content += f'      {_card(bug_fix, "Fix Identified", "#198754", prev_bug.get("fix_identified"))}\n'
+    html_content += '    </div>\n'
+    html_content += '  </div>\n'
+
+    # ── Issues summary cards ──
+    html_content += '\n  <h2>Issue Tracking</h2>\n'
+    html_content += '  <div class="cards">\n'
+    html_content += f'    {_card(len(issues), "Issues Detected")}\n'
+    html_content += f'    {_card(len(new_issues_created), "New Issues", "#fd7e14")}\n'
+    html_content += f'    {_card(len(issues) - len(new_issues_created), "Already Tracked", "#198754")}\n'
+    html_content += '  </div>\n'
+
+    # ── Detected Issues detail ──
+    html_content += '\n  <h2>Detected Issues</h2>\n  <div class="section">\n'
 
     for i in issues:
         tracked = state["created_issues"].get(i["key"])
@@ -604,13 +723,9 @@ def generate_summary(ado_reports, bug_reports, issues, state, new_issues_created
 
     # Write files
     SUMMARIES_DIR.mkdir(parents=True, exist_ok=True)
-    md_path = SUMMARIES_DIR / f"comparison-{ts}.md"
-    md_latest = SUMMARIES_DIR / "comparison-latest.md"
     html_path = SUMMARIES_DIR / f"comparison-{ts}.html"
     html_latest = SUMMARIES_DIR / "comparison-latest.html"
 
-    md_path.write_text(md_content, encoding="utf-8")
-    md_latest.write_text(md_content, encoding="utf-8")
     html_path.write_text(html_content, encoding="utf-8")
     html_latest.write_text(html_content, encoding="utf-8")
 

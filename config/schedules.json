@@ -49,10 +49,34 @@
       "description": "Bug killer scan at 10pm daily"
     },
     {
+      "agent": "bug-killer",
+      "job": "resolve-merge-conflicts",
+      "cron": "3 * * * *",
+      "description": "Resolve merge conflicts for open PRs hourly at :03"
+    },
+    {
+      "agent": "bug-killer",
+      "job": "daily-summary",
+      "cron": "0 1 * * *",
+      "description": "Bug killer daily activity summary at 1am"
+    },
+    {
+      "agent": "bug-killer",
+      "job": "review-pr-comments",
+      "cron": "33 * * * *",
+      "description": "Address PR review comments hourly at :33"
+    },
+    {
       "agent": "emailer",
       "job": "scan-all-mailboxes",
       "cron": "0 7 * * *",
       "description": "Gmail scan all mailboxes at 7am daily"
+    },
+    {
+      "agent": "memo-checker",
+      "job": "consolidate",
+      "cron": "0 3 * * *",
+      "description": "Memory consolidation and report at 3am daily"
     }
   ]
 }

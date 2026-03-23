@@ -265,6 +265,70 @@ try {
     Remove-TestRoot -Root $root
 }
 
+# ========================================
+# TC79: Get-AgentStatus skips non-job agent-level metadata
+# ========================================
+Write-Host "`nTC79: Get-AgentStatus skips errorCount and other agent metadata" -ForegroundColor Cyan
+$root = New-TestRoot
+try {
+    Write-TestConstants -Root $root
+    Import-RunnerFunctions -Root $root
+
+    # Write dashboard.json with agent-level metadata (errorCount, lastError)
+    # alongside real job entries -- mirrors production dashboard format
+    $dashWithMeta = @{
+        agents = @{
+            "scrum-master" = @{
+                "sprint-progress" = @{
+                    status = "idle"
+                    run_id = "abc123"
+                    updated = "2026-03-22T10:00:00Z"
+                    runs_completed = 5
+                    last_completed = "2026-03-22T10:00:00Z"
+                }
+                "errorCount" = 0
+                "lastError" = "2026-03-21T09:00:00Z"
+            }
+        }
+    }
+    $dashFile = Join-Path $root "state/dashboard.json"
+    $json = $dashWithMeta | ConvertTo-Json -Depth 10
+    Write-AtomicFile -Path $dashFile -Content $json
+
+    # Source Get-AgentStatus.ps1 logic: iterate keys and skip non-hashtable values
+    $dash = Get-Content -Path $dashFile -Raw | ConvertFrom-Json -AsHashtable
+    $rows = @()
+    $errorOccurred = $false
+
+    foreach ($agentName in ($dash["agents"].Keys | Sort-Object)) {
+        $agentData = $dash["agents"][$agentName]
+        foreach ($jobName in ($agentData.Keys | Sort-Object)) {
+            $jobData = $agentData[$jobName]
+            # This is the fix under test: skip non-hashtable values
+            if ($jobData -isnot [hashtable]) { continue }
+            try {
+                $status = if ($jobData.ContainsKey("status")) { $jobData["status"] } else { "unknown" }
+                $rows += [PSCustomObject]@{
+                    Agent  = $agentName
+                    Job    = $jobName
+                    Status = $status
+                }
+            } catch {
+                $errorOccurred = $true
+            }
+        }
+    }
+
+    Assert-True (-not $errorOccurred) "No errors when iterating dashboard with agent-level metadata"
+    Assert-True ($rows.Count -eq 1) "Only 1 job row returned (errorCount and lastError skipped)"
+    if ($rows.Count -ge 1) {
+        Assert-True ($rows[0].Job -eq "sprint-progress") "Row is for sprint-progress job"
+        Assert-True ($rows[0].Status -eq "idle") "Status is idle"
+    }
+} finally {
+    Remove-TestRoot -Root $root
+}
+
 # --- Summary ---
 Write-Host "`n========================================" -ForegroundColor White
 Write-Host "Test-DashboardState: $script:Passed passed, $script:Failed failed" -ForegroundColor $(if ($script:Failed -gt 0) { "Red" } else { "Green" })

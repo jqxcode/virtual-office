@@ -170,7 +170,7 @@ $requiredClasses = @(
     ".job-list",
     ".job-item",
     ".queue-badge",
-    ".event-log",
+    ".event-log-full",
     ".event-row"
 )
 
@@ -185,7 +185,7 @@ foreach ($cls in $requiredClasses) {
 Write-Host "`nTC35: HTML structure valid" -ForegroundColor Cyan
 
 Assert-True ($HtmlContent -match 'id="agent-grid"') "index.html contains id=""agent-grid"""
-Assert-True ($HtmlContent -match 'id="event-log"') "index.html contains id=""event-log"""
+Assert-True ($HtmlContent -match 'id="event-log-full"') "index.html contains id=""event-log-full"""
 Assert-True ($HtmlContent -match 'href="styles\.css"') "index.html links to styles.css"
 Assert-True ($HtmlContent -match 'src="app\.js"') "index.html links to app.js"
 
@@ -357,22 +357,18 @@ if (-not (Test-Path $AppJsFile)) {
     $hasStripFunction = $AppJsContent -match "function stripOutputPrefix"
     Assert-True $hasStripFunction "app.js defines stripOutputPrefix helper function"
 
-    # Verify all /api/output/ href assignments use the strip function
-    # Pattern: /api/output/" + <something> where <something> is NOT stripOutputPrefix
-    $allOutputHrefs = [regex]::Matches($AppJsContent, '/api/output/"\s*\+\s*(\w+)')
-    $rawCount = 0
-    foreach ($m in $allOutputHrefs) {
-        if ($m.Groups[1].Value -ne "stripOutputPrefix") {
-            $rawCount++
-        }
-    }
-    Assert-True ($rawCount -eq 0) "All /api/output/ href assignments use stripOutputPrefix (found $rawCount raw usages)"
+    # Verify getReportHref uses /api/output/ for server-relative URLs
+    $usesApiOutput = $AppJsContent -match 'getReportHref.*return.*"/api/output/"'
+    # Check that getReportHref function body references /api/output/
+    $fnBody = [regex]::Match($AppJsContent, 'function getReportHref[\s\S]*?^}', [System.Text.RegularExpressions.RegexOptions]::Multiline)
+    $usesApiOutputInFn = $fnBody.Value -match '/api/output/'
+    Assert-True $usesApiOutputInFn "getReportHref uses /api/output/ for server-relative report URLs"
 }
 
 # ========================================
-# TC66: Report links use vscode:// or file:// URI, not /api/output/
+# TC66: Report links use /api/output/ server-relative URLs
 # ========================================
-Write-Host "`nTC66: Report links use vscode:// or file:// URI, not /api/output/" -ForegroundColor Cyan
+Write-Host "`nTC66: Report links use /api/output/ server-relative URLs" -ForegroundColor Cyan
 
 if (-not (Test-Path $AppJsFile)) {
     Write-Host "ERROR: Cannot find app.js at $AppJsFile" -ForegroundColor Red
@@ -385,15 +381,16 @@ if (-not (Test-Path $AppJsFile)) {
     $hasGetReportHref = $AppJsContent -match "function getReportHref"
     Assert-True $hasGetReportHref "app.js defines getReportHref helper function"
 
-    $hasVscodeUri = $AppJsContent -match 'vscode://file/'
-    Assert-True $hasVscodeUri "app.js contains vscode://file/ URI scheme"
+    # Reports should use server-relative /api/output/ URLs, NOT file:// or vscode://
+    $hasNoVscodeUri = -not ($AppJsContent -match 'vscode://file/')
+    Assert-True $hasNoVscodeUri "app.js does NOT use vscode://file/ URI scheme (uses /api/output/ instead)"
 
-    $hasFileUri = $AppJsContent -match 'file:///'
-    Assert-True $hasFileUri "app.js contains file:/// URI scheme for HTML reports"
+    $hasNoFileUri = -not ($AppJsContent -match 'file:///')
+    Assert-True $hasNoFileUri "app.js does NOT use file:/// URI scheme (uses /api/output/ instead)"
 
-    # Verify NO remaining /api/output/ href assignments
-    $apiOutputCount = ([regex]::Matches($AppJsContent, '/api/output/')).Count
-    Assert-True ($apiOutputCount -eq 0) "app.js has zero /api/output/ href assignments (found $apiOutputCount)"
+    # Verify report links open in new tab
+    $hasTargetBlank = $AppJsContent -match 'target.*=.*"_blank"'
+    Assert-True $hasTargetBlank "Report links open in new tab (target=_blank)"
 }
 
 # ========================================

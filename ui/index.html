@@ -20,21 +20,101 @@
     </div>
   </header>
 
+  <!-- Top-level navigation tabs -->
+  <nav class="top-tabs" id="top-tabs">
+    <button class="top-tab active" data-tab="agents">AGENTS</button>
+    <button class="top-tab" data-tab="events">EVENT LOG</button>
+  </nav>
+
   <main class="main-content">
-    <section class="agents-section">
-      <div class="agent-tabs" id="agent-tabs">
-        <!-- Tabs rendered by JS from config groups -->
+    <!-- Agents View -->
+    <section id="view-agents" class="view active">
+      <!-- Stats row: 4 tiles -->
+      <div class="stats-row" id="stats-row">
+        <div class="stat-card">
+          <div class="stat-label">JOBS COMPLETED</div>
+          <div class="stat-primary" id="stat-completed-today">--</div>
+          <div class="stat-secondary" id="stat-completed-week">--</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">JOBS FAILED</div>
+          <div class="stat-primary" id="stat-failed-today">--</div>
+          <div class="stat-secondary" id="stat-failed-week">--</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">AGENTS WORKING</div>
+          <div class="stat-primary" id="stat-agents-active">--</div>
+          <div class="stat-secondary" id="stat-agents-total">--</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">SYSTEM HEARTBEAT</div>
+          <div class="stat-primary" id="stat-heartbeat">--</div>
+          <div class="stat-secondary" id="stat-heartbeat-time">--</div>
+        </div>
       </div>
-      <h2 class="section-title" id="agent-section-title">Agents</h2>
-      <div id="agent-grid" class="agent-grid">
-        <div class="placeholder-message">Loading agents...</div>
+
+      <!-- Agent group sub-tabs -->
+      <div class="agent-tabs" id="agent-tabs"></div>
+
+      <!-- Two-column layout -->
+      <div class="mission-columns">
+        <div class="mission-col-left">
+          <div class="section-header">
+            <span>Active Agents</span>
+            <span class="section-badge" id="active-agents-badge">--</span>
+          </div>
+          <div id="agent-list"></div>
+          <!-- Keep agent-grid ID for backward compat with tests -->
+          <div id="agent-grid" class="agent-grid" style="display:none"></div>
+        </div>
+        <div class="mission-col-right">
+          <div class="section-header">
+            <span>Recent Activity</span>
+            <span class="section-badge">Last 15</span>
+          </div>
+          <div id="activity-feed"></div>
+        </div>
       </div>
     </section>
 
-    <section class="events-section">
-      <h2 class="section-title">Event Log</h2>
-      <div id="event-log" class="event-log">
-        <div class="placeholder-message">Waiting for events...</div>
+    <!-- Event Log View -->
+    <section id="view-events" class="view" style="display:none">
+      <div class="event-filters">
+        <div class="filter-group">
+          <label class="filter-label">Agent</label>
+          <select id="filter-agent" class="filter-select">
+            <option value="">All Agents</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label class="filter-label">Event Type</label>
+          <select id="filter-event-type" class="filter-select">
+            <option value="">All Events</option>
+            <option value="started">Started</option>
+            <option value="completed">Completed</option>
+            <option value="failed">Failed</option>
+            <option value="queued">Queued</option>
+            <option value="stale_lock_cleared">Stale Lock Cleared</option>
+            <option value="schedule_registered">Schedule Registered</option>
+            <option value="schedule_removed">Schedule Removed</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label class="filter-label">Time Range</label>
+          <select id="filter-time" class="filter-select">
+            <option value="">All Time</option>
+            <option value="1h">Last Hour</option>
+            <option value="6h">Last 6 Hours</option>
+            <option value="24h">Last 24 Hours</option>
+            <option value="7d">Last 7 Days</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <span id="event-count" class="event-count">--</span>
+        </div>
+      </div>
+      <div id="event-log-full" class="event-log-full">
+        <div class="placeholder-message">Loading events...</div>
       </div>
     </section>
   </main>

@@ -39,6 +39,9 @@ foreach ($agentName in ($dashboard["agents"].Keys | Sort-Object)) {
     foreach ($jobName in ($agentData.Keys | Sort-Object)) {
         $jobData = $agentData[$jobName]
 
+        # Skip agent-level metadata keys (errorCount, lastError, etc.)
+        if ($jobData -isnot [hashtable]) { continue }
+
         $status = if ($jobData.ContainsKey("status")) { $jobData["status"] } else { "unknown" }
         $runId = if ($jobData.ContainsKey("run_id")) { $jobData["run_id"] } else { "-" }
         $queueDepth = if ($jobData.ContainsKey("queue_depth")) { $jobData["queue_depth"] } else { 0 }
