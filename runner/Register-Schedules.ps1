@@ -107,11 +107,25 @@ $schedules = Get-Content -Path $schedulesFile -Raw | ConvertFrom-Json -AsHashtab
 $invokeScript = Join-Path $PSScriptRoot "Invoke-AgentJob.ps1"
 $registered = @()
 
+# Track occurrence count per agent+job key to handle duplicate cron entries
+$taskNameCount = @{}
+
 foreach ($entry in $schedules["schedules"]) {
     $agentName = $entry["agent"]
     $jobName = $entry["job"]
     $cron = $entry["cron"]
-    $taskName = "VirtualOffice-$agentName-$jobName"
+    $baseKey = "$agentName|$jobName"
+    if (-not $taskNameCount.ContainsKey($baseKey)) {
+        $taskNameCount[$baseKey] = 1
+    } else {
+        $taskNameCount[$baseKey]++
+    }
+    $occurrence = $taskNameCount[$baseKey]
+    if ($occurrence -eq 1) {
+        $taskName = "VirtualOffice-$agentName-$jobName"
+    } else {
+        $taskName = "VirtualOffice-$agentName-$jobName-$occurrence"
+    }
 
     Write-Host "Processing: $taskName (cron: $cron)"
 
