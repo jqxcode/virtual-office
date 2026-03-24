@@ -86,7 +86,7 @@
     },
     {
       "agent": "hang-scout",
-      "job": "detect",
+      "job": "detect-hang",
       "cron": "45 * * * *",
       "description": "Hang detection scan every hour at :45"
     },

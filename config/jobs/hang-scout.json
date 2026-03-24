@@ -1,6 +1,6 @@
 {
   "jobs": {
-    "detect": {
+    "detect-hang": {
       "prompt": "Run hang detection scan now. Read the 'hangDetection' config from this job definition for per-agent thresholds. Scan all VO agent lock files under Q:/src/personal_projects/virtual-office/state/agents/*/lock. For each lock, check if the age exceeds that agent's hangThresholdMinutes (default 60). For hung jobs: walk the process tree, capture py-spy stack traces for Python processes, classify the hang, decide whether to kill (only if age > killThresholdMinutes), log the incident, and file GitHub issues for new patterns. Skip any agents listed in 'exclude'. Output a scan summary at the end.",
       "maxRuns": 0,
       "enabled": true,
