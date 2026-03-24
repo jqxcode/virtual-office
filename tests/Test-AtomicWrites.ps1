@@ -195,6 +195,51 @@ try {
     Remove-TestRoot -Root $root
 }
 
+# ========================================
+# TC68: Unicode-to-ASCII sanitization replaces common unicode before saving
+# ========================================
+Write-Host "`nTC68: Unicode-to-ASCII sanitization produces clean ASCII output" -ForegroundColor Cyan
+$root = New-TestRoot
+try {
+    # Simulate the sanitization block from Invoke-AgentJob.ps1 Step 9
+    $rawOutput = "Progress $([char]0x2014) done $([char]0x2192) next step$([char]0x2026)"
+    $sanitized = $rawOutput
+    $sanitized = $sanitized -replace [char]0x2014, '--'
+    $sanitized = $sanitized -replace [char]0x2013, '-'
+    $sanitized = $sanitized -replace [char]0x2192, '->'
+    $sanitized = $sanitized -replace [char]0x2190, '<-'
+    $sanitized = $sanitized -replace [char]0x2019, "'"
+    $sanitized = $sanitized -replace [char]0x2018, "'"
+    $sanitized = $sanitized -replace [char]0x201C, '"'
+    $sanitized = $sanitized -replace [char]0x201D, '"'
+    $sanitized = $sanitized -replace [char]0x2026, '...'
+    $sanitized = $sanitized -replace [char]0xFEFF, ''
+
+    Assert-True ($sanitized -eq "Progress -- done -> next step...") "Em dash, arrow, and ellipsis replaced with ASCII"
+    Assert-True (-not ($sanitized -match '[^\x00-\x7F]')) "No non-ASCII characters remain after sanitization"
+
+    # Write sanitized content and verify it reads back as pure ASCII
+    $outputFile = Join-Path $root "state/sanitized-output.md"
+    Write-AtomicFile -Path $outputFile -Content $sanitized -Encoding ([System.Text.Encoding]::UTF8)
+    Assert-True (Test-Path $outputFile) "Sanitized output file written"
+    if (Test-Path $outputFile) {
+        $readBack = [System.IO.File]::ReadAllText($outputFile, [System.Text.Encoding]::UTF8)
+        Assert-True ($readBack -eq "Progress -- done -> next step...") "Sanitized content reads back correctly"
+        # Confirm no multi-byte UTF-8 sequences beyond optional UTF-8 BOM (EF BB BF)
+        # WriteAllText with UTF8 encoding writes a BOM, so skip the first 3 bytes if present
+        $bytes = [System.IO.File]::ReadAllBytes($outputFile)
+        $startIdx = 0
+        if ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) {
+            $startIdx = 3
+        }
+        $contentBytes = @($bytes[$startIdx..($bytes.Length - 1)])
+        $nonAsciiCount = @($contentBytes | Where-Object { $_ -gt 127 }).Count
+        Assert-True ($nonAsciiCount -eq 0) "File content bytes (after BOM) are all pure ASCII"
+    }
+} finally {
+    Remove-TestRoot -Root $root
+}
+
 # --- Summary ---
 Write-Host "`n========================================" -ForegroundColor White
 Write-Host "Test-AtomicWrites: $script:Passed passed, $script:Failed failed" -ForegroundColor $(if ($script:Failed -gt 0) { "Red" } else { "Green" })
