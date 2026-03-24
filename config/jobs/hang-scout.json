@@ -35,14 +35,14 @@
       }
     },
     "detect-scrum-master": {
-      "prompt": "Run hang detection scan targeting ONLY the scrum-master agent. Use hangThresholdMinutes=20 and killThresholdMinutes=60 for this scan (override the config defaults). Scan ONLY the lock file at Q:/src/personal_projects/virtual-office/state/agents/scrum-master/lock. If age >= 20 minutes: walk the process tree, capture py-spy stack traces for Python processes, classify the hang, decide whether to kill (only if age > 60 min), log the incident, and file GitHub issues for new patterns. Output scan summary.",
+      "prompt": "Run hang detection scan targeting ONLY the scrum-master agent. Use hangThresholdMinutes=30 and killThresholdMinutes=60 for this scan (override the config defaults). Scan ONLY the lock file at Q:/src/personal_projects/virtual-office/state/agents/scrum-master/lock. If age >= 30 minutes: walk the process tree, capture py-spy stack traces for Python processes, classify the hang, decide whether to kill (only if age > 60 min), log the incident, and file GitHub issues for new patterns. Output scan summary.",
       "maxRuns": 0,
       "enabled": true,
       "saveOutput": true,
       "description": "One-off hang detection for scrum-master only with 20min hang / 60min kill thresholds"
     },
     "daily-report": {
-      "prompt": "Generate the daily 5W incident report. Collect all hang incidents from Q:/src/personal_projects/virtual-office/output/hang-scout/incidents/ in the last 24 hours. Generate a self-contained dark-themed HTML report using the 5W framework (Who/What/When/Where/Why) for each incident. Include executive summary, pattern summary table, and recommendations. Save to output/hang-scout/daily-report-YYYYMMDD.html and daily-report-latest.html. Open in Edge.",
+      "prompt": "Generate the daily 5W incident report. (1) Parse audit logs from Q:/src/personal_projects/virtual-office/output/audit/*.jsonl for the past 7 days to extract run durations per agent/job. (2) Collect all hang incidents from Q:/src/personal_projects/virtual-office/output/hang-scout/incidents/ in the last 24 hours. (3) Generate a self-contained dark-themed HTML report with: executive summary, 5W incident details, pattern summary table, a Chart.js line chart showing runtime trends per agent/job over 7 days (include the chart.js CDN script and adapter), a runtime summary table with avg/max/trend, and recommendations (flag increasing trends and jobs approaching hang thresholds). Save to output/hang-scout/daily-report-YYYYMMDD.html and daily-report-latest.html. Open in Edge.",
       "maxRuns": 0,
       "enabled": true,
       "saveOutput": false,
