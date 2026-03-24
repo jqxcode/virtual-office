@@ -24,6 +24,7 @@
   <nav class="top-tabs" id="top-tabs">
     <button class="top-tab active" data-tab="agents">AGENTS</button>
     <button class="top-tab" data-tab="events">EVENT LOG</button>
+    <button class="top-tab" data-tab="queue">TASK QUEUE</button>
   </nav>
 
   <main class="main-content">
@@ -116,6 +117,38 @@
       <div id="event-log-full" class="event-log-full">
         <div class="placeholder-message">Loading events...</div>
       </div>
+    </section>
+
+    <!-- Task Queue View -->
+    <section id="view-queue" class="view" style="display:none">
+      <!-- Upcoming schedule table -->
+      <div class="section-header">
+        <span>Upcoming Schedule</span>
+        <span class="section-badge" id="schedule-count">--</span>
+      </div>
+      <div class="schedule-table-wrapper" id="schedule-table-wrapper">
+        <table class="schedule-table">
+          <thead>
+            <tr>
+              <th>Next Run</th>
+              <th>Agent</th>
+              <th>Job</th>
+              <th>Schedule</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="schedule-tbody"></tbody>
+        </table>
+        <div id="schedule-overflow" class="schedule-overflow" style="display:none"></div>
+      </div>
+
+      <!-- Per-agent queue cards -->
+      <div class="section-header" style="margin-top:1.5rem">
+        <span>Agent Queues</span>
+        <span class="section-badge" id="queue-total-badge">--</span>
+      </div>
+      <div id="queue-cards" class="queue-cards-grid"></div>
     </section>
   </main>
 

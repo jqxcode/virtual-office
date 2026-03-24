@@ -28,6 +28,13 @@
       "saveOutput": false,
       "description": "Runs ADO autopilot burndown update (live) for Meeting Join and Meeting Notes areas"
     },
+    "bug-autopilot-notes": {
+      "prompt": "Run bug-autopilot LIVE for Meeting Notes area bugs. Steps: (1) cd Q:/src/hackathon/bug-autopilot/ (2) git pull to get latest code (3) Validate configs exist and are valid JSON (4) pip install -r requirements.txt --quiet (5) Run: powershell.exe -File bugautopilot.ps1 -Config Q:/src/hackathon/bug-autopilot/configs/meeting-notes.json -Once (6) Copy the newly generated HTML report from reports/ (named run-YYYYMMDD-HHMMSS.html) to Q:/src/personal_projects/virtual-office/output/scrum-master/ preserving its original filename, and also copy it as bug-autopilot-notes-latest.html (7) Run the comparison script: python Q:/src/personal_projects/virtual-office/runner/Compare-Runs.py (8) Open the report in Edge.",
+      "maxRuns": 0,
+      "enabled": true,
+      "saveOutput": false,
+      "description": "Runs bug-autopilot live for Meeting Notes bugs"
+    },
     "compare-runs": {
       "prompt": "Compare all scrum-master reports and create GitHub issues for detected problems. Run: python Q:/src/personal_projects/virtual-office/runner/Compare-Runs.py (without --dry-run flag to actually create issues). This will parse ADO autopilot HTML reports and bug autopilot investigations.json, compare across runs, generate a summary at Q:/src/personal_projects/virtual-office/output/scrum-master/run-summaries/, and create GitHub issues in teams-microsoft/ado-autopilot and teams-microsoft/bug-autopilot repos. Issues that were already created (tracked in issue-state.json) will be skipped. Open the comparison summary in Edge after completion.",
       "maxRuns": 0,

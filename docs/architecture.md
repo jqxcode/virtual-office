@@ -20,10 +20,16 @@ Virtual Office is a Windows-based agent orchestration framework that schedules, 
               | events    |  |          |  | logs     |
               +-----------+  +----------+  +----------+
                     |
-              +-----v-----------+
-              |  server.ps1     |
-              |  (HTTP :8400)   |
-              +-----+-----------+
+              +-----v-----------------------+
+              |  server.ps1  (HTTP :8400)   |
+              |  /api/config                |
+              |  /api/dashboard             |
+              |  /api/events                |
+              |  /api/errors                |
+              |  /api/schedules             |
+              |  /api/queue/cancel  (POST)  |
+              |  /api/job/stop      (POST)  |
+              +-----+-----------------------+
                     |
               +-----v-----------+
               |  Browser UI     |
@@ -53,7 +59,7 @@ Virtual Office is a Windows-based agent orchestration framework that schedules, 
 
 ### Top Navigation
 
-Centered pill-shaped tabs: AGENTS | EVENT LOG (extensible for future: TASKS, CHAT, MEMORY).
+Centered pill-shaped tabs: AGENTS | EVENT LOG | TASK QUEUE (extensible for future: CHAT, MEMORY).
 Active tab is filled/highlighted. Selection persisted to URL `?view=`.
 
 ### Summary Stats Row (4 tiles)
@@ -131,6 +137,11 @@ state/errors.jsonl
         |
         v
   /api/errors ───────> Error badges on agent cards + system health
+
+config/schedules.json + state/agents/{agent}/{job}/queue + state/agents/{agent}/lock
+        |
+        v
+  /api/schedules ────> Task Queue tab (schedule table + queue cards)
 ```
 
 ### Theme
@@ -144,6 +155,51 @@ Report links use server-relative `/api/output/{path}` URLs. MD files auto-render
 ### Event Log Tab
 
 Full-page event viewer with filters (agent, event type, time range). Loads all events. Shows newest first. Filter dropdowns apply client-side.
+
+### Task Queue Tab
+
+Third top-level tab. Two sections: Upcoming Schedule table (top) and Per-Agent Queue Cards (bottom).
+
+**Upcoming Schedule Table**
+
+Expands each enabled cron schedule into its next concrete fire instances (up to 10 per schedule, 20 globally), sorted chronologically. Disabled schedules appear at the bottom as a single row.
+
+- Fire time column: human-readable date + 12-hour time (e.g., "Mon, Mar 23, 9:00 AM")
+- Schedule column: human-readable cron description (e.g., "Weekdays at 9:00 AM"); tooltip shows raw cron expression
+- Status badge: scheduled | running | queued | disabled
+- Cross-referenced with dashboard state: the first matching schedule row for a currently running job is marked "running"; subsequent rows for jobs with queue depth > 0 are marked "queued"
+- Action column: Cancel button on queued rows (single-click); Force Stop button on running rows (2-click confirmation: first click shows "Click again to stop", auto-resets after 3s)
+- Cron expansion and next-fire computation run client-side in JavaScript on each poll cycle
+
+**Per-Agent Queue Cards**
+
+One card per registered agent, colored by agent. Each card shows:
+- Agent display name + Working/Idle/Disabled status badge
+- Lock indicator: locked (agent has an active job) or unlocked
+- If locked: the currently running job name, elapsed time, and a Force Stop button
+- Per-job list with queue depth badge and Cancel button when depth > 0
+- Next scheduled fire time (earliest across all enabled schedules for that agent)
+
+**New API Endpoints (v0.4.0)**
+
+| Endpoint | Method | Description |
+|---|---|---|
+| /api/schedules | GET | Returns merged schedule list + per-agent queue/lock state |
+| /api/queue/cancel | POST | Decrements queue depth by 1, writes queue_cancelled event + audit entry |
+| /api/job/stop | POST | Kills process by PID from lock file, removes lock, writes force_stopped event + audit entry |
+
+`/api/schedules` response shape:
+```json
+{
+  "schedules": [{ "agent": "str", "job": "str", "cron": "str", "enabled": true, "description": "str" }],
+  "queues": {
+    "<agent>": {
+      "lock": { "job": "str", "ts": "ISO-8601", "run_id": "str", "pid": 0 },
+      "jobs": { "<job>": { "queue_depth": 0 } }
+    }
+  }
+}
+```
 
 ---
 
@@ -192,8 +248,24 @@ Full-page event viewer with filters (agent, event type, time range). Loads all e
 ### events.jsonl (one line per event)
 
 ```json
-{"ts": "ISO-8601", "agent": "str", "job": "str", "event": "started|completed|queued|dequeued|error|skipped", "runId": "str", "details": {}, "systemVersion": "str"}
+{"ts": "ISO-8601", "agent": "str", "job": "str", "event": "started|completed|queued|dequeued|error|skipped|force_stopped|queue_cancelled", "runId": "str", "details": {}, "systemVersion": "str"}
 ```
+
+**Event type reference:**
+
+| Event | Trigger | Notable details fields |
+|---|---|---|
+| started | Job begins execution | run_id |
+| completed | Job exits with code 0 | duration, exit_code |
+| failed | Job exits non-zero | exit_code, duration |
+| queued | Trigger fires while locked | queue_depth |
+| dequeued | Queued entry begins execution | |
+| skipped | maxRuns limit reached | |
+| stale_lock_cleared | Lock file found stale on startup | lock_age_seconds |
+| schedule_registered | Schedule entry added | cron |
+| schedule_removed | Schedule entry removed | |
+| force_stopped | User clicked Force Stop in UI | pid, run_id, elapsed_seconds, stopped_by |
+| queue_cancelled | User clicked Cancel in UI | cancelled_by, remaining_depth |
 
 ### errors.jsonl (one line per error)
 
@@ -244,6 +316,25 @@ Full-page event viewer with filters (agent, event type, time range). Loads all e
 ```json
 {"count": 0, "lastRun": "ISO-8601|null", "lastRunId": "str|null"}
 ```
+
+### lock file (state/agents/{agent}/lock)
+
+Written atomically when a job begins. Updated with pid and run_id after the claude process starts.
+
+```json
+{
+  "job": "str",
+  "ts": "ISO-8601",
+  "run_id": "str",
+  "pid": 12345
+}
+```
+
+**v0.4.0 change:** `pid` and `run_id` fields added. The lock is initially written without these fields (before process start), then overwritten with them immediately after the process starts. Backward-compatible: old lock files without `pid` are still parsed safely (treated as pid=0, which skips the kill step but still clears the lock).
+
+### queue file (state/agents/{agent}/{job}/queue)
+
+Plain text file containing a single integer: the number of pending queued triggers for this job. Absent or empty means zero. Written atomically. Decremented by one on each dequeue or cancel.
 
 ---
 

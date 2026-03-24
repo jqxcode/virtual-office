@@ -208,7 +208,7 @@ try {
                         $auditLines = [System.IO.File]::ReadAllLines($af.FullName, [System.Text.Encoding]::UTF8)
                         foreach ($line in $auditLines) {
                             $trimmed = $line.Trim()
-                            if ($trimmed.Length -gt 0) {
+                            if ($trimmed.Length -gt 0 -and $trimmed.StartsWith('{') -and $trimmed.EndsWith('}')) {
                                 # Normalize audit "action" field to "event" for consistency
                                 if ($trimmed -match '"action"' -and $trimmed -notmatch '"event"') {
                                     $trimmed = $trimmed -replace '"action"\s*:', '"event":'
@@ -231,7 +231,7 @@ try {
                             $parts = [regex]::Split($trimmed, '(?<=\})(?=\{)')
                             foreach ($part in $parts) {
                                 $p = $part.Trim()
-                                if ($p.Length -gt 0) {
+                                if ($p.Length -gt 0 -and $p.StartsWith('{') -and $p.EndsWith('}')) {
                                     $nonEmpty += $p
                                 }
                             }
@@ -319,6 +319,232 @@ try {
                     }
                 } else {
                     Send-NotFound $context
+                }
+            }
+            elseif ($urlPath -eq "/api/schedules") {
+                # Serve merged schedule + runtime queue state
+                $schedulesFile = Join-Path $ConfigDir "schedules.json"
+                $jobsDir = Join-Path $ConfigDir "jobs"
+                $agentsStateDir = Join-Path $StateDir "agents"
+                $schedulesList = @()
+                if (Test-Path $schedulesFile) {
+                    $schedulesJson = [System.IO.File]::ReadAllText($schedulesFile, [System.Text.Encoding]::UTF8)
+                    $schedulesObj = $schedulesJson | ConvertFrom-Json
+                    foreach ($entry in $schedulesObj.schedules) {
+                        $agentName = $entry.agent
+                        $jobName   = $entry.job
+                        $enabled   = $false
+                        $jobFile   = Join-Path $jobsDir "$agentName.json"
+                        if (Test-Path $jobFile) {
+                            $jobJson  = [System.IO.File]::ReadAllText($jobFile, [System.Text.Encoding]::UTF8)
+                            $jobObj   = $jobJson | ConvertFrom-Json
+                            # jobs is a hashtable/object with job names as keys
+                            $jobEntry = $null
+                            if ($jobObj.jobs.PSObject.Properties[$jobName]) {
+                                $jobEntry = $jobObj.jobs.$jobName
+                            }
+                            if ($jobEntry) {
+                                if ($jobEntry.PSObject.Properties["enabled"]) {
+                                    $enabled = [bool]$jobEntry.enabled
+                                } else {
+                                    $enabled = $true
+                                }
+                            }
+                        }
+                        $desc = ""
+                        if ($entry.PSObject.Properties["description"]) { $desc = $entry.description }
+                        $schedulesList += [PSCustomObject]@{
+                            agent       = $agentName
+                            job         = $jobName
+                            cron        = $entry.cron
+                            description = $desc
+                            enabled     = $enabled
+                        }
+                    }
+                }
+                # Build queues map
+                $queuesMap = [PSCustomObject]@{}
+                if (Test-Path $agentsStateDir) {
+                    $agentDirs = Get-ChildItem -Path $agentsStateDir -Directory -ErrorAction SilentlyContinue
+                    foreach ($aDir in $agentDirs) {
+                        $aName    = $aDir.Name
+                        $lockFile = Join-Path $aDir.FullName "lock"
+                        $lockInfo = $null
+                        if (Test-Path $lockFile) {
+                            try {
+                                $lockText = [System.IO.File]::ReadAllText($lockFile, [System.Text.Encoding]::UTF8)
+                                $lockInfo = $lockText | ConvertFrom-Json
+                            } catch {}
+                        }
+                        $jobsMap = [PSCustomObject]@{}
+                        $jobDirs = Get-ChildItem -Path $aDir.FullName -Directory -ErrorAction SilentlyContinue
+                        foreach ($jDir in $jobDirs) {
+                            $jName     = $jDir.Name
+                            $queueFile = Join-Path $jDir.FullName "queue"
+                            $depth     = 0
+                            if (Test-Path $queueFile) {
+                                try {
+                                    $qText = [System.IO.File]::ReadAllText($queueFile, [System.Text.Encoding]::UTF8).Trim()
+                                    $depth = [int]$qText
+                                } catch { $depth = 0 }
+                            }
+                            $jobsMap | Add-Member -NotePropertyName $jName -NotePropertyValue ([PSCustomObject]@{ queue_depth = $depth }) -Force
+                        }
+                        $agentInfo = [PSCustomObject]@{ jobs = $jobsMap }
+                        if ($null -ne $lockInfo) {
+                            $agentInfo | Add-Member -NotePropertyName "lock" -NotePropertyValue $lockInfo -Force
+                        }
+                        $queuesMap | Add-Member -NotePropertyName $aName -NotePropertyValue $agentInfo -Force
+                    }
+                }
+                $result = [PSCustomObject]@{
+                    schedules = $schedulesList
+                    queues    = $queuesMap
+                }
+                Send-TextResponse $context 200 "application/json" ($result | ConvertTo-Json -Depth 10)
+            }
+            elseif ($urlPath -eq "/api/queue/cancel" -and $request.HttpMethod -eq "POST") {
+                # Cancel a queued job (decrement queue depth)
+                $SYSTEM_VERSION = "0.4.0"
+                $AuditDir = Join-Path (Join-Path $ProjectRoot "output") "audit"
+                $reader   = New-Object System.IO.StreamReader($request.InputStream)
+                $bodyText = $reader.ReadToEnd()
+                $body     = $bodyText | ConvertFrom-Json
+                $agentName = $body.agent
+                $jobName   = $body.job
+                # Validate names
+                if ($agentName -notmatch '^[a-zA-Z0-9_-]+$' -or $jobName -notmatch '^[a-zA-Z0-9_-]+$') {
+                    Send-TextResponse $context 400 "application/json" '{"ok":false,"error":"invalid agent or job name"}'
+                } else {
+                    $queueFile = Join-Path (Join-Path (Join-Path (Join-Path $StateDir "agents") $agentName) $jobName) "queue"
+                    if (-not (Test-Path $queueFile)) {
+                        Send-TextResponse $context 400 "application/json" '{"ok":false,"error":"queue file not found"}'
+                    } else {
+                        $qText = [System.IO.File]::ReadAllText($queueFile, [System.Text.Encoding]::UTF8).Trim()
+                        $depth = 0
+                        [int]::TryParse($qText, [ref]$depth) | Out-Null
+                        if ($depth -le 0) {
+                            Send-TextResponse $context 400 "application/json" '{"ok":false,"error":"queue already empty"}'
+                        } else {
+                            $newDepth  = [Math]::Max(0, $depth - 1)
+                            $tmpFile   = "$queueFile.tmp"
+                            [System.IO.File]::WriteAllText($tmpFile, "$newDepth", [System.Text.Encoding]::UTF8)
+                            Move-Item -Path $tmpFile -Destination $queueFile -Force
+                            # Update dashboard.json
+                            $dashFile = Join-Path $StateDir "dashboard.json"
+                            if (Test-Path $dashFile) {
+                                try {
+                                    $dashText = [System.IO.File]::ReadAllText($dashFile, [System.Text.Encoding]::UTF8)
+                                    $dashObj  = $dashText | ConvertFrom-Json
+                                    if ($dashObj.agents.$agentName.jobs.$jobName) {
+                                        $dashObj.agents.$agentName.jobs.$jobName | Add-Member -NotePropertyName "queue_depth" -NotePropertyValue $newDepth -Force
+                                    }
+                                    $dashTmp = "$dashFile.tmp"
+                                    [System.IO.File]::WriteAllText($dashTmp, ($dashObj | ConvertTo-Json -Depth 10), [System.Text.Encoding]::UTF8)
+                                    Move-Item -Path $dashTmp -Destination $dashFile -Force
+                                } catch {}
+                            }
+                            $now      = [DateTime]::UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ")
+                            $eventObj = [PSCustomObject]@{
+                                timestamp     = $now
+                                agent         = $agentName
+                                job           = $jobName
+                                event         = "queue_cancelled"
+                                details       = [PSCustomObject]@{ cancelled_by = "user"; remaining_depth = $newDepth }
+                                systemVersion = $SYSTEM_VERSION
+                            }
+                            $eventLine = ($eventObj | ConvertTo-Json -Compress)
+                            $eventsFile = Join-Path $StateDir "events.jsonl"
+                            [System.IO.File]::AppendAllText($eventsFile, "$eventLine`n", [System.Text.Encoding]::UTF8)
+                            # Audit log
+                            if (-not (Test-Path $AuditDir)) { New-Item -ItemType Directory -Path $AuditDir -Force | Out-Null }
+                            $auditFile = Join-Path $AuditDir ([DateTime]::UtcNow.ToString("yyyy-MM") + ".jsonl")
+                            [System.IO.File]::AppendAllText($auditFile, "$eventLine`n", [System.Text.Encoding]::UTF8)
+                            Send-TextResponse $context 200 "application/json" ("{`"ok`":true,`"queue_depth`":$newDepth}")
+                        }
+                    }
+                }
+            }
+            elseif ($urlPath -eq "/api/job/stop" -and $request.HttpMethod -eq "POST") {
+                # Force stop a running job
+                $SYSTEM_VERSION = "0.4.0"
+                $AuditDir = Join-Path (Join-Path $ProjectRoot "output") "audit"
+                $reader   = New-Object System.IO.StreamReader($request.InputStream)
+                $bodyText = $reader.ReadToEnd()
+                $body     = $bodyText | ConvertFrom-Json
+                $agentName = $body.agent
+                $jobName   = $body.job
+                # Validate names
+                if ($agentName -notmatch '^[a-zA-Z0-9_-]+$' -or $jobName -notmatch '^[a-zA-Z0-9_-]+$') {
+                    Send-TextResponse $context 400 "application/json" '{"ok":false,"error":"invalid agent or job name"}'
+                } else {
+                    $lockFile = Join-Path (Join-Path (Join-Path $StateDir "agents") $agentName) "lock"
+                    if (-not (Test-Path $lockFile)) {
+                        Send-TextResponse $context 400 "application/json" '{"ok":false,"error":"not running"}'
+                    } else {
+                        $lockText = [System.IO.File]::ReadAllText($lockFile, [System.Text.Encoding]::UTF8)
+                        $lockObj  = $lockText | ConvertFrom-Json
+                        $procId = 0
+                        if ($lockObj.PSObject.Properties["pid"])    { $procId = [int]$lockObj.pid }
+                        $runId  = ""
+                        if ($lockObj.PSObject.Properties["run_id"]) { $runId  = $lockObj.run_id }
+                        $lockTs = ""
+                        if ($lockObj.PSObject.Properties["ts"])     { $lockTs = $lockObj.ts }
+                        # Calculate elapsed seconds
+                        $elapsed  = 0
+                        if ($lockTs -ne "") {
+                            try {
+                                $startDt = [DateTime]::Parse($lockTs, $null, [System.Globalization.DateTimeStyles]::RoundtripKind)
+                                $elapsed = [int]([DateTime]::UtcNow - $startDt).TotalSeconds
+                            } catch {}
+                        }
+                        # Kill the process
+                        if ($procId -gt 0) {
+                            Stop-Process -Id $procId -Force -ErrorAction SilentlyContinue
+                        }
+                        # Also kill any claude processes in the tree
+                        try {
+                            $claudeProcs = Get-Process -Name "claude" -ErrorAction SilentlyContinue
+                            if ($claudeProcs) {
+                                $claudeProcs | ForEach-Object { Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue }
+                            }
+                        } catch {}
+                        # Remove lock file
+                        Remove-Item -Path $lockFile -Force -ErrorAction SilentlyContinue
+                        # Update dashboard.json
+                        $dashFile = Join-Path $StateDir "dashboard.json"
+                        if (Test-Path $dashFile) {
+                            try {
+                                $dashText = [System.IO.File]::ReadAllText($dashFile, [System.Text.Encoding]::UTF8)
+                                $dashObj  = $dashText | ConvertFrom-Json
+                                if ($dashObj.agents.$agentName.jobs.$jobName) {
+                                    $dashObj.agents.$agentName.jobs.$jobName | Add-Member -NotePropertyName "status" -NotePropertyValue "idle" -Force
+                                    $dashObj.agents.$agentName.jobs.$jobName | Add-Member -NotePropertyName "run_id" -NotePropertyValue $null -Force
+                                    $dashObj.agents.$agentName.jobs.$jobName | Add-Member -NotePropertyName "pid"    -NotePropertyValue $null -Force
+                                }
+                                $dashTmp = "$dashFile.tmp"
+                                [System.IO.File]::WriteAllText($dashTmp, ($dashObj | ConvertTo-Json -Depth 10), [System.Text.Encoding]::UTF8)
+                                Move-Item -Path $dashTmp -Destination $dashFile -Force
+                            } catch {}
+                        }
+                        $now      = [DateTime]::UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ")
+                        $eventObj = [PSCustomObject]@{
+                            timestamp     = $now
+                            agent         = $agentName
+                            job           = $jobName
+                            event         = "force_stopped"
+                            details       = [PSCustomObject]@{ stopped_by = "user"; pid = $procId; run_id = $runId; elapsed_seconds = $elapsed }
+                            systemVersion = $SYSTEM_VERSION
+                        }
+                        $eventLine = ($eventObj | ConvertTo-Json -Compress)
+                        $eventsFile = Join-Path $StateDir "events.jsonl"
+                        [System.IO.File]::AppendAllText($eventsFile, "$eventLine`n", [System.Text.Encoding]::UTF8)
+                        # Audit log
+                        if (-not (Test-Path $AuditDir)) { New-Item -ItemType Directory -Path $AuditDir -Force | Out-Null }
+                        $auditFile = Join-Path $AuditDir ([DateTime]::UtcNow.ToString("yyyy-MM") + ".jsonl")
+                        [System.IO.File]::AppendAllText($auditFile, "$eventLine`n", [System.Text.Encoding]::UTF8)
+                        Send-TextResponse $context 200 "application/json" ("{`"ok`":true,`"pid`":$procId}")
+                    }
                 }
             }
             else {

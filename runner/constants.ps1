@@ -1,7 +1,7 @@
 # Virtual Office - Shared Constants
-# Version: 0.3.0
+# Version: 0.4.0
 
-$SYSTEM_VERSION = "0.3.0"
+$SYSTEM_VERSION = "0.4.0"
 $PROJECT_ROOT = $PSScriptRoot | Split-Path -Parent
 $CONFIG_DIR = Join-Path $PROJECT_ROOT "config"
 $STATE_DIR = Join-Path $PROJECT_ROOT "state"

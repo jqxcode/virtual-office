@@ -859,14 +859,16 @@ body {
 }
 
 .mission-col-left {
-  flex: 0 0 45%;
+  flex: 45 0 0;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 1rem;
 }
 
 .mission-col-right {
-  flex: 0 0 55%;
+  flex: 55 0 0;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
@@ -1166,6 +1168,330 @@ body {
   background: #484f58;
 }
 
+/* === Schedule Table (Task Queue tab) === */
+.schedule-table-wrapper {
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.schedule-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.schedule-table thead th {
+  background: #0d1117;
+  color: #8b949e;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.6rem 0.8rem;
+  text-align: left;
+  border-bottom: 1px solid #30363d;
+}
+
+.schedule-table tbody tr {
+  border-bottom: 1px solid #21262d;
+  transition: background 0.1s;
+}
+
+.schedule-table tbody tr:nth-child(even) {
+  background: #1c2128;
+}
+
+.schedule-table tbody tr:nth-child(odd) {
+  background: #161b22;
+}
+
+.schedule-table tbody tr:hover {
+  background: #1f2937;
+}
+
+.schedule-table tbody tr.disabled-row {
+  opacity: 0.45;
+}
+
+.schedule-table tbody tr.running-row {
+  background: rgba(59, 130, 246, 0.08);
+  border-left: 3px solid #3b82f6;
+}
+
+.schedule-table tbody tr.queued-row {
+  background: rgba(217, 119, 6, 0.06);
+  border-left: 3px solid #d97706;
+}
+
+.schedule-table td {
+  padding: 0.5rem 0.8rem;
+  color: #e6edf3;
+  vertical-align: middle;
+}
+
+.schedule-next-time {
+  font-family: "Cascadia Code", "Fira Code", "Consolas", monospace;
+  font-size: 0.78rem;
+  color: #e6edf3;
+  white-space: nowrap;
+}
+
+.schedule-agent {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.schedule-job {
+  color: #8b949e;
+  white-space: nowrap;
+}
+
+.schedule-cron-human {
+  font-size: 0.78rem;
+  color: #8b949e;
+}
+
+.schedule-status-badge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.15rem 0.5rem;
+  border-radius: 9999px;
+  white-space: nowrap;
+}
+
+.schedule-status-badge.scheduled {
+  color: #484f58;
+  background: #21262d;
+}
+
+.schedule-status-badge.running {
+  color: #e6edf3;
+  background: #3b82f6;
+  animation: pulse-label 1.5s ease-in-out infinite;
+}
+
+.schedule-status-badge.queued {
+  color: #d97706;
+  background: rgba(217, 119, 6, 0.15);
+}
+
+.schedule-status-badge.disabled {
+  color: #484f58;
+  background: #21262d;
+}
+
+/* Action buttons */
+.cancel-btn {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.2rem 0.6rem;
+  border-radius: 6px;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  background: transparent;
+  color: #ef4444;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.cancel-btn:hover {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: #ef4444;
+}
+
+.force-stop-btn {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.2rem 0.6rem;
+  border-radius: 6px;
+  border: 1px solid #ef4444;
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  cursor: pointer;
+  transition: all 0.15s;
+  position: relative;
+}
+
+.force-stop-btn:hover {
+  background: rgba(239, 68, 68, 0.3);
+}
+
+.force-stop-btn.confirming {
+  background: #ef4444;
+  color: #fff;
+}
+
+/* Confirm tooltip for force stop */
+.stop-confirm-tooltip {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #ef4444;
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.stop-confirm-tooltip::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 4px solid transparent;
+  border-top-color: #ef4444;
+}
+
+/* Schedule overflow footer */
+.schedule-overflow {
+  padding: 0.5rem 0.8rem;
+  text-align: center;
+  font-size: 0.78rem;
+  color: #484f58;
+  border-top: 1px solid #30363d;
+  background: #0d1117;
+}
+
+/* === Queue Cards (Task Queue tab) === */
+.queue-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1rem;
+}
+
+.queue-card {
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 10px;
+  padding: 1rem 1.15rem;
+  border-left: 4px solid #30363d;
+  transition: border-color 0.15s;
+}
+
+.queue-card:hover {
+  border-left-color: #484f58;
+}
+
+.queue-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.6rem;
+}
+
+.queue-card-name {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.queue-card-status {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.15rem 0.55rem;
+  border-radius: 9999px;
+}
+
+.queue-card-running {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  color: #3b82f6;
+  margin-bottom: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  background: rgba(59, 130, 246, 0.08);
+  border-radius: 6px;
+}
+
+.queue-card-running .elapsed {
+  font-family: "Cascadia Code", "Fira Code", "Consolas", monospace;
+  font-weight: 600;
+}
+
+.queue-card-section {
+  margin-top: 0.5rem;
+}
+
+.queue-card-section-title {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #8b949e;
+  margin-bottom: 0.3rem;
+}
+
+.queue-card-lock {
+  font-size: 0.78rem;
+  color: #8b949e;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.lock-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.lock-indicator.locked {
+  background: #d97706;
+  box-shadow: 0 0 6px rgba(217, 119, 6, 0.5);
+}
+
+.lock-indicator.unlocked {
+  background: #22c55e;
+}
+
+.queue-card-jobs {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.queue-card-job {
+  font-size: 0.78rem;
+  color: #8b949e;
+  padding: 0.25rem 0.4rem;
+  background: #0d1117;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+}
+
+.queue-card-job .queue-depth {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #d97706;
+  background: rgba(217, 119, 6, 0.15);
+  padding: 0.1rem 0.4rem;
+  border-radius: 9999px;
+}
+
+.queue-card-next {
+  font-size: 0.78rem;
+  color: #484f58;
+  margin-top: 0.5rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid #30363d;
+}
+
 /* === Responsive === */
 @media (max-width: 768px) {
   .main-content {
@@ -1206,5 +1532,13 @@ body {
   .mission-col-left,
   .mission-col-right {
     flex: 1 1 100%;
+  }
+
+  .schedule-table-wrapper {
+    overflow-x: auto;
+  }
+
+  .queue-cards-grid {
+    grid-template-columns: 1fr;
   }
 }

@@ -32,6 +32,8 @@ var allEvents = [];
 var activeGroup = null;
 var activeTopTab = "agents";
 var lastDashboard = null;
+var scheduleData = null;
+var MAX_SCHEDULE_ROWS = 20;
 
 // --- Fetch helpers ---
 
@@ -63,6 +65,126 @@ async function fetchErrors() {
   var response = await fetch(CONFIG.API_BASE + "/api/errors", { cache: "no-store" });
   if (!response.ok) throw new Error("HTTP " + response.status);
   return await response.json();
+}
+
+async function fetchSchedules() {
+  var response = await fetch(CONFIG.API_BASE + "/api/schedules", { cache: "no-store" });
+  if (!response.ok) throw new Error("HTTP " + response.status);
+  return await response.json();
+}
+
+// --- Cron helpers ---
+
+function cronToHuman(cronExpr) {
+  if (!cronExpr || typeof cronExpr !== "string") return String(cronExpr);
+  var parts = cronExpr.trim().split(/\s+/);
+  if (parts.length !== 5) return cronExpr;
+
+  var min = parts[0];
+  var hour = parts[1];
+  var dom = parts[2];
+  var month = parts[3];
+  var dow = parts[4];
+
+  function formatHour12(h, m) {
+    var hi = parseInt(h, 10);
+    var mi = parseInt(m, 10);
+    var ampm = hi >= 12 ? "PM" : "AM";
+    var h12 = hi % 12;
+    if (h12 === 0) h12 = 12;
+    return h12 + ":" + (mi < 10 ? "0" : "") + mi + " " + ampm;
+  }
+
+  // Every N minutes
+  if (min.indexOf("*/") === 0) {
+    var interval = min.substring(2);
+    return "Every " + interval + " minutes";
+  }
+
+  // Every Nh at :MM
+  if (hour.indexOf("*/") === 0 && /^\d+$/.test(min)) {
+    var hInterval = hour.substring(2);
+    var mi2 = parseInt(min, 10);
+    return "Every " + hInterval + "h at :" + (mi2 < 10 ? "0" : "") + mi2;
+  }
+
+  // Hourly at :MM
+  if (/^\d+$/.test(min) && hour === "*" && dom === "*" && month === "*" && dow === "*") {
+    var mi3 = parseInt(min, 10);
+    return "Hourly at :" + (mi3 < 10 ? "0" : "") + mi3;
+  }
+
+  // Daily / Weekdays / Weekends at specific time
+  if (/^\d+$/.test(min) && /^\d+$/.test(hour) && dom === "*" && month === "*") {
+    var timeStr = formatHour12(hour, min);
+    if (dow === "*") return "Daily at " + timeStr;
+    if (dow === "1-5") return "Weekdays at " + timeStr;
+    if (dow === "0,6") return "Weekends at " + timeStr;
+  }
+
+  return cronExpr;
+}
+
+function getNextCronFires(cronExpr, afterDate, count) {
+  if (!cronExpr || typeof cronExpr !== "string") return [];
+  var parts = cronExpr.trim().split(/\s+/);
+  if (parts.length !== 5) return [];
+
+  var minField = parts[0];
+  var hourField = parts[1];
+  var domField = parts[2];
+  var monthField = parts[3];
+  var dowField = parts[4];
+
+  function matchesCronField(value, field) {
+    if (field === "*") return true;
+    // */N
+    if (field.indexOf("*/") === 0) {
+      var step = parseInt(field.substring(2), 10);
+      return step > 0 && value % step === 0;
+    }
+    // Comma-separated list (may include ranges)
+    var segments = field.split(",");
+    for (var i = 0; i < segments.length; i++) {
+      var seg = segments[i].trim();
+      if (seg.indexOf("-") !== -1) {
+        var rangeParts = seg.split("-");
+        var lo = parseInt(rangeParts[0], 10);
+        var hi = parseInt(rangeParts[1], 10);
+        if (value >= lo && value <= hi) return true;
+      } else {
+        if (parseInt(seg, 10) === value) return true;
+      }
+    }
+    return false;
+  }
+
+  var results = [];
+  // Start from afterDate, round up to next minute
+  var cursor = new Date(afterDate.getTime());
+  cursor.setSeconds(0, 0);
+  cursor = new Date(cursor.getTime() + 60000); // next whole minute
+
+  var maxIterations = 14 * 24 * 60; // 14 days in minutes
+  for (var iter = 0; iter < maxIterations && results.length < count; iter++) {
+    var cMin = cursor.getMinutes();
+    var cHour = cursor.getHours();
+    var cDom = cursor.getDate();
+    var cMonth = cursor.getMonth() + 1; // cron months are 1-12
+    var cDow = cursor.getDay(); // 0=Sun
+
+    if (matchesCronField(cMin, minField) &&
+        matchesCronField(cHour, hourField) &&
+        matchesCronField(cDom, domField) &&
+        matchesCronField(cMonth, monthField) &&
+        matchesCronField(cDow, dowField)) {
+      results.push(new Date(cursor.getTime()));
+    }
+
+    cursor = new Date(cursor.getTime() + 60000);
+  }
+
+  return results;
 }
 
 // --- URL helpers ---
@@ -147,6 +269,11 @@ function switchTopTab(tabName) {
   // Load events when switching to events tab
   if (tabName === "events" && allEvents.length === 0) {
     loadAllEvents();
+  }
+
+  // Load schedules when switching to queue tab
+  if (tabName === "queue" && !scheduleData) {
+    loadScheduleData();
   }
 }
 
@@ -1416,6 +1543,405 @@ function updateTimestamp() {
   el.textContent = "Updated " + new Date().toLocaleTimeString();
 }
 
+// --- Schedule / Queue rendering ---
+
+async function loadScheduleData() {
+  try {
+    var results = await Promise.all([fetchSchedules(), fetchDashboard(), fetchConfig()]);
+    scheduleData = results[0];
+    scheduleData.dashboard = results[1];
+    scheduleData.config = results[2];
+    // Use mergeConfigAndDashboard to get properly normalized agent/job state
+    // This handles the flat dashboard format exactly like the Agents tab does
+    scheduleData.merged = mergeConfigAndDashboard(results[2], results[1]);
+    renderScheduleTable();
+    renderQueueCards();
+  } catch (e) {
+    console.warn("Failed to load schedule data:", e.message);
+  }
+}
+
+function renderScheduleTable() {
+  if (!scheduleData) return;
+  var schedules = scheduleData.schedules || [];
+  var now = new Date();
+  var allItems = [];
+
+  schedules.forEach(function(sched) {
+    var agent = sched.agent || "";
+    var job = sched.job || "";
+    var cron = sched.cron || "";
+    var enabled = sched.enabled !== false;
+    var description = sched.description || "";
+    var cronHuman = cronToHuman(cron);
+    var fires = enabled ? getNextCronFires(cron, now, 10) : [];
+
+    if (!enabled) {
+      // Show one row for disabled schedules
+      allItems.push({
+        fireTime: null,
+        agent: agent,
+        job: job,
+        cron: cron,
+        cronHuman: cronHuman,
+        description: description,
+        enabled: false,
+        status: "disabled"
+      });
+      return;
+    }
+
+    fires.forEach(function(fireTime) {
+      allItems.push({
+        fireTime: fireTime,
+        agent: agent,
+        job: job,
+        cron: cron,
+        cronHuman: cronHuman,
+        description: description,
+        enabled: true,
+        status: "scheduled"
+      });
+    });
+  });
+
+  // Cross-reference with merged agent state (same source as Agents tab)
+  var mergedAgents = scheduleData.merged || {};
+  var runningMarked = {};
+  var queuedMarked = {};
+
+  allItems.forEach(function(item) {
+    if (!item.enabled) return;
+    var key = item.agent + "/" + item.job;
+    var agentData = mergedAgents[item.agent];
+    if (!agentData) return;
+
+    // Find the matching job in the merged jobs array
+    var matchedJob = null;
+    (agentData.jobs || []).forEach(function(j) {
+      if (j.name === item.job) matchedJob = j;
+    });
+    if (!matchedJob) return;
+
+    if (matchedJob.status === "running" && !runningMarked[key]) {
+      item.status = "running";
+      runningMarked[key] = true;
+    } else if (matchedJob.queueDepth > 0 && !queuedMarked[key]) {
+      var queuedCount = queuedMarked[key + "_count"] || 0;
+      if (queuedCount < matchedJob.queueDepth) {
+        item.status = "queued";
+        queuedMarked[key + "_count"] = queuedCount + 1;
+      }
+    }
+  });
+
+  // Sort: disabled at end, then by fireTime ascending
+  allItems.sort(function(a, b) {
+    if (!a.fireTime && !b.fireTime) return 0;
+    if (!a.fireTime) return 1;
+    if (!b.fireTime) return -1;
+    return a.fireTime.getTime() - b.fireTime.getTime();
+  });
+
+  var totalCount = allItems.length;
+  var displayItems = allItems.slice(0, MAX_SCHEDULE_ROWS);
+
+  var tbody = document.getElementById("schedule-tbody");
+  if (!tbody) return;
+  tbody.innerHTML = "";
+
+  displayItems.forEach(function(item) {
+    var tr = document.createElement("tr");
+    if (item.status === "running") tr.className = "running-row";
+    else if (item.status === "queued") tr.className = "queued-row";
+    else if (item.status === "disabled") tr.className = "disabled-row";
+
+    // Next Run
+    var tdTime = document.createElement("td");
+    if (item.fireTime) {
+      tdTime.textContent = item.fireTime.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }) + ", " + item.fireTime.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+    } else {
+      tdTime.textContent = "--";
+    }
+    tr.appendChild(tdTime);
+
+    // Agent
+    var tdAgent = document.createElement("td");
+    tdAgent.style.color = getAgentColor(item.agent);
+    tdAgent.style.fontWeight = "bold";
+    tdAgent.textContent = item.agent;
+    tr.appendChild(tdAgent);
+
+    // Job
+    var tdJob = document.createElement("td");
+    tdJob.style.color = "#9ca3af";
+    tdJob.textContent = item.job;
+    tr.appendChild(tdJob);
+
+    // Schedule
+    var tdSchedule = document.createElement("td");
+    tdSchedule.textContent = item.cronHuman;
+    tdSchedule.title = item.cron;
+    tr.appendChild(tdSchedule);
+
+    // Status
+    var tdStatus = document.createElement("td");
+    var badge = document.createElement("span");
+    badge.className = "schedule-status-badge " + item.status;
+    badge.textContent = item.status;
+    tdStatus.appendChild(badge);
+    tr.appendChild(tdStatus);
+
+    // Action
+    var tdAction = document.createElement("td");
+    if (item.status === "running") {
+      var stopBtn = document.createElement("button");
+      stopBtn.className = "force-stop-btn";
+      stopBtn.textContent = "Force Stop";
+      stopBtn.addEventListener("click", function() {
+        if (stopBtn.classList.contains("confirming")) {
+          fetch(CONFIG.API_BASE + "/api/job/stop", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ agent: item.agent, job: item.job })
+          }).then(function() {
+            scheduleData = null;
+            loadScheduleData();
+          });
+        } else {
+          stopBtn.classList.add("confirming");
+          stopBtn.textContent = "Click again to stop";
+          setTimeout(function() {
+            stopBtn.classList.remove("confirming");
+            stopBtn.textContent = "Force Stop";
+          }, 3000);
+        }
+      });
+      tdAction.appendChild(stopBtn);
+    } else if (item.status === "queued") {
+      var cancelBtn = document.createElement("button");
+      cancelBtn.className = "cancel-btn";
+      cancelBtn.textContent = "Cancel";
+      cancelBtn.addEventListener("click", function() {
+        fetch(CONFIG.API_BASE + "/api/queue/cancel", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ agent: item.agent, job: item.job })
+        }).then(function() {
+          scheduleData = null;
+          loadScheduleData();
+        });
+      });
+      tdAction.appendChild(cancelBtn);
+    }
+    tr.appendChild(tdAction);
+
+    tbody.appendChild(tr);
+  });
+
+  // Update count badge
+  var countEl = document.getElementById("schedule-count");
+  if (countEl) countEl.textContent = totalCount;
+
+  // Overflow message
+  var overflowEl = document.getElementById("schedule-overflow");
+  if (overflowEl) {
+    if (totalCount > MAX_SCHEDULE_ROWS) {
+      overflowEl.style.display = "";
+      overflowEl.textContent = "Showing " + MAX_SCHEDULE_ROWS + " of " + totalCount + " upcoming tasks";
+    } else {
+      overflowEl.style.display = "none";
+    }
+  }
+}
+
+function renderQueueCards() {
+  if (!scheduleData) return;
+  var queues = scheduleData.queues || {};
+  var config = scheduleData.config || agentConfig;
+  var mergedAgents = scheduleData.merged || {};
+  var schedules = scheduleData.schedules || [];
+  var container = document.getElementById("queue-cards");
+  if (!container) return;
+  container.innerHTML = "";
+
+  var totalQueueDepth = 0;
+  var agentNames = [];
+  if (config && config.agents) {
+    agentNames = Object.keys(config.agents);
+  }
+
+  agentNames.forEach(function(agentName) {
+    var agentCfg = config.agents[agentName];
+    var agentColor = getAgentColor(agentName);
+    var agentData = mergedAgents[agentName] || {};
+    var agentQueue = queues[agentName] || {};
+    var mergedJobs = agentData.jobs || [];
+    var agentStatus = getAgentStatus(agentData);
+
+    var card = document.createElement("div");
+    card.className = "queue-card";
+    card.style.borderLeftColor = agentColor;
+
+    // Header
+    var header = document.createElement("div");
+    header.className = "queue-card-header";
+    var nameSpan = document.createElement("span");
+    nameSpan.className = "queue-card-name";
+    nameSpan.textContent = agentData.display_name || agentCfg.displayName || agentName;
+    nameSpan.style.color = agentColor;
+    header.appendChild(nameSpan);
+
+    var statusBadge = document.createElement("span");
+    statusBadge.className = "queue-card-status " + agentStatus;
+    if (agentStatus === "busy") {
+      statusBadge.textContent = "Working";
+    } else if (agentStatus === "disabled") {
+      statusBadge.textContent = "Disabled";
+    } else {
+      statusBadge.textContent = "Idle";
+    }
+    header.appendChild(statusBadge);
+    card.appendChild(header);
+
+    // Running job info (from merged data, same as Agents tab)
+    var runningJobName = null;
+    if (agentData.running_job) {
+      runningJobName = agentData.running_job.job || agentData.running_job.name || null;
+    }
+
+    // Lock status
+    var lockDiv = document.createElement("div");
+    lockDiv.className = "queue-card-lock";
+    var lockDot = document.createElement("span");
+    var lockText = document.createElement("span");
+    if (runningJobName) {
+      lockDot.className = "lock-indicator locked";
+      lockText.textContent = "Locked by " + runningJobName;
+
+      // Show running job info with elapsed
+      var runInfoDiv = document.createElement("div");
+      runInfoDiv.className = "queue-card-running";
+      var runText = "Running: " + runningJobName;
+      var startedTime = null;
+      mergedJobs.forEach(function(j) {
+        if (j.status === "running" && j.started) {
+          startedTime = j.started;
+        }
+      });
+      if (startedTime) {
+        var elapsed = Math.max(0, Math.floor((Date.now() - new Date(startedTime).getTime()) / 1000));
+        var em = Math.floor(elapsed / 60);
+        var es = elapsed % 60;
+        runText += " (" + em + "m " + (es < 10 ? "0" : "") + es + "s)";
+      }
+      runInfoDiv.textContent = runText;
+
+      var stopBtn = document.createElement("button");
+      stopBtn.className = "force-stop-btn";
+      stopBtn.textContent = "Force Stop";
+      stopBtn.addEventListener("click", function() {
+        if (stopBtn.classList.contains("confirming")) {
+          fetch(CONFIG.API_BASE + "/api/job/stop", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ agent: agentName, job: runningJobName })
+          }).then(function() {
+            scheduleData = null;
+            loadScheduleData();
+          });
+        } else {
+          stopBtn.classList.add("confirming");
+          stopBtn.textContent = "Click again to stop";
+          setTimeout(function() {
+            stopBtn.classList.remove("confirming");
+            stopBtn.textContent = "Force Stop";
+          }, 3000);
+        }
+      });
+      runInfoDiv.appendChild(stopBtn);
+      card.appendChild(runInfoDiv);
+    } else {
+      lockDot.className = "lock-indicator unlocked";
+      lockText.textContent = "Unlocked";
+    }
+    lockDiv.appendChild(lockDot);
+    lockDiv.appendChild(lockText);
+    card.appendChild(lockDiv);
+
+    // Job queue list (from merged jobs array)
+    var jobList = document.createElement("div");
+    jobList.className = "queue-card-jobs";
+    mergedJobs.forEach(function(job) {
+      var jobName = job.name || "unknown";
+      var jobRow = document.createElement("div");
+      jobRow.className = "queue-card-job";
+
+      var jName = document.createElement("span");
+      jName.className = "queue-card-job-name";
+      jName.textContent = jobName;
+      jobRow.appendChild(jName);
+
+      // Get queue depth from merged job data
+      var depth = job.queueDepth || 0;
+      totalQueueDepth += depth;
+
+      if (depth > 0) {
+        var depthBadge = document.createElement("span");
+        depthBadge.className = "queue-depth";
+        depthBadge.textContent = depth + " queued";
+        jobRow.appendChild(depthBadge);
+
+        var cancelBtn = document.createElement("button");
+        cancelBtn.className = "cancel-btn";
+        cancelBtn.textContent = "Cancel";
+        cancelBtn.addEventListener("click", function() {
+          fetch(CONFIG.API_BASE + "/api/queue/cancel", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ agent: agentName, job: jobName })
+          }).then(function() {
+            scheduleData = null;
+            loadScheduleData();
+          });
+        });
+        jobRow.appendChild(cancelBtn);
+      }
+
+      jobList.appendChild(jobRow);
+    });
+    card.appendChild(jobList);
+
+    // Next scheduled
+    var agentSchedules = schedules.filter(function(s) {
+      return s.agent === agentName && s.enabled !== false;
+    });
+    if (agentSchedules.length > 0) {
+      var nextFireDiv = document.createElement("div");
+      nextFireDiv.className = "queue-card-next";
+      var earliest = null;
+      var earliestJob = "";
+      agentSchedules.forEach(function(s) {
+        var fires = getNextCronFires(s.cron || "", new Date(), 1);
+        if (fires.length > 0 && (!earliest || fires[0].getTime() < earliest.getTime())) {
+          earliest = fires[0];
+          earliestJob = s.job || "";
+        }
+      });
+      if (earliest) {
+        nextFireDiv.textContent = "Next: " + earliestJob + " at " + earliest.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+      }
+      card.appendChild(nextFireDiv);
+    }
+
+    container.appendChild(card);
+  });
+
+  // Update total badge
+  var totalBadge = document.getElementById("queue-total-badge");
+  if (totalBadge) totalBadge.textContent = totalQueueDepth;
+}
+
 // --- Polling ---
 
 async function poll() {
@@ -1480,6 +2006,20 @@ async function poll() {
   } catch (e) {
     console.warn("Errors fetch failed:", e.message);
   }
+
+  // Refresh queue tab if active
+  if (activeTopTab === "queue") {
+    try {
+      scheduleData = await fetchSchedules();
+      scheduleData.dashboard = lastDashboard;
+      scheduleData.config = agentConfig;
+      scheduleData.merged = mergeConfigAndDashboard(agentConfig, lastDashboard);
+      renderScheduleTable();
+      renderQueueCards();
+    } catch (e) {
+      console.warn("Schedules fetch failed:", e.message);
+    }
+  }
 }
 
 async function startPolling() {
@@ -1490,7 +2030,7 @@ async function startPolling() {
   if (tabParam) {
     activeGroup = tabParam;
   }
-  if (viewParam && (viewParam === "agents" || viewParam === "events")) {
+  if (viewParam && (viewParam === "agents" || viewParam === "events" || viewParam === "queue")) {
     activeTopTab = viewParam;
     switchTopTab(viewParam);
   }
