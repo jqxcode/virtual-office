@@ -83,6 +83,18 @@
       "job": "Bug-Autopilot-Adoption-daily-summary",
       "cron": "30 7 * * *",
       "description": "Bug-AutoPilot daily summary post to Teams at 7:30am"
+    },
+    {
+      "agent": "hang-scout",
+      "job": "detect",
+      "cron": "45 * * * *",
+      "description": "Hang detection scan every hour at :45"
+    },
+    {
+      "agent": "hang-scout",
+      "job": "daily-report",
+      "cron": "0 0 * * *",
+      "description": "Daily 5W incident report at midnight"
     }
   ]
 }

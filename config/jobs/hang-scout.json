@@ -1,0 +1,18 @@
+{
+  "jobs": {
+    "detect": {
+      "prompt": "Run hang detection scan now. Scan all VO agent lock files under Q:/src/personal_projects/virtual-office/state/agents/*/lock for jobs running longer than 60 minutes. For each hung job: walk the process tree, capture py-spy stack traces for Python processes, classify the hang, decide whether to kill, log the incident, and file GitHub issues for new patterns. Output a scan summary at the end.",
+      "maxRuns": 0,
+      "enabled": true,
+      "saveOutput": true,
+      "description": "Scans for hung VO agent jobs, diagnoses via process tree and py-spy, kills if safe, logs incidents"
+    },
+    "daily-report": {
+      "prompt": "Generate the daily 5W incident report. Collect all hang incidents from Q:/src/personal_projects/virtual-office/output/hang-scout/incidents/ in the last 24 hours. Generate a self-contained dark-themed HTML report using the 5W framework (Who/What/When/Where/Why) for each incident. Include executive summary, pattern summary table, and recommendations. Save to output/hang-scout/daily-report-YYYYMMDD.html and daily-report-latest.html. Open in Edge.",
+      "maxRuns": 0,
+      "enabled": true,
+      "saveOutput": false,
+      "description": "Generates daily 5W incident report summarizing all hang detections in the last 24 hours"
+    }
+  }
+}

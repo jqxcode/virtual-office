@@ -40,6 +40,14 @@
       "description": "Posts daily Bug-AutoPilot summary to Teams Bug-Autopilot channel from ADO query data",
       "staleLockTimeoutMinutes": 30,
       "group": "Work Agents"
+    },
+    "hang-scout": {
+      "displayName": "Hang Scout",
+      "icon": "",
+      "agentFile": "~/.claude/agents/hang-scout.md",
+      "description": "Detects hung agent jobs, diagnoses via process tree and py-spy, kills if safe, files issues for new patterns",
+      "staleLockTimeoutMinutes": 15,
+      "group": "Work Agents"
     }
   }
 }
