@@ -1,6 +1,6 @@
 {
   "jobs": {
-    "consolidate": {
+    "consolidate-memories": {
       "prompt": "Run memory consolidation. Working directory is Q:/src. Scan all sub-project memory dirs under C:/Users/qitxu/.claude/projects/Q--src*/memory/, compare against root memory at C:/Users/qitxu/.claude/projects/Q--src/memory/, copy new/updated files with ext_ prefix, remove duplicates, update MEMORY.md index (keep under 200 lines), and generate the daily HTML report to Q:/src/local_skills/session_management/memory-report-YYYYMMDD.html. Open the report in Edge when done.",
       "maxRuns": 0,
       "enabled": true,
