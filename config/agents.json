@@ -47,7 +47,7 @@
       "agentFile": "~/.claude/agents/hang-scout.md",
       "description": "Detects hung agent jobs, diagnoses via process tree and py-spy, kills if safe, files issues for new patterns",
       "staleLockTimeoutMinutes": 15,
-      "group": "Work Agents"
+      "group": "Other Agents"
     }
   }
 }
