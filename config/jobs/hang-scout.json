@@ -42,11 +42,24 @@
       "description": "One-off hang detection for scrum-master only with 20min hang / 60min kill thresholds"
     },
     "daily-report": {
-      "prompt": "Generate the daily 5W incident report. (1) Parse audit logs from Q:/src/personal_projects/virtual-office/output/audit/*.jsonl for the past 7 days to extract run durations per agent/job. (2) Collect all hang incidents from Q:/src/personal_projects/virtual-office/output/hang-scout/incidents/ in the last 24 hours. (3) Generate a self-contained dark-themed HTML report with: executive summary, 5W incident details, pattern summary table, a Chart.js line chart showing runtime trends per agent/job over 7 days (include the chart.js CDN script and adapter), a runtime summary table with avg/max/trend, and recommendations (flag increasing trends and jobs approaching hang thresholds). Save to output/hang-scout/daily-report-YYYYMMDD.html and daily-report-latest.html. Open in Edge.",
+      "prompt": "Generate the daily 5W incident report. (1) Parse audit logs from Q:/src/personal_projects/virtual-office/output/audit/*.jsonl for the past 7 days to extract run durations per agent/job. (2) Collect all hang incidents from Q:/src/personal_projects/virtual-office/output/hang-scout/incidents/ in the last 24 hours. (3) Collect bug-autopilot performance data: read all run-*-summary.json files from the bugAutopilotPerf.logsPath for the last 24 hours (today) and last 7 days (baseline). Merge per_step_aggregate data across runs. Flag outliers (max > outlierMultiplier * avg), threshold breaches (p95 > stepThresholds), trend increases (> trendAlertPercent vs 7-day avg), and slow bugs (> 2x run average). (4) Generate a self-contained dark-themed HTML report with: executive summary, 5W incident details, pattern summary table, Chart.js runtime trends line chart, runtime summary table, Bug Autopilot Performance Analysis section (run summary table, step performance table with alert badges, grouped bar chart, outlier bugs, top N slowest bugs with stacked-bar step breakdowns), and recommendations. Save to output/hang-scout/daily-report-YYYYMMDD.html and daily-report-latest.html. Open in Edge.",
       "maxRuns": 0,
       "enabled": true,
       "saveOutput": false,
-      "description": "Generates daily 5W incident report summarizing all hang detections in the last 24 hours"
+      "description": "Generates daily 5W incident report with bug-autopilot performance analysis",
+      "bugAutopilotPerf": {
+        "enabled": true,
+        "logsPath": "Q:/src/hackathon/bug-autopilot/reports/logs",
+        "outlierMultiplier": 2.0,
+        "stepThresholds": {
+          "invoke_claude": 600,
+          "telemetry_query": 300,
+          "routing": 120,
+          "_default": 300
+        },
+        "trendAlertPercent": 20,
+        "slowestBugsCount": 5
+      }
     }
   }
 }
