@@ -32,6 +32,14 @@
       "description": "Consolidates Claude Code memories from sub-project repos, removes duplicates, generates daily HTML report",
       "staleLockTimeoutMinutes": 30,
       "group": "Other Agents"
+    },
+    "poster": {
+      "displayName": "Poster",
+      "icon": "",
+      "agentFile": "~/.claude/agents/poster.md",
+      "description": "Posts daily Bug-AutoPilot summary to Teams Bug-Autopilot channel from ADO query data",
+      "staleLockTimeoutMinutes": 30,
+      "group": "Work Agents"
     }
   }
 }

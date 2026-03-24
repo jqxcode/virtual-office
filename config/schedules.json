@@ -77,6 +77,12 @@
       "job": "consolidate",
       "cron": "0 3 * * *",
       "description": "Memory consolidation and report at 3am daily"
+    },
+    {
+      "agent": "poster",
+      "job": "daily-summary",
+      "cron": "30 7 * * *",
+      "description": "Bug-AutoPilot daily summary post to Teams at 7:30am"
     }
   ]
 }
