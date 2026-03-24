@@ -26,7 +26,7 @@
       "portalUrl": "http://localhost:8402/"
     },
     "memo-checker": {
-      "displayName": "Memo Checker",
+      "displayName": "Memory Checker",
       "icon": "",
       "agentFile": "~/.claude/agents/memo-checker.md",
       "description": "Consolidates Claude Code memories from sub-project repos, removes duplicates, generates daily HTML report",
