@@ -361,7 +361,7 @@ try {
                     try {
                         $lockRaw = Get-Content -Path $agentLockFile -Raw -ErrorAction SilentlyContinue
                         $lockObj = $lockRaw.Trim() | ConvertFrom-Json
-                        if ($null -ne $lockObj.pid) {
+                        if ($null -ne $lockObj.PSObject.Properties['pid']) {
                             $lockPid = [int]$lockObj.pid
                             $proc = Get-Process -Id $lockPid -ErrorAction SilentlyContinue
                             if ($null -ne $proc) { $lockValid = $true }
@@ -435,7 +435,7 @@ try {
                     try {
                         $lockRaw = Get-Content -Path $agentLockFile -Raw -ErrorAction SilentlyContinue
                         $lockObj = $lockRaw.Trim() | ConvertFrom-Json
-                        if ($null -ne $lockObj.pid) {
+                        if ($null -ne $lockObj.PSObject.Properties['pid']) {
                             $lockPid = [int]$lockObj.pid
                             $proc = Get-Process -Id $lockPid -ErrorAction SilentlyContinue
                             if ($null -ne $proc) { $lockValid = $true }
@@ -504,12 +504,17 @@ try {
                     try {
                         $lockRaw = Get-Content -Path $agentLockFile -Raw -ErrorAction SilentlyContinue
                         $lockObj = $lockRaw.Trim() | ConvertFrom-Json
-                        if ($null -ne $lockObj.pid) {
+                        if ($null -ne $lockObj.PSObject.Properties['pid']) {
                             $lockPid = [int]$lockObj.pid
                             $proc = Get-Process -Id $lockPid -ErrorAction SilentlyContinue
                             if ($null -ne $proc) { $lockValid = $true }
                         } else {
-                            $lockValid = $true
+                            $noPidGraceSeconds = 60
+                            $lockTs = $null
+                            try { $lockTs = [datetime]$lockObj.ts } catch { }
+                            if ($null -ne $lockTs -and ((Get-Date) - $lockTs).TotalSeconds -le $noPidGraceSeconds) {
+                                $lockValid = $true
+                            }
                         }
                     } catch { $lockValid = $false }
                 }
@@ -544,6 +549,167 @@ try {
 
     $dash = Get-Content -Path $dashFile -Raw | ConvertFrom-Json -AsHashtable
     Assert-True ($dash["agents"]["live-agent"]["live-job"]["status"] -eq "running") "Status stays 'running' when lock file has live PID"
+} finally {
+    Remove-TestRoot -Root $root
+}
+
+# ========================================
+# TC83: Repair-StuckDashboard keeps "running" when lock has no PID but is recent (within grace)
+# ========================================
+Write-Host "`nTC83: Repair-StuckDashboard keeps 'running' when no-PID lock is within 60s grace" -ForegroundColor Cyan
+$root = New-TestRoot
+try {
+    Write-TestConstants -Root $root
+    Import-RunnerFunctions -Root $root
+
+    function global:Repair-StuckDashboard {
+        if (-not (Test-Path $DASHBOARD_FILE)) { return }
+        $dashboard = $null
+        try {
+            $dashboard = Get-Content -Path $DASHBOARD_FILE -Raw | ConvertFrom-Json -AsHashtable
+        } catch { return }
+        if ($null -eq $dashboard -or -not $dashboard.ContainsKey("agents")) { return }
+        $changed = $false
+        foreach ($agentName in @($dashboard["agents"].Keys)) {
+            $agentData = $dashboard["agents"][$agentName]
+            if ($agentData -isnot [hashtable]) { continue }
+            $agentLockFile = Join-Path $STATE_DIR "agents" $agentName "lock"
+            foreach ($jobName in @($agentData.Keys)) {
+                $jobData = $agentData[$jobName]
+                if ($jobData -isnot [hashtable]) { continue }
+                if (-not $jobData.ContainsKey("status")) { continue }
+                if ($jobData["status"] -ne "running") { continue }
+                $lockValid = $false
+                if (Test-Path $agentLockFile) {
+                    try {
+                        $lockRaw = Get-Content -Path $agentLockFile -Raw -ErrorAction SilentlyContinue
+                        $lockObj = $lockRaw.Trim() | ConvertFrom-Json
+                        if ($null -ne $lockObj.PSObject.Properties['pid']) {
+                            $lockPid = [int]$lockObj.pid
+                            $proc = Get-Process -Id $lockPid -ErrorAction SilentlyContinue
+                            if ($null -ne $proc) { $lockValid = $true }
+                        } else {
+                            $noPidGraceSeconds = 60
+                            $lockTs = $null
+                            try { $lockTs = [datetime]$lockObj.ts } catch { }
+                            if ($null -ne $lockTs -and ((Get-Date) - $lockTs).TotalSeconds -le $noPidGraceSeconds) {
+                                $lockValid = $true
+                            }
+                        }
+                    } catch { $lockValid = $false }
+                }
+                if (-not $lockValid) {
+                    $jobData["status"] = "terminated"
+                    $jobData["updated"] = (Get-Date -Format "o")
+                    $jobData["terminated_at"] = (Get-Date -Format "o")
+                    $agentData[$jobName] = $jobData
+                    $changed = $true
+                }
+            }
+            $dashboard["agents"][$agentName] = $agentData
+        }
+        if ($changed) {
+            $json = $dashboard | ConvertTo-Json -Depth 10
+            Write-AtomicFile -Path $DASHBOARD_FILE -Content $json
+        }
+    }
+
+    # Lock written just now, no PID (process is still starting)
+    $agentStateDir = Join-Path $root "state/agents/starting-agent"
+    New-Item -ItemType Directory -Path $agentStateDir -Force | Out-Null
+    $lockFile = Join-Path $agentStateDir "lock"
+    $recentTs = (Get-Date).AddSeconds(-5).ToString("o")
+    $lockContent = @{ ts = $recentTs; job = "start-job" } | ConvertTo-Json -Compress
+    Set-Content -Path $lockFile -Value $lockContent -Encoding ASCII
+
+    Update-Dashboard -AgentName "starting-agent" -JobName "start-job" -Status "running" -Details @{ run_id = "grace01" }
+
+    $dashFile = Join-Path $root "state/dashboard.json"
+    Repair-StuckDashboard
+
+    $dash = Get-Content -Path $dashFile -Raw | ConvertFrom-Json -AsHashtable
+    Assert-True ($dash["agents"]["starting-agent"]["start-job"]["status"] -eq "running") "Status stays 'running' when no-PID lock is recent (within grace)"
+} finally {
+    Remove-TestRoot -Root $root
+}
+
+# ========================================
+# TC84: Repair-StuckDashboard resets "running" when lock has no PID and is older than grace
+# ========================================
+Write-Host "`nTC84: Repair-StuckDashboard resets to 'terminated' when no-PID lock is stale (over 60s)" -ForegroundColor Cyan
+$root = New-TestRoot
+try {
+    Write-TestConstants -Root $root
+    Import-RunnerFunctions -Root $root
+
+    function global:Repair-StuckDashboard {
+        if (-not (Test-Path $DASHBOARD_FILE)) { return }
+        $dashboard = $null
+        try {
+            $dashboard = Get-Content -Path $DASHBOARD_FILE -Raw | ConvertFrom-Json -AsHashtable
+        } catch { return }
+        if ($null -eq $dashboard -or -not $dashboard.ContainsKey("agents")) { return }
+        $changed = $false
+        foreach ($agentName in @($dashboard["agents"].Keys)) {
+            $agentData = $dashboard["agents"][$agentName]
+            if ($agentData -isnot [hashtable]) { continue }
+            $agentLockFile = Join-Path $STATE_DIR "agents" $agentName "lock"
+            foreach ($jobName in @($agentData.Keys)) {
+                $jobData = $agentData[$jobName]
+                if ($jobData -isnot [hashtable]) { continue }
+                if (-not $jobData.ContainsKey("status")) { continue }
+                if ($jobData["status"] -ne "running") { continue }
+                $lockValid = $false
+                if (Test-Path $agentLockFile) {
+                    try {
+                        $lockRaw = Get-Content -Path $agentLockFile -Raw -ErrorAction SilentlyContinue
+                        $lockObj = $lockRaw.Trim() | ConvertFrom-Json
+                        if ($null -ne $lockObj.PSObject.Properties['pid']) {
+                            $lockPid = [int]$lockObj.pid
+                            $proc = Get-Process -Id $lockPid -ErrorAction SilentlyContinue
+                            if ($null -ne $proc) { $lockValid = $true }
+                        } else {
+                            $noPidGraceSeconds = 60
+                            $lockTs = $null
+                            try { $lockTs = [datetime]$lockObj.ts } catch { }
+                            if ($null -ne $lockTs -and ((Get-Date) - $lockTs).TotalSeconds -le $noPidGraceSeconds) {
+                                $lockValid = $true
+                            }
+                        }
+                    } catch { $lockValid = $false }
+                }
+                if (-not $lockValid) {
+                    $jobData["status"] = "terminated"
+                    $jobData["updated"] = (Get-Date -Format "o")
+                    $jobData["terminated_at"] = (Get-Date -Format "o")
+                    $agentData[$jobName] = $jobData
+                    $changed = $true
+                }
+            }
+            $dashboard["agents"][$agentName] = $agentData
+        }
+        if ($changed) {
+            $json = $dashboard | ConvertTo-Json -Depth 10
+            Write-AtomicFile -Path $DASHBOARD_FILE -Content $json
+        }
+    }
+
+    # Lock written 90 minutes ago, no PID (process never started)
+    $agentStateDir = Join-Path $root "state/agents/stuck-agent"
+    New-Item -ItemType Directory -Path $agentStateDir -Force | Out-Null
+    $lockFile = Join-Path $agentStateDir "lock"
+    $staleTs = (Get-Date).AddMinutes(-90).ToString("o")
+    $lockContent = @{ ts = $staleTs; job = "stuck-job" } | ConvertTo-Json -Compress
+    Set-Content -Path $lockFile -Value $lockContent -Encoding ASCII
+
+    Update-Dashboard -AgentName "stuck-agent" -JobName "stuck-job" -Status "running" -Details @{ run_id = "stale01" }
+
+    $dashFile = Join-Path $root "state/dashboard.json"
+    Repair-StuckDashboard
+
+    $dash = Get-Content -Path $dashFile -Raw | ConvertFrom-Json -AsHashtable
+    Assert-True ($dash["agents"]["stuck-agent"]["stuck-job"]["status"] -eq "terminated") "Status reset to 'terminated' when no-PID lock is stale"
+    Assert-True ($dash["agents"]["stuck-agent"]["stuck-job"].ContainsKey("terminated_at")) "terminated_at field added for stale no-PID lock"
 } finally {
     Remove-TestRoot -Root $root
 }
