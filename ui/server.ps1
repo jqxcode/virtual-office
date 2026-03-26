@@ -128,6 +128,7 @@ function Send-Response($context, $statusCode, $contentType, $bodyBytes) {
     $response = $context.Response
     $response.StatusCode = $statusCode
     $response.ContentType = $contentType
+    $response.Headers.Set("Cache-Control", "no-cache, no-store, must-revalidate")
     $response.ContentLength64 = $bodyBytes.Length
     $response.OutputStream.Write($bodyBytes, 0, $bodyBytes.Length)
     $response.OutputStream.Close()
