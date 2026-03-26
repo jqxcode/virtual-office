@@ -206,7 +206,7 @@ function Repair-StuckDashboard {
                 try {
                     $lockRaw = Get-Content -Path $agentLockFile -Raw -ErrorAction SilentlyContinue
                     $lockObj = $lockRaw.Trim() | ConvertFrom-Json
-                    if ($null -ne $lockObj.pid) {
+                    if ($null -ne $lockObj.PSObject.Properties['pid']) {
                         $lockPid = [int]$lockObj.pid
                         $proc = Get-Process -Id $lockPid -ErrorAction SilentlyContinue
                         if ($null -ne $proc) {
@@ -214,8 +214,15 @@ function Repair-StuckDashboard {
                         }
                     } else {
                         # Lock exists but has no PID yet (race between lock write and PID update)
-                        # Treat as valid to avoid false-positive resets on concurrent starts
-                        $lockValid = $true
+                        # Allow a 60-second grace period for the process to start and update the lock.
+                        # After that, treat the no-PID lock as stale -- the process never started.
+                        $noPidGraceSeconds = 60
+                        $lockTs = $null
+                        try { $lockTs = [datetime]$lockObj.ts } catch { }
+                        if ($null -ne $lockTs -and ((Get-Date) - $lockTs).TotalSeconds -le $noPidGraceSeconds) {
+                            $lockValid = $true
+                        }
+                        # else: lock older than grace period with no PID -- treat as stale
                     }
                 } catch {
                     # Malformed lock file -- treat as invalid
