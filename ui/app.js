@@ -1539,6 +1539,12 @@ async function loadAllEvents() {
   try {
     allEvents = await fetchAllEvents();
     populateAgentFilter();
+    // Sync agent filter dropdown after options are populated
+    // (switchTopTab may have set it before options existed)
+    var agentDropdown = document.getElementById("filter-agent");
+    if (agentDropdown && selectedAgentFilter) {
+      agentDropdown.value = selectedAgentFilter;
+    }
     renderFilteredEvents();
   } catch (e) {
     console.warn("Failed to load all events:", e.message);
