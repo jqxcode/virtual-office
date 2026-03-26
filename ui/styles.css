@@ -983,6 +983,14 @@ body {
   -moz-user-select: none;
   -ms-user-select: none;
   user-select: none;
+  /* Prevent child elements from intercepting drag events */
+  pointer-events: none;
+}
+
+/* Re-enable pointer-events for interactive children (buttons) */
+.agent-list-card[draggable="true"] button,
+.agent-list-card[draggable="true"] .agent-filter-btn {
+  pointer-events: auto;
 }
 
 .agent-list-card.dragging {

@@ -1183,11 +1183,70 @@ function computeStats(events, agents) {
 
 // --- Mission Control: Agent List (left column) ---
 
+function initAgentListDragDrop() {
+  // Container-level drag delegation (set up ONCE, survives re-renders)
+  var listEl = document.getElementById("agent-list");
+  if (!listEl || listEl._dragInitialized) return;
+  listEl._dragInitialized = true;
+
+  listEl.addEventListener("dragover", function(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    // Find the card being dragged over
+    var targetCard = e.target.closest(".agent-list-card");
+    // Clear all drag-over indicators
+    listEl.querySelectorAll(".agent-list-card").forEach(function(c) {
+      c.classList.remove("drag-over");
+    });
+    if (targetCard && !targetCard.classList.contains("dragging")) {
+      targetCard.classList.add("drag-over");
+    }
+  });
+
+  listEl.addEventListener("dragleave", function(e) {
+    var targetCard = e.target.closest(".agent-list-card");
+    if (targetCard) targetCard.classList.remove("drag-over");
+  });
+
+  listEl.addEventListener("drop", function(e) {
+    e.preventDefault();
+    // Clear all drag-over indicators
+    listEl.querySelectorAll(".agent-list-card").forEach(function(c) {
+      c.classList.remove("drag-over");
+    });
+    var draggedName = e.dataTransfer.getData("text/plain");
+    if (!draggedName) return;
+    var draggedCard = listEl.querySelector('[data-agent="' + draggedName + '"]');
+    if (!draggedCard) return;
+    // Find the drop target card
+    var targetCard = e.target.closest(".agent-list-card");
+    if (!targetCard || targetCard === draggedCard) return;
+    // Determine position: insert before or after target based on mouse Y
+    var rect = targetCard.getBoundingClientRect();
+    var midY = rect.top + rect.height / 2;
+    if (e.clientY < midY) {
+      listEl.insertBefore(draggedCard, targetCard);
+    } else {
+      listEl.insertBefore(draggedCard, targetCard.nextSibling);
+    }
+    // Persist new order to localStorage
+    var newOrder = [];
+    listEl.querySelectorAll(".agent-list-card").forEach(function(c) {
+      if (c.dataset.agent) newOrder.push(c.dataset.agent);
+    });
+    try { localStorage.setItem("vo-agent-order", JSON.stringify(newOrder)); } catch (e2) { /* ignore */ }
+  });
+}
+
 function renderAgentList(agents) {
   var listEl = document.getElementById("agent-list");
   if (!listEl) return;
   // Skip re-render while user is actively dragging to avoid destroying drag state
   if (isDragging) return;
+
+  // Set up container-level drag handlers once
+  initAgentListDragDrop();
+
   listEl.innerHTML = "";
 
   var busyCount = 0;
@@ -1217,12 +1276,15 @@ function renderAgentList(agents) {
     var card = document.createElement("div");
     card.className = "agent-list-card " + status;
     card.dataset.agent = name;
-    card.draggable = true;
     card.setAttribute("draggable", "true");
 
-    // Drag-and-drop handlers
+    // Track drag state for this card (suppresses click after drag)
+    var wasDragged = false;
+
+    // Card-level drag handlers: dragstart + dragend only
     card.addEventListener("dragstart", function(e) {
       isDragging = true;
+      wasDragged = true;
       e.dataTransfer.effectAllowed = "move";
       e.dataTransfer.setData("text/plain", name);
       card.classList.add("dragging");
@@ -1230,61 +1292,29 @@ function renderAgentList(agents) {
     card.addEventListener("dragend", function() {
       isDragging = false;
       card.classList.remove("dragging");
-      // Remove all drag-over indicators
-      var allCards = listEl.querySelectorAll(".agent-list-card");
-      allCards.forEach(function(c) { c.classList.remove("drag-over"); });
-    });
-    card.addEventListener("dragover", function(e) {
-      e.preventDefault();
-      e.dataTransfer.dropEffect = "move";
-      // Show drop indicator on this card
-      var allCards = listEl.querySelectorAll(".agent-list-card");
-      allCards.forEach(function(c) { c.classList.remove("drag-over"); });
-      if (!card.classList.contains("dragging")) {
-        card.classList.add("drag-over");
-      }
-    });
-    card.addEventListener("dragleave", function() {
-      card.classList.remove("drag-over");
-    });
-    card.addEventListener("drop", function(e) {
-      e.preventDefault();
-      card.classList.remove("drag-over");
-      var draggedName = e.dataTransfer.getData("text/plain");
-      if (!draggedName || draggedName === name) return;
-      var draggedCard = listEl.querySelector('[data-agent="' + draggedName + '"]');
-      if (!draggedCard) return;
-      // Determine position: insert before or after target
-      var rect = card.getBoundingClientRect();
-      var midY = rect.top + rect.height / 2;
-      if (e.clientY < midY) {
-        listEl.insertBefore(draggedCard, card);
-      } else {
-        listEl.insertBefore(draggedCard, card.nextSibling);
-      }
-      // Persist new order to localStorage
-      var newOrder = [];
+      // Clean up all drag-over indicators
       listEl.querySelectorAll(".agent-list-card").forEach(function(c) {
-        if (c.dataset.agent) newOrder.push(c.dataset.agent);
+        c.classList.remove("drag-over");
       });
-      try { localStorage.setItem("vo-agent-order", JSON.stringify(newOrder)); } catch (e2) { /* ignore */ }
+      setTimeout(function() { wasDragged = false; }, 200);
     });
 
     // Top row: name + status badge
     var topRow = document.createElement("div");
     topRow.className = "agent-list-top";
+    topRow.setAttribute("draggable", "false");
 
     var nameEl = document.createElement("span");
     nameEl.className = "agent-list-name";
     nameEl.textContent = agentData.display_name || name;
     nameEl.style.color = getAgentColor(name);
+    nameEl.setAttribute("draggable", "false");
     topRow.appendChild(nameEl);
 
     var filterBtn = document.createElement("button");
     filterBtn.className = "agent-filter-btn" + (selectedAgentFilter === name ? " active" : "");
     filterBtn.title = "Filter schedule for " + (agentData.display_name || name);
     filterBtn.innerHTML = "&#x1F50D;";
-    filterBtn.draggable = false;
     filterBtn.setAttribute("draggable", "false");
     filterBtn.addEventListener("click", function(e) {
       e.stopPropagation();
@@ -1323,6 +1353,7 @@ function renderAgentList(agents) {
 
     var statusDot = document.createElement("span");
     statusDot.className = "agent-list-dot " + status;
+    statusDot.setAttribute("draggable", "false");
     topRow.appendChild(statusDot);
     card.appendChild(topRow);
 
@@ -1333,6 +1364,7 @@ function renderAgentList(agents) {
     // Activity line
     var activityLine = document.createElement("div");
     activityLine.className = "agent-list-activity";
+    activityLine.setAttribute("draggable", "false");
 
     if (status === "busy" && agentData.running_job) {
       var runJobName = agentData.running_job.job || agentData.running_job.name || "unknown";
@@ -1374,6 +1406,7 @@ function renderAgentList(agents) {
     // Timestamp line
     var tsLine = document.createElement("div");
     tsLine.className = "agent-list-timestamp";
+    tsLine.setAttribute("draggable", "false");
     if (agentData.last_completed) {
       tsLine.textContent = formatTimestamp(agentData.last_completed);
     } else {
@@ -1382,12 +1415,6 @@ function renderAgentList(agents) {
     card.appendChild(tsLine);
 
     // Click handler (suppress after drag to avoid accidental modal open)
-    var wasDragged = false;
-    card.addEventListener("dragstart", function() { wasDragged = true; });
-    card.addEventListener("dragend", function() {
-      // Reset after a short delay so the click event that follows dragend is still suppressed
-      setTimeout(function() { wasDragged = false; }, 200);
-    });
     if (status === "busy") {
       card.classList.add("clickable");
       card.addEventListener("click", function() {
