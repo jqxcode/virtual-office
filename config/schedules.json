@@ -2,7 +2,7 @@
   "schedules": [
     {
       "agent": "scrum-master",
-      "job": "sprint-progress",
+      "job": "TODO-sprint-progress",
       "cron": "0 7 * * 1-5",
       "description": "Sprint progress report weekday mornings at 7am"
     },
@@ -20,19 +20,19 @@
     },
     {
       "agent": "scrum-master",
-      "job": "bug-autopilot",
+      "job": "bug-autopilot-meeting-join",
       "cron": "0 8 * * *",
       "description": "Bug autopilot (live) at 8am daily"
     },
     {
       "agent": "scrum-master",
-      "job": "bug-autopilot",
+      "job": "bug-autopilot-meeting-join",
       "cron": "0 20 * * *",
       "description": "Bug autopilot (live) at 8pm daily"
     },
     {
       "agent": "scrum-master",
-      "job": "compare-runs",
+      "job": "TODO-compare-runs",
       "cron": "0 11 * * *",
       "description": "Compare results and file GitHub issues at 11am daily"
     },

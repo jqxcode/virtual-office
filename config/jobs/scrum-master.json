@@ -1,6 +1,6 @@
 {
   "jobs": {
-    "sprint-progress": {
+    "TODO-sprint-progress": {
       "prompt": "Generate a sprint progress update now. You MUST save the report as a self-contained HTML file (inline CSS, no external dependencies) to Q:/src/personal_projects/virtual-office/output/sprint-progress-YYYYMMDD.html (using today's date). Also save a copy to Q:/src/personal_projects/virtual-office/output/sprint-progress-latest.html. Use the Segoe UI font, a blue header with sprint name/dates, summary cards for counts (completed/in-progress/not-started/blocked), a work items table, highlights, and risks sections. Open the report in Edge after saving.",
       "maxRuns": 0,
       "enabled": true,
@@ -14,7 +14,7 @@
       "saveOutput": false,
       "description": "Runs ADO autopilot status tweet update (live) for Meeting Join and Meeting Notes areas"
     },
-    "bug-autopilot": {
+    "bug-autopilot-meeting-join": {
       "prompt": "Run bug-autopilot LIVE for Meeting Join area bugs. Steps: (1) cd Q:/src/hackathon/bug-autopilot/ (2) git pull to get latest code (3) Validate configs exist and are valid JSON (4) pip install -r requirements.txt --quiet (5) Run: powershell.exe -File bugautopilot.ps1 -Once (6) Copy the newly generated HTML report from reports/ (named run-YYYYMMDD-HHMMSS.html) to Q:/src/personal_projects/virtual-office/output/scrum-master/ preserving its original filename, and also copy it as bug-autopilot-latest.html (7) Run the comparison script: python Q:/src/personal_projects/virtual-office/runner/Compare-Runs.py (8) Open the report in Edge.",
       "maxRuns": 0,
       "enabled": true,
@@ -35,7 +35,7 @@
       "saveOutput": false,
       "description": "Runs bug-autopilot live for Meeting Notes bugs"
     },
-    "compare-runs": {
+    "TODO-compare-runs": {
       "prompt": "Compare all scrum-master reports and create GitHub issues for detected problems. Run: python Q:/src/personal_projects/virtual-office/runner/Compare-Runs.py (without --dry-run flag to actually create issues). This will parse ADO autopilot HTML reports and bug autopilot investigations.json, compare across runs, generate a summary at Q:/src/personal_projects/virtual-office/output/scrum-master/run-summaries/, and create GitHub issues in teams-microsoft/ado-autopilot and teams-microsoft/bug-autopilot repos. Issues that were already created (tracked in issue-state.json) will be skipped. Open the comparison summary in Edge after completion.",
       "maxRuns": 0,
       "enabled": true,
