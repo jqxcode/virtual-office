@@ -511,6 +511,17 @@ while ($keepRunning) {
         if (-not (Test-Path $outputAgentDir)) {
             New-Item -ItemType Directory -Path $outputAgentDir -Force | Out-Null
         }
+        # Sanitize unicode characters to ASCII equivalents before saving
+        $output = $output -replace [char]0x2014, '--'   # em dash to --
+        $output = $output -replace [char]0x2013, '-'    # en dash to -
+        $output = $output -replace [char]0x2192, '->'   # right arrow to ->
+        $output = $output -replace [char]0x2190, '<-'   # left arrow to <-
+        $output = $output -replace [char]0x2019, "'"    # right single quote to '
+        $output = $output -replace [char]0x2018, "'"    # left single quote to '
+        $output = $output -replace [char]0x201C, '"'    # left double quote to "
+        $output = $output -replace [char]0x201D, '"'    # right double quote to "
+        $output = $output -replace [char]0x2026, '...'  # ellipsis to ...
+        $output = $output -replace [char]0xFEFF, ''     # BOM strip
         $outputFile = Join-Path $outputAgentDir "$Job-$timestamp.md"
         $latestFile = Join-Path $outputAgentDir "$Job-latest.md"
         Write-AtomicFile -Path $outputFile -Content $output -Encoding ([System.Text.Encoding]::UTF8)
