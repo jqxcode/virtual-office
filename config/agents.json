@@ -25,12 +25,12 @@
       "group": "Other Agents",
       "portalUrl": "http://localhost:8402/"
     },
-    "memo-checker": {
-      "displayName": "Memory Checker",
+    "checker": {
+      "displayName": "Checker",
       "icon": "",
-      "agentFile": "~/.claude/agents/memo-checker.md",
-      "description": "Consolidates Claude Code memories from sub-project repos, removes duplicates, generates daily HTML report",
-      "staleLockTimeoutMinutes": 30,
+      "agentFile": "~/.claude/agents/checker.md",
+      "description": "Consolidates memories, generates sprint progress reports, compares run results, and generates daily HTML reports",
+      "staleLockTimeoutMinutes": 120,
       "group": "Other Agents"
     },
     "poster": {

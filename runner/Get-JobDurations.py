@@ -27,7 +27,7 @@ AGENT_COLORS = {
     "scrum-master": "#3498db",
     "bug-killer": "#e74c3c",
     "emailer": "#2ecc71",
-    "memo-checker": "#9b59b6",
+    "checker": "#9b59b6",
 }
 
 def parse_duration(s):

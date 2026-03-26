@@ -23,7 +23,7 @@
             "hangThresholdMinutes": 30,
             "killThresholdMinutes": 60
           },
-          "memo-checker": {
+          "checker": {
             "hangThresholdMinutes": 20,
             "killThresholdMinutes": 30
           },
