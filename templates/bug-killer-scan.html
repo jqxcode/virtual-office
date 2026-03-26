@@ -27,6 +27,11 @@
     .code .new { color: #2ecc71; }
     a { color: #00d4ff; text-decoration: none; }
     a:hover { text-decoration: underline; }
+
+    /* Auth hint for jqxcode links */
+    .auth-hint { display: inline-block; margin-left: 6px; font-size: 0.72rem; color: #f39c12; vertical-align: middle; cursor: help; }
+    .gh-open { display: inline-block; margin-left: 4px; padding: 1px 6px; background: #0d1b2a; border: 1px solid #0f3460; border-radius: 4px; font-size: 0.72rem; color: #aaa; cursor: pointer; vertical-align: middle; }
+    .gh-open:hover { background: #16213e; color: #00d4ff; }
     .result-bar { display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: #0d1b2a; border-radius: 8px; border-left: 4px solid #1e8449; }
     .result-bar.failed { border-left-color: #922b21; }
     .result-bar.skipped { border-left-color: #7d6608; }
@@ -99,5 +104,39 @@
   </div>
 
 </div>
+<script>
+// For private jqxcode repos, add auth hint + "open via gh" button next to GitHub links
+(function() {
+  var PAT_KEY = 'jqxcode_pat'; // reads from localStorage if set
+  document.querySelectorAll('a[href*="github.com/jqxcode/"]').forEach(function(a) {
+    // "open via gh" button that copies the gh CLI command
+    var btn = document.createElement('span');
+    btn.className = 'gh-open';
+    btn.title = 'Copy gh CLI command to open this link (uses jqxcode auth)';
+    btn.textContent = 'gh open';
+    btn.onclick = function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      var url = a.href;
+      // Determine gh command: issue vs PR
+      var cmd;
+      var m = url.match(/github\.com\/([^/]+\/[^/]+)\/(pull|issues)\/(\d+)/);
+      if (m) {
+        var repo = m[1], type = m[2], num = m[3];
+        cmd = type === 'pull'
+          ? 'GH_TOKEN=$(git -C Q:/src/personal_projects/virtual-office remote -v | grep -oP "ghp_[^@]+") gh pr view ' + num + ' --repo ' + repo + ' --web'
+          : 'GH_TOKEN=$(git -C Q:/src/personal_projects/virtual-office remote -v | grep -oP "ghp_[^@]+") gh issue view ' + num + ' --repo ' + repo + ' --web';
+      } else {
+        cmd = 'GH_TOKEN=$(git -C Q:/src/personal_projects/virtual-office remote -v | grep -oP "ghp_[^@]+") gh repo view ' + url.replace('https://github.com/','') + ' --web';
+      }
+      navigator.clipboard.writeText(cmd).then(function() {
+        btn.textContent = 'copied!';
+        setTimeout(function() { btn.textContent = 'gh open'; }, 1500);
+      });
+    };
+    a.parentNode.insertBefore(btn, a.nextSibling);
+  });
+})();
+</script>
 </body>
 </html>
