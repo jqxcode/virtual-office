@@ -2011,8 +2011,67 @@ function renderQueueCards() {
   var totalQueueDepth = 0;
   var agentNames = [];
   if (config && config.agents) {
-    agentNames = Object.keys(config.agents).sort(function(a, b) {
+    agentNames = Object.keys(config.agents);
+  }
+
+  // Apply saved drag-and-drop order from localStorage (fallback to config order)
+  var savedQueueOrder = null;
+  try {
+    var rawQ = localStorage.getItem("vo-queue-card-order");
+    if (rawQ) savedQueueOrder = JSON.parse(rawQ);
+  } catch (e) { /* ignore */ }
+  if (Array.isArray(savedQueueOrder) && savedQueueOrder.length > 0) {
+    agentNames.sort(function(a, b) {
+      var ia = savedQueueOrder.indexOf(a);
+      var ib = savedQueueOrder.indexOf(b);
+      if (ia === -1) ia = 9999;
+      if (ib === -1) ib = 9999;
+      return ia - ib;
+    });
+  } else {
+    // Default: alphabetical
+    agentNames.sort(function(a, b) {
       return a.toLowerCase() < b.toLowerCase() ? -1 : a.toLowerCase() > b.toLowerCase() ? 1 : 0;
+    });
+  }
+
+  // Set up container-level drag handlers once
+  if (!container._dragInitialized) {
+    container._dragInitialized = true;
+    container.addEventListener("dragover", function(e) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      var targetCard = e.target.closest(".queue-card");
+      container.querySelectorAll(".queue-card").forEach(function(c) { c.classList.remove("drag-over"); });
+      if (targetCard && !targetCard.classList.contains("dragging")) {
+        targetCard.classList.add("drag-over");
+      }
+    });
+    container.addEventListener("dragleave", function(e) {
+      var targetCard = e.target.closest(".queue-card");
+      if (targetCard) targetCard.classList.remove("drag-over");
+    });
+    container.addEventListener("drop", function(e) {
+      e.preventDefault();
+      container.querySelectorAll(".queue-card").forEach(function(c) { c.classList.remove("drag-over"); });
+      var draggedName = e.dataTransfer.getData("text/plain");
+      if (!draggedName) return;
+      var draggedCard = container.querySelector('.queue-card[data-agent="' + draggedName + '"]');
+      if (!draggedCard) return;
+      var targetCard = e.target.closest(".queue-card");
+      if (!targetCard || targetCard === draggedCard) return;
+      var rect = targetCard.getBoundingClientRect();
+      var midY = rect.top + rect.height / 2;
+      if (e.clientY < midY) {
+        container.insertBefore(draggedCard, targetCard);
+      } else {
+        container.insertBefore(draggedCard, targetCard.nextSibling);
+      }
+      var newOrder = [];
+      container.querySelectorAll(".queue-card").forEach(function(c) {
+        if (c.dataset.agent) newOrder.push(c.dataset.agent);
+      });
+      try { localStorage.setItem("vo-queue-card-order", JSON.stringify(newOrder)); } catch (e2) { /* ignore */ }
     });
   }
 
@@ -2031,10 +2090,35 @@ function renderQueueCards() {
     var card = document.createElement("div");
     card.className = "queue-card";
     card.style.borderLeftColor = agentColor;
+    card.setAttribute("draggable", "true");
+
+    // Drag handle
+    var qDragHandle = document.createElement("span");
+    qDragHandle.className = "drag-handle";
+    qDragHandle.textContent = "\u2630";
+    qDragHandle.title = "Drag to reorder";
+    qDragHandle.setAttribute("draggable", "false");
+
+    card.addEventListener("dragstart", function(e) {
+      if (!card._handleMouseDown) { e.preventDefault(); return; }
+      isDragging = true;
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", agentName);
+      card.classList.add("dragging");
+    });
+    card.addEventListener("dragend", function() {
+      isDragging = false;
+      card._handleMouseDown = false;
+      card.classList.remove("dragging");
+      container.querySelectorAll(".queue-card").forEach(function(c) { c.classList.remove("drag-over"); });
+    });
+    qDragHandle.addEventListener("mousedown", function() { card._handleMouseDown = true; });
+    document.addEventListener("mouseup", function() { card._handleMouseDown = false; });
 
     // Header
     var header = document.createElement("div");
     header.className = "queue-card-header";
+    header.prepend(qDragHandle);
     var nameSpan = document.createElement("span");
     nameSpan.className = "queue-card-name";
     nameSpan.textContent = agentData.display_name || agentCfg.displayName || agentName;

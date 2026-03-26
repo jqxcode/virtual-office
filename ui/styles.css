@@ -1002,12 +1002,13 @@ body {
   cursor: grabbing;
 }
 
-.agent-list-card.dragging {
+.agent-list-card.dragging,
+.queue-card.dragging {
   opacity: 0.4;
-  cursor: grabbing;
 }
 
-.agent-list-card.drag-over {
+.agent-list-card.drag-over,
+.queue-card.drag-over {
   border-top: 2px solid #3b82f6;
   margin-top: -1px;
 }
