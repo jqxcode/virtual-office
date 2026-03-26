@@ -7,6 +7,20 @@
       "saveOutput": false,
       "description": "Consolidates all sub-project memories into root, deduplicates, generates HTML report"
     },
+    "TODO-sprint-progress": {
+      "prompt": "Generate a sprint progress update now. You MUST save the report as a self-contained HTML file (inline CSS, no external dependencies) to Q:/src/personal_projects/virtual-office/output/sprint-progress-YYYYMMDD.html (using today's date). Also save a copy to Q:/src/personal_projects/virtual-office/output/sprint-progress-latest.html. Use the Segoe UI font, a blue header with sprint name/dates, summary cards for counts (completed/in-progress/not-started/blocked), a work items table, highlights, and risks sections. Open the report in Edge after saving.",
+      "maxRuns": 0,
+      "enabled": true,
+      "saveOutput": false,
+      "description": "Queries ADO work items and meeting notes to generate sprint progress report"
+    },
+    "TODO-compare-runs": {
+      "prompt": "Compare all scrum-master reports and create GitHub issues for detected problems. Run: python Q:/src/personal_projects/virtual-office/runner/Compare-Runs.py (without --dry-run flag to actually create issues). This will parse ADO autopilot HTML reports and bug autopilot investigations.json, compare across runs, generate a summary at Q:/src/personal_projects/virtual-office/output/scrum-master/run-summaries/, and create GitHub issues in teams-microsoft/ado-autopilot and teams-microsoft/bug-autopilot repos. Issues that were already created (tracked in issue-state.json) will be skipped. Open the comparison summary in Edge after completion.",
+      "maxRuns": 0,
+      "enabled": true,
+      "saveOutput": false,
+      "description": "Compares run results across runs and files GitHub issues for detected problems"
+    },
     "YTD-OOF-Summary": {
       "prompt": "Run the YTD-OOF-Summary job. Query both Teams channels (Absence and OOF/WFH/Late) via WorkIQ for all messages from Dec 1 of previous year through today. Filter for direct reports only, classify each absence as full-day OOF or BRB/partial, count only current-year working days, and generate the HTML report using the template. Open in Edge when done.",
       "maxRuns": 0,
