@@ -121,8 +121,15 @@
 
     <!-- Task Queue View -->
     <section id="view-queue" class="view" style="display:none">
-      <!-- Upcoming schedule table -->
+      <!-- Per-agent queue cards -->
       <div class="section-header">
+        <span>Agent Queues</span>
+        <span class="section-badge" id="queue-total-badge">--</span>
+      </div>
+      <div id="queue-cards" class="queue-cards-grid"></div>
+
+      <!-- Upcoming schedule table -->
+      <div class="section-header" style="margin-top:1.5rem">
         <span>Upcoming Schedule</span>
         <span class="section-badge" id="schedule-count">--</span>
       </div>
@@ -142,13 +149,6 @@
         </table>
         <div id="schedule-overflow" class="schedule-overflow" style="display:none"></div>
       </div>
-
-      <!-- Per-agent queue cards -->
-      <div class="section-header" style="margin-top:1.5rem">
-        <span>Agent Queues</span>
-        <span class="section-badge" id="queue-total-badge">--</span>
-      </div>
-      <div id="queue-cards" class="queue-cards-grid"></div>
     </section>
   </main>
 
