@@ -954,6 +954,21 @@ body {
   color: #484f58;
 }
 
+/* === Agent List Card: Drag-and-Drop === */
+.agent-list-card[draggable="true"] {
+  cursor: grab;
+}
+
+.agent-list-card.dragging {
+  opacity: 0.4;
+  cursor: grabbing;
+}
+
+.agent-list-card.drag-over {
+  border-top: 2px solid #3b82f6;
+  margin-top: -1px;
+}
+
 /* === Activity Feed (right column) === */
 .activity-entry {
   background: #161b22;

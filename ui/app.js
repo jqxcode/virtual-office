@@ -1175,9 +1175,23 @@ function renderAgentList(agents) {
   listEl.innerHTML = "";
 
   var busyCount = 0;
-  var agentNames = Object.keys(agents).sort(function(a, b) {
-    return a.toLowerCase() < b.toLowerCase() ? -1 : a.toLowerCase() > b.toLowerCase() ? 1 : 0;
-  });
+  var agentNames = Object.keys(agents);
+
+  // Apply saved drag-and-drop order from localStorage (fallback to config order)
+  var savedOrder = null;
+  try {
+    var raw = localStorage.getItem("vo-agent-order");
+    if (raw) savedOrder = JSON.parse(raw);
+  } catch (e) { /* ignore */ }
+  if (Array.isArray(savedOrder) && savedOrder.length > 0) {
+    agentNames.sort(function(a, b) {
+      var ia = savedOrder.indexOf(a);
+      var ib = savedOrder.indexOf(b);
+      if (ia === -1) ia = 9999;
+      if (ib === -1) ib = 9999;
+      return ia - ib;
+    });
+  }
 
   agentNames.forEach(function(name) {
     var agentData = agents[name];
@@ -1187,6 +1201,55 @@ function renderAgentList(agents) {
     var card = document.createElement("div");
     card.className = "agent-list-card " + status;
     card.dataset.agent = name;
+    card.draggable = true;
+
+    // Drag-and-drop handlers
+    card.addEventListener("dragstart", function(e) {
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", name);
+      card.classList.add("dragging");
+    });
+    card.addEventListener("dragend", function() {
+      card.classList.remove("dragging");
+      // Remove all drag-over indicators
+      var allCards = listEl.querySelectorAll(".agent-list-card");
+      allCards.forEach(function(c) { c.classList.remove("drag-over"); });
+    });
+    card.addEventListener("dragover", function(e) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      // Show drop indicator on this card
+      var allCards = listEl.querySelectorAll(".agent-list-card");
+      allCards.forEach(function(c) { c.classList.remove("drag-over"); });
+      if (!card.classList.contains("dragging")) {
+        card.classList.add("drag-over");
+      }
+    });
+    card.addEventListener("dragleave", function() {
+      card.classList.remove("drag-over");
+    });
+    card.addEventListener("drop", function(e) {
+      e.preventDefault();
+      card.classList.remove("drag-over");
+      var draggedName = e.dataTransfer.getData("text/plain");
+      if (!draggedName || draggedName === name) return;
+      var draggedCard = listEl.querySelector('[data-agent="' + draggedName + '"]');
+      if (!draggedCard) return;
+      // Determine position: insert before or after target
+      var rect = card.getBoundingClientRect();
+      var midY = rect.top + rect.height / 2;
+      if (e.clientY < midY) {
+        listEl.insertBefore(draggedCard, card);
+      } else {
+        listEl.insertBefore(draggedCard, card.nextSibling);
+      }
+      // Persist new order to localStorage
+      var newOrder = [];
+      listEl.querySelectorAll(".agent-list-card").forEach(function(c) {
+        if (c.dataset.agent) newOrder.push(c.dataset.agent);
+      });
+      try { localStorage.setItem("vo-agent-order", JSON.stringify(newOrder)); } catch (e2) { /* ignore */ }
+    });
 
     // Top row: name + status badge
     var topRow = document.createElement("div");
