@@ -559,10 +559,9 @@ while ($keepRunning) {
 
     Write-Host "Job '$Job' for agent '$Agent' $completedAction (run: $runId, output: $auditOutputFile, duration: $runDuration)"
 
-    # Step 11: Remove lock
-    if (Test-Path $lockFile) { Remove-Item -Path $lockFile -Force }
-
-    # Step 12: Check queues across ALL jobs for this agent, not just the current job
+    # Step 11: Check queues across ALL jobs for this agent before releasing lock
+    # (Hold the lock until we know there's nothing left to run, preventing race conditions
+    # where queued jobs get stranded because the lock was released before checking the queue)
     $keepRunning = $false
 
     # First check own queue
@@ -600,6 +599,11 @@ while ($keepRunning) {
                 }
             }
         }
+    }
+
+    # Step 12: Release lock only when there's nothing left to run
+    if (-not $keepRunning) {
+        if (Test-Path $lockFile) { Remove-Item -Path $lockFile -Force }
     }
 }
 
