@@ -1597,3 +1597,79 @@ body {
     grid-template-columns: 1fr;
   }
 }
+
+.agent-list-top {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+/* === Agent Schedule Filter === */
+.agent-filter-btn {
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.7rem;
+  padding: 2px 4px;
+  margin-left: auto;
+  opacity: 0.4;
+  transition: opacity 0.15s, border-color 0.15s, background 0.15s;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.agent-filter-btn:hover {
+  opacity: 0.8;
+  border-color: #484f58;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.agent-filter-btn.active {
+  opacity: 1;
+  border-color: #3b82f6;
+  background: rgba(59, 130, 246, 0.15);
+}
+
+.agent-list-card.schedule-filter-active,
+.queue-card.schedule-filter-active {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.3), inset 0 0 0 1px rgba(59, 130, 246, 0.1);
+}
+
+.schedule-filter-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.75rem;
+  margin-bottom: 0.5rem;
+  background: rgba(59, 130, 246, 0.08);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  border-radius: 6px;
+  font-size: 0.82rem;
+  color: #c9d1d9;
+}
+
+.schedule-filter-indicator span:first-child {
+  font-weight: 600;
+}
+
+.schedule-filter-clear {
+  background: none;
+  border: 1px solid #484f58;
+  border-radius: 4px;
+  color: #8b949e;
+  cursor: pointer;
+  font-size: 0.75rem;
+  padding: 1px 6px;
+  margin-left: auto;
+  transition: background 0.15s, color 0.15s;
+  line-height: 1.2;
+}
+
+.schedule-filter-clear:hover {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: #ef4444;
+  color: #ef4444;
+}
