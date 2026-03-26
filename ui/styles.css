@@ -972,6 +972,17 @@ body {
 /* === Agent List Card: Drag-and-Drop === */
 .agent-list-card[draggable="true"] {
   cursor: grab;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+.agent-list-card[draggable="true"] * {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
 }
 
 .agent-list-card.dragging {

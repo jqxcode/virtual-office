@@ -1218,6 +1218,7 @@ function renderAgentList(agents) {
     card.className = "agent-list-card " + status;
     card.dataset.agent = name;
     card.draggable = true;
+    card.setAttribute("draggable", "true");
 
     // Drag-and-drop handlers
     card.addEventListener("dragstart", function(e) {
@@ -1283,6 +1284,8 @@ function renderAgentList(agents) {
     filterBtn.className = "agent-filter-btn" + (selectedAgentFilter === name ? " active" : "");
     filterBtn.title = "Filter schedule for " + (agentData.display_name || name);
     filterBtn.innerHTML = "&#x1F50D;";
+    filterBtn.draggable = false;
+    filterBtn.setAttribute("draggable", "false");
     filterBtn.addEventListener("click", function(e) {
       e.stopPropagation();
       if (selectedAgentFilter === name) {
