@@ -377,8 +377,12 @@ function renderAgentCard(name, agentData) {
     });
   }
 
-  // Jobs list
-  var jobs = agentData.jobs || [];
+  // Jobs list (sorted alphabetically by name)
+  var jobs = (agentData.jobs || []).slice().sort(function(a, b) {
+    var na = (a.name || a.job || "").toLowerCase();
+    var nb = (b.name || b.job || "").toLowerCase();
+    return na < nb ? -1 : na > nb ? 1 : 0;
+  });
   var activeJobs = [];
   jobs.forEach(function (job) {
     if (job.status === "running" || job.status === "queued" || job.status === "pending" ||
@@ -1171,7 +1175,9 @@ function renderAgentList(agents) {
   listEl.innerHTML = "";
 
   var busyCount = 0;
-  var agentNames = Object.keys(agents);
+  var agentNames = Object.keys(agents).sort(function(a, b) {
+    return a.toLowerCase() < b.toLowerCase() ? -1 : a.toLowerCase() > b.toLowerCase() ? 1 : 0;
+  });
 
   agentNames.forEach(function(name) {
     var agentData = agents[name];
@@ -1768,7 +1774,9 @@ function renderQueueCards() {
   var totalQueueDepth = 0;
   var agentNames = [];
   if (config && config.agents) {
-    agentNames = Object.keys(config.agents);
+    agentNames = Object.keys(config.agents).sort(function(a, b) {
+      return a.toLowerCase() < b.toLowerCase() ? -1 : a.toLowerCase() > b.toLowerCase() ? 1 : 0;
+    });
   }
 
   agentNames.forEach(function(agentName) {
@@ -1776,7 +1784,11 @@ function renderQueueCards() {
     var agentColor = getAgentColor(agentName);
     var agentData = mergedAgents[agentName] || {};
     var agentQueue = queues[agentName] || {};
-    var mergedJobs = agentData.jobs || [];
+    var mergedJobs = (agentData.jobs || []).slice().sort(function(a, b) {
+      var na = (a.name || "").toLowerCase();
+      var nb = (b.name || "").toLowerCase();
+      return na < nb ? -1 : na > nb ? 1 : 0;
+    });
     var agentStatus = getAgentStatus(agentData);
 
     var card = document.createElement("div");
