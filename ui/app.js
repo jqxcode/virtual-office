@@ -1281,8 +1281,22 @@ function renderAgentList(agents) {
     // Track drag state for this card (suppresses click after drag)
     var wasDragged = false;
 
+    // Drag handle — only this element initiates the drag
+    var dragHandle = document.createElement("span");
+    dragHandle.className = "drag-handle";
+    dragHandle.textContent = "\u2630"; // hamburger/grip icon
+    dragHandle.title = "Drag to reorder";
+    dragHandle.setAttribute("draggable", "false");
+    card.appendChild(dragHandle);
+
     // Card-level drag handlers: dragstart + dragend only
+    // Prevent drag unless it starts from the drag handle
     card.addEventListener("dragstart", function(e) {
+      // Only allow drag if the mousedown originated on the drag handle
+      if (!card._handleMouseDown) {
+        e.preventDefault();
+        return;
+      }
       isDragging = true;
       wasDragged = true;
       e.dataTransfer.effectAllowed = "move";
@@ -1291,12 +1305,20 @@ function renderAgentList(agents) {
     });
     card.addEventListener("dragend", function() {
       isDragging = false;
+      card._handleMouseDown = false;
       card.classList.remove("dragging");
       // Clean up all drag-over indicators
       listEl.querySelectorAll(".agent-list-card").forEach(function(c) {
         c.classList.remove("drag-over");
       });
       setTimeout(function() { wasDragged = false; }, 200);
+    });
+    // Track mousedown on handle to gate dragstart
+    dragHandle.addEventListener("mousedown", function() {
+      card._handleMouseDown = true;
+    });
+    document.addEventListener("mouseup", function() {
+      card._handleMouseDown = false;
     });
 
     // Top row: name + status badge
@@ -2226,7 +2248,9 @@ async function poll() {
       lastDashboardJSON = dashJSON;
       renderAgents(dashboard);
     } else if (activeTopTab === "agents" && lastDashboard) {
-      // Even if dashboard unchanged, refresh activity feed with latest events
+      // Always re-render agent list to pick up localStorage order changes
+      renderAgents(lastDashboard);
+      // Also refresh activity feed with latest events
       var mergedAgents = mergeConfigAndDashboard(agentConfig, lastDashboard);
       // Filter events to active group
       var visNames = [];

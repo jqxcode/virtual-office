@@ -971,7 +971,7 @@ body {
 
 /* === Agent List Card: Drag-and-Drop === */
 .agent-list-card[draggable="true"] {
-  cursor: grab;
+  cursor: default;
   -webkit-user-select: none;
   -moz-user-select: none;
   -ms-user-select: none;
@@ -983,14 +983,23 @@ body {
   -moz-user-select: none;
   -ms-user-select: none;
   user-select: none;
-  /* Prevent child elements from intercepting drag events */
-  pointer-events: none;
 }
 
-/* Re-enable pointer-events for interactive children (buttons) */
-.agent-list-card[draggable="true"] button,
-.agent-list-card[draggable="true"] .agent-filter-btn {
+/* Drag handle styling */
+.drag-handle {
+  cursor: grab;
+  font-size: 0.9rem;
+  color: #484f58;
+  flex-shrink: 0;
+  padding: 0 0.2rem;
+  transition: color 0.15s;
   pointer-events: auto;
+}
+.drag-handle:hover {
+  color: #8b949e;
+}
+.agent-list-card.dragging .drag-handle {
+  cursor: grabbing;
 }
 
 .agent-list-card.dragging {
