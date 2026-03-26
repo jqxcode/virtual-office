@@ -298,13 +298,14 @@ function renderAgentCard(name, agentData) {
   card.className = "agent-card " + status;
   card.dataset.agent = name;
 
+  // Status dot (top-right corner)
+  var dot = document.createElement("span");
+  dot.className = "status-dot " + status;
+  card.appendChild(dot);
+
   // Header
   var header = document.createElement("div");
   header.className = "card-header";
-
-  var dot = document.createElement("span");
-  dot.className = "status-dot " + status;
-  header.appendChild(dot);
 
   var iconSpan = document.createElement("span");
   iconSpan.className = "agent-icon";
@@ -318,7 +319,7 @@ function renderAgentCard(name, agentData) {
 
   card.appendChild(header);
 
-  // Status line
+  // Status line (only shown when there's meaningful info)
   var statusLine = document.createElement("div");
   statusLine.className = "card-status-line";
 
@@ -333,9 +334,9 @@ function renderAgentCard(name, agentData) {
   } else if (agentData.last_completed) {
     statusLine.textContent = "Last completed: " + formatTimeAgo(agentData.last_completed);
   } else {
-    statusLine.textContent = "Idle";
+    statusLine.textContent = "";
   }
-  card.appendChild(statusLine);
+  if (statusLine.textContent) card.appendChild(statusLine);
 
   // Queue badge
   var queueDepth = 0;
@@ -1261,18 +1262,9 @@ function renderAgentList(agents) {
     nameEl.style.color = getAgentColor(name);
     topRow.appendChild(nameEl);
 
-    var statusBadge = document.createElement("span");
-    if (status === "busy") {
-      statusBadge.className = "agent-list-status working";
-      statusBadge.textContent = "Working";
-    } else if (status === "disabled") {
-      statusBadge.className = "agent-list-status disabled-status";
-      statusBadge.textContent = "Disabled";
-    } else {
-      statusBadge.className = "agent-list-status idle-status";
-      statusBadge.textContent = "Idle";
-    }
-    topRow.appendChild(statusBadge);
+    var statusDot = document.createElement("span");
+    statusDot.className = "agent-list-dot " + status;
+    topRow.appendChild(statusDot);
     card.appendChild(topRow);
 
     // Activity line
@@ -1867,16 +1859,9 @@ function renderQueueCards() {
     nameSpan.style.color = agentColor;
     header.appendChild(nameSpan);
 
-    var statusBadge = document.createElement("span");
-    statusBadge.className = "queue-card-status " + agentStatus;
-    if (agentStatus === "busy") {
-      statusBadge.textContent = "Working";
-    } else if (agentStatus === "disabled") {
-      statusBadge.textContent = "Disabled";
-    } else {
-      statusBadge.textContent = "Idle";
-    }
-    header.appendChild(statusBadge);
+    var statusDot = document.createElement("span");
+    statusDot.className = "queue-card-dot " + agentStatus;
+    header.appendChild(statusDot);
     card.appendChild(header);
 
     // Running job info (from merged data, same as Agents tab)
@@ -1936,13 +1921,12 @@ function renderQueueCards() {
       });
       runInfoDiv.appendChild(stopBtn);
       card.appendChild(runInfoDiv);
-    } else {
-      lockDot.className = "lock-indicator unlocked";
-      lockText.textContent = "Unlocked";
     }
-    lockDiv.appendChild(lockDot);
-    lockDiv.appendChild(lockText);
-    card.appendChild(lockDiv);
+    if (runningJobName) {
+      lockDiv.appendChild(lockDot);
+      lockDiv.appendChild(lockText);
+      card.appendChild(lockDiv);
+    }
 
     // Job queue list (from merged jobs array)
     var jobList = document.createElement("div");

@@ -180,6 +180,7 @@ body {
   padding: 1rem 1.15rem;
   transition: box-shadow 0.2s, border-color 0.2s, background 0.2s;
   overflow: visible;
+  position: relative;
 }
 
 .agent-card:hover {
@@ -214,7 +215,10 @@ body {
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  flex-shrink: 0;
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+  z-index: 1;
 }
 
 .status-dot.idle {
@@ -223,12 +227,23 @@ body {
 }
 
 .status-dot.busy {
+  background: #3b82f6;
+  box-shadow: 0 0 6px #3b82f6;
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+.status-dot.error {
   background: #ef4444;
   box-shadow: 0 0 6px #ef4444;
 }
 
 .status-dot.disabled {
   background: #484f58;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; box-shadow: 0 0 6px #3b82f6; }
+  50% { opacity: 0.5; box-shadow: 0 0 12px #3b82f6; }
 }
 
 .agent-icon {
@@ -927,31 +942,31 @@ body {
   flex-shrink: 0;
 }
 
-.agent-list-status {
-  font-size: 0.65rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  padding: 0.15rem 0.55rem;
-  border-radius: 9999px;
+.agent-list-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
   flex-shrink: 0;
 }
 
-.agent-list-status.working {
+.agent-list-dot.idle {
   background: #22c55e;
-  color: #0d1117;
-  animation: pulse-glow 2s ease-in-out infinite;
+  box-shadow: 0 0 6px #22c55e;
 }
 
-.agent-list-status.idle-status {
-  background: transparent;
-  color: #22c55e;
-  border: 1px solid #22c55e;
+.agent-list-dot.busy {
+  background: #3b82f6;
+  box-shadow: 0 0 6px #3b82f6;
+  animation: pulse-dot 2s ease-in-out infinite;
 }
 
-.agent-list-status.disabled-status {
-  background: #30363d;
-  color: #484f58;
+.agent-list-dot.error {
+  background: #ef4444;
+  box-shadow: 0 0 6px #ef4444;
+}
+
+.agent-list-dot.disabled {
+  background: #484f58;
 }
 
 /* === Agent List Card: Drag-and-Drop === */
@@ -1418,6 +1433,33 @@ body {
   border-radius: 9999px;
 }
 
+.queue-card-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.queue-card-dot.idle {
+  background: #22c55e;
+  box-shadow: 0 0 6px #22c55e;
+}
+
+.queue-card-dot.busy {
+  background: #3b82f6;
+  box-shadow: 0 0 6px #3b82f6;
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+.queue-card-dot.error {
+  background: #ef4444;
+  box-shadow: 0 0 6px #ef4444;
+}
+
+.queue-card-dot.disabled {
+  background: #484f58;
+}
+
 .queue-card-running {
   display: flex;
   align-items: center;
@@ -1467,9 +1509,7 @@ body {
   box-shadow: 0 0 6px rgba(217, 119, 6, 0.5);
 }
 
-.lock-indicator.unlocked {
-  background: #22c55e;
-}
+
 
 .queue-card-jobs {
   list-style: none;
