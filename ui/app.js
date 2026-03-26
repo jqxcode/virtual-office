@@ -34,6 +34,8 @@ var activeTopTab = "agents";
 var lastDashboard = null;
 var scheduleData = null;
 var MAX_SCHEDULE_ROWS = 20;
+var selectedAgentFilter = null;
+var isDragging = false;
 
 // --- Fetch helpers ---
 
@@ -1173,6 +1175,8 @@ function computeStats(events, agents) {
 function renderAgentList(agents) {
   var listEl = document.getElementById("agent-list");
   if (!listEl) return;
+  // Skip re-render while user is actively dragging to avoid destroying drag state
+  if (isDragging) return;
   listEl.innerHTML = "";
 
   var busyCount = 0;
@@ -1206,11 +1210,13 @@ function renderAgentList(agents) {
 
     // Drag-and-drop handlers
     card.addEventListener("dragstart", function(e) {
+      isDragging = true;
       e.dataTransfer.effectAllowed = "move";
       e.dataTransfer.setData("text/plain", name);
       card.classList.add("dragging");
     });
     card.addEventListener("dragend", function() {
+      isDragging = false;
       card.classList.remove("dragging");
       // Remove all drag-over indicators
       var allCards = listEl.querySelectorAll(".agent-list-card");
@@ -1262,10 +1268,49 @@ function renderAgentList(agents) {
     nameEl.style.color = getAgentColor(name);
     topRow.appendChild(nameEl);
 
+    var filterBtn = document.createElement("button");
+    filterBtn.className = "agent-filter-btn" + (selectedAgentFilter === name ? " active" : "");
+    filterBtn.title = "Filter schedule for " + (agentData.display_name || name);
+    filterBtn.innerHTML = "&#x1F50D;";
+    filterBtn.addEventListener("click", function(e) {
+      e.stopPropagation();
+      if (selectedAgentFilter === name) {
+        selectedAgentFilter = null;
+      } else {
+        selectedAgentFilter = name;
+      }
+      // Update all filter button states
+      document.querySelectorAll(".agent-filter-btn").forEach(function(btn) {
+        btn.classList.remove("active");
+      });
+      if (selectedAgentFilter) {
+        document.querySelectorAll('.agent-filter-btn').forEach(function(btn) {
+          if (btn.closest('[data-agent="' + selectedAgentFilter + '"]')) {
+            btn.classList.add("active");
+          }
+        });
+      }
+      // Update card selected states
+      document.querySelectorAll(".agent-list-card").forEach(function(c) {
+        c.classList.remove("schedule-filter-active");
+      });
+      if (selectedAgentFilter) {
+        var activeCard = document.querySelector('.agent-list-card[data-agent="' + selectedAgentFilter + '"]');
+        if (activeCard) activeCard.classList.add("schedule-filter-active");
+      }
+      renderScheduleFilterIndicator();
+      renderScheduleTable();
+    });
+    topRow.appendChild(filterBtn);
+
     var statusDot = document.createElement("span");
     statusDot.className = "agent-list-dot " + status;
     topRow.appendChild(statusDot);
     card.appendChild(topRow);
+
+    if (selectedAgentFilter === name) {
+      card.classList.add("schedule-filter-active");
+    }
 
     // Activity line
     var activityLine = document.createElement("div");
@@ -1318,10 +1363,17 @@ function renderAgentList(agents) {
     }
     card.appendChild(tsLine);
 
-    // Click handler
+    // Click handler (suppress after drag to avoid accidental modal open)
+    var wasDragged = false;
+    card.addEventListener("dragstart", function() { wasDragged = true; });
+    card.addEventListener("dragend", function() {
+      // Reset after a short delay so the click event that follows dragend is still suppressed
+      setTimeout(function() { wasDragged = false; }, 200);
+    });
     if (status === "busy") {
-      card.style.cursor = "pointer";
+      card.classList.add("clickable");
       card.addEventListener("click", function() {
+        if (wasDragged) return;
         showRunningModal(name, agentData);
       });
     }
@@ -1622,7 +1674,57 @@ async function loadScheduleData() {
   }
 }
 
+function renderScheduleFilterIndicator() {
+  // Remove existing indicator if present
+  var existing = document.getElementById("schedule-filter-indicator");
+  if (existing) existing.remove();
+
+  if (!selectedAgentFilter) return;
+
+  var wrapper = document.getElementById("schedule-table-wrapper");
+  if (!wrapper) return;
+
+  var indicator = document.createElement("div");
+  indicator.id = "schedule-filter-indicator";
+  indicator.className = "schedule-filter-indicator";
+
+  var label = document.createElement("span");
+  var displayName = selectedAgentFilter;
+  // Try to get display_name from scheduleData or lastDashboard
+  if (scheduleData && scheduleData.merged && scheduleData.merged[selectedAgentFilter]) {
+    displayName = scheduleData.merged[selectedAgentFilter].display_name || selectedAgentFilter;
+  } else if (lastDashboard && lastDashboard[selectedAgentFilter]) {
+    displayName = lastDashboard[selectedAgentFilter].display_name || selectedAgentFilter;
+  }
+  label.textContent = "Showing schedule for: " + displayName;
+  label.style.color = getAgentColor(selectedAgentFilter);
+  indicator.appendChild(label);
+
+  var clearBtn = document.createElement("button");
+  clearBtn.className = "schedule-filter-clear";
+  clearBtn.innerHTML = "&#x2715;";
+  clearBtn.title = "Clear filter";
+  clearBtn.addEventListener("click", function() {
+    selectedAgentFilter = null;
+    document.querySelectorAll(".agent-filter-btn").forEach(function(btn) {
+      btn.classList.remove("active");
+    });
+    document.querySelectorAll(".agent-list-card").forEach(function(c) {
+      c.classList.remove("schedule-filter-active");
+    });
+    document.querySelectorAll(".queue-card").forEach(function(c) {
+      c.classList.remove("schedule-filter-active");
+    });
+    renderScheduleFilterIndicator();
+    renderScheduleTable();
+  });
+  indicator.appendChild(clearBtn);
+
+  wrapper.parentNode.insertBefore(indicator, wrapper);
+}
+
 function renderScheduleTable() {
+  renderScheduleFilterIndicator();
   if (!scheduleData) return;
   var schedules = scheduleData.schedules || [];
   var now = new Date();
@@ -1703,6 +1805,13 @@ function renderScheduleTable() {
     if (!b.fireTime) return -1;
     return a.fireTime.getTime() - b.fireTime.getTime();
   });
+
+  // Apply agent filter if active
+  if (selectedAgentFilter) {
+    allItems = allItems.filter(function(item) {
+      return item.agent === selectedAgentFilter;
+    });
+  }
 
   var totalCount = allItems.length;
   var displayItems = allItems.slice(0, MAX_SCHEDULE_ROWS);
@@ -1859,10 +1968,48 @@ function renderQueueCards() {
     nameSpan.style.color = agentColor;
     header.appendChild(nameSpan);
 
+    var qFilterBtn = document.createElement("button");
+    qFilterBtn.className = "agent-filter-btn" + (selectedAgentFilter === agentName ? " active" : "");
+    qFilterBtn.title = "Filter schedule for " + (agentData.display_name || agentCfg.displayName || agentName);
+    qFilterBtn.innerHTML = "&#x1F50D;";
+    qFilterBtn.addEventListener("click", function(e) {
+      e.stopPropagation();
+      if (selectedAgentFilter === agentName) {
+        selectedAgentFilter = null;
+      } else {
+        selectedAgentFilter = agentName;
+      }
+      document.querySelectorAll(".agent-filter-btn").forEach(function(btn) {
+        btn.classList.remove("active");
+      });
+      document.querySelectorAll(".agent-list-card, .queue-card").forEach(function(c) {
+        c.classList.remove("schedule-filter-active");
+      });
+      if (selectedAgentFilter) {
+        document.querySelectorAll('.agent-filter-btn').forEach(function(btn) {
+          var parentCard = btn.closest('[data-agent="' + selectedAgentFilter + '"]') || btn.closest('.queue-card');
+          if (parentCard && parentCard.dataset.agent === selectedAgentFilter) {
+            btn.classList.add("active");
+          }
+        });
+        document.querySelectorAll('.agent-list-card[data-agent="' + selectedAgentFilter + '"], .queue-card[data-agent="' + selectedAgentFilter + '"]').forEach(function(c) {
+          c.classList.add("schedule-filter-active");
+        });
+      }
+      renderScheduleFilterIndicator();
+      renderScheduleTable();
+    });
+    header.appendChild(qFilterBtn);
+
     var statusDot = document.createElement("span");
     statusDot.className = "queue-card-dot " + agentStatus;
     header.appendChild(statusDot);
     card.appendChild(header);
+
+    card.dataset.agent = agentName;
+    if (selectedAgentFilter === agentName) {
+      card.classList.add("schedule-filter-active");
+    }
 
     // Running job info (from merged data, same as Agents tab)
     var runningJobName = null;
