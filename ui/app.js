@@ -269,8 +269,19 @@ function switchTopTab(tabName) {
   window.history.replaceState({}, "", url);
 
   // Load events when switching to events tab
-  if (tabName === "events" && allEvents.length === 0) {
-    loadAllEvents();
+  if (tabName === "events") {
+    // Sync selectedAgentFilter to the Event Log dropdown
+    var agentDropdown = document.getElementById("filter-agent");
+    if (agentDropdown && selectedAgentFilter) {
+      agentDropdown.value = selectedAgentFilter;
+    } else if (agentDropdown && !selectedAgentFilter) {
+      agentDropdown.value = "";
+    }
+    if (allEvents.length === 0) {
+      loadAllEvents();
+    } else {
+      renderFilteredEvents();
+    }
   }
 
   // Load schedules when switching to queue tab
@@ -1300,6 +1311,10 @@ function renderAgentList(agents) {
       }
       renderScheduleFilterIndicator();
       renderScheduleTable();
+      // Switch to Event Log tab filtered to this agent
+      if (selectedAgentFilter) {
+        switchTopTab("events");
+      }
     });
     topRow.appendChild(filterBtn);
 
