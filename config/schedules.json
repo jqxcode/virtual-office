@@ -73,10 +73,16 @@
       "description": "Gmail scan all mailboxes at 7am daily"
     },
     {
-      "agent": "memo-checker",
-      "job": "consolidate-memories",
+      "agent": "checker",
+      "job": "consolidate-agent-memories",
       "cron": "0 3 * * *",
       "description": "Memory consolidation and report at 3am daily"
+    },
+    {
+      "agent": "checker",
+      "job": "YTD-OOF-Summary",
+      "cron": "0 6 L * *",
+      "description": "YTD OOF summary report on the last day of each month at 6am"
     },
     {
       "agent": "poster",

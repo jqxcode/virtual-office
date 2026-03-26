@@ -1,0 +1,18 @@
+{
+  "jobs": {
+    "consolidate-agent-memories": {
+      "prompt": "Run memory consolidation. Working directory is Q:/src. Scan all sub-project memory dirs under C:/Users/qitxu/.claude/projects/Q--src*/memory/, compare against root memory at C:/Users/qitxu/.claude/projects/Q--src/memory/, copy new/updated files with ext_ prefix, remove duplicates, update MEMORY.md index (keep under 200 lines), and generate the daily HTML report to Q:/src/local_skills/session_management/memory-report-YYYYMMDD.html. Open the report in Edge when done.",
+      "maxRuns": 0,
+      "enabled": true,
+      "saveOutput": false,
+      "description": "Consolidates all sub-project memories into root, deduplicates, generates HTML report"
+    },
+    "YTD-OOF-Summary": {
+      "prompt": "Run the YTD-OOF-Summary job. Query both Teams channels (Absence and OOF/WFH/Late) via WorkIQ for all messages from Dec 1 of previous year through today. Filter for direct reports only, classify each absence as full-day OOF or BRB/partial, count only current-year working days, and generate the HTML report using the template. Open in Edge when done.",
+      "maxRuns": 0,
+      "enabled": true,
+      "saveOutput": false,
+      "description": "Monthly YTD OOF summary for direct reports from Teams channels"
+    }
+  }
+}
