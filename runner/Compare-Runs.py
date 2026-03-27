@@ -13,6 +13,25 @@ from pathlib import Path
 
 OUTPUT_DIR = Path(__file__).resolve().parent.parent / "output" / "scrum-master"
 SUMMARIES_DIR = OUTPUT_DIR / "run-summaries"
+
+
+def _gh_issue_state(url):
+    """Query GitHub for the current state of an issue. Returns 'open', 'closed', or 'unknown'."""
+    if not url:
+        return "unknown"
+    try:
+        # Extract owner/repo#number from URL like https://github.com/owner/repo/issues/123
+        parts = url.rstrip("/").split("/")
+        owner, repo, number = parts[-4], parts[-3], parts[-1]
+        result = subprocess.run(
+            ["gh", "issue", "view", number, "--repo", f"{owner}/{repo}", "--json", "state", "-q", ".state"],
+            capture_output=True, text=True, timeout=15
+        )
+        if result.returncode == 0:
+            return result.stdout.strip().lower()
+    except Exception:
+        pass
+    return "unknown"
 STATE_FILE = SUMMARIES_DIR / "issue-state.json"
 STATS_FILE = SUMMARIES_DIR / "run-stats-latest.json"
 
@@ -569,7 +588,14 @@ def generate_summary(ado_reports, bug_reports, issues, state, new_issues_created
         md_lines.append("")
         for idx, i in enumerate(ado_issues, 1):
             tracked = state["created_issues"].get(i["key"])
-            status = f" ([#{tracked['url'].split('/')[-1]}]({tracked['url']}))" if tracked and tracked.get("url") else " (new)" if i["key"] in new_issues_created else ""
+            if tracked and tracked.get("url"):
+                gh_state = _gh_issue_state(tracked["url"])
+                num = tracked["url"].split("/")[-1]
+                status = f" ([#{num}]({tracked['url']}) -- {gh_state})"
+            elif i["key"] in new_issues_created:
+                status = " (new)"
+            else:
+                status = ""
             md_lines.append(f"{idx}. **{i['title']}**{status}")
         md_lines.append("")
 
@@ -589,7 +615,14 @@ def generate_summary(ado_reports, bug_reports, issues, state, new_issues_created
         md_lines.append("")
         for idx, i in enumerate(bug_issues, 1):
             tracked = state["created_issues"].get(i["key"])
-            status = f" ([#{tracked['url'].split('/')[-1]}]({tracked['url']}))" if tracked and tracked.get("url") else " (new)" if i["key"] in new_issues_created else ""
+            if tracked and tracked.get("url"):
+                gh_state = _gh_issue_state(tracked["url"])
+                num = tracked["url"].split("/")[-1]
+                status = f" ([#{num}]({tracked['url']}) -- {gh_state})"
+            elif i["key"] in new_issues_created:
+                status = " (new)"
+            else:
+                status = ""
             md_lines.append(f"{idx}. **{i['title']}**{status}")
         md_lines.append("")
 
@@ -633,6 +666,9 @@ def generate_summary(ado_reports, bug_reports, issues, state, new_issues_created
     .issue {{ background: #fff; border: 1px solid #e9ecef; border-radius: 8px; padding: 14px 18px; margin-bottom: 10px; }}
     .issue.new {{ border-left: 4px solid #fd7e14; }}
     .issue.tracked {{ border-left: 4px solid #198754; }}
+    .issue.closed {{ border-left: 4px solid #6c757d; opacity: 0.7; }}
+    .state-open {{ color: #198754; font-weight: 600; }}
+    .state-closed {{ color: #6c757d; text-decoration: line-through; }}
     .issue .title {{ font-weight: 600; font-size: 14px; }}
     .issue .status {{ font-size: 12px; color: #6c757d; margin-top: 4px; }}
     .issue a {{ color: #0d6efd; text-decoration: none; }}
@@ -704,13 +740,21 @@ def generate_summary(ado_reports, bug_reports, issues, state, new_issues_created
     for i in issues:
         tracked = state["created_issues"].get(i["key"])
         is_new = i["key"] in new_issues_created
-        css_class = "new" if is_new else "tracked"
         if tracked and tracked.get("url"):
-            status_html = f'<a href="{tracked["url"]}">#{tracked["url"].split("/")[-1]}</a> &mdash; tracked'
+            gh_state = _gh_issue_state(tracked["url"])
+            issue_num = tracked["url"].split("/")[-1]
+            if gh_state == "closed":
+                css_class = "closed"
+                status_html = f'<a href="{tracked["url"]}">#{issue_num}</a> -- <span class="state-closed">closed</span>'
+            else:
+                css_class = "tracked"
+                status_html = f'<a href="{tracked["url"]}">#{issue_num}</a> -- <span class="state-open">open</span>'
         elif is_new and new_issues_created[i["key"]]:
             url = new_issues_created[i["key"]]
-            status_html = f'<a href="{url}">#{url.split("/")[-1]}</a> &mdash; just created'
+            css_class = "new"
+            status_html = f'<a href="{url}">#{url.split("/")[-1]}</a> -- just created'
         else:
+            css_class = "new" if is_new else "tracked"
             status_html = "detected (no issue created)"
         html_content += f'    <div class="issue {css_class}"><div class="title">{i["title"]}</div><div class="status">{i["repo"]} &bull; {status_html}</div></div>\n'
 
