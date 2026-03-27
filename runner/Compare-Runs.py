@@ -827,6 +827,15 @@ def main():
     for issue in issues:
         if issue["key"] in state["created_issues"]:
             existing = state["created_issues"][issue["key"]]
+            # Check if the tracked issue has been closed on GitHub -- if so, skip re-detecting it
+            if existing.get("url"):
+                gh_state = _gh_issue_state(existing["url"])
+                if gh_state == "closed":
+                    print(f"  SKIP (closed on GitHub): {issue['key']} -> {existing['url']}")
+                    existing["gh_state"] = "closed"
+                    continue
+                else:
+                    existing["gh_state"] = gh_state
             print(f"  SKIP (already tracked): {issue['key']} -> {existing.get('url', 'no url')}")
             continue
 
