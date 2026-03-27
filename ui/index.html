@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Virtual Office</title>
-  <link rel="stylesheet" href="styles.css?v=5">
+  <link rel="stylesheet" href="styles.css?v=6">
 </head>
 <body>
   <header class="header">
@@ -57,25 +57,16 @@
       <!-- Agent group sub-tabs -->
       <div class="agent-tabs" id="agent-tabs"></div>
 
-      <!-- Two-column layout -->
-      <div class="mission-columns">
-        <div class="mission-col-left">
-          <div class="section-header">
-            <span>Active Agents</span>
-            <span class="section-badge" id="active-agents-badge">--</span>
-          </div>
-          <div id="agent-list"></div>
-          <!-- Keep agent-grid ID for backward compat with tests -->
-          <div id="agent-grid" class="agent-grid" style="display:none"></div>
-        </div>
-        <div class="mission-col-right">
-          <div class="section-header">
-            <span>Recent Activity</span>
-            <span class="section-badge">Last 15</span>
-          </div>
-          <div id="activity-feed"></div>
-        </div>
+      <!-- Agent list -->
+      <div class="section-header">
+        <span>Active Agents</span>
+        <span class="section-badge" id="active-agents-badge">--</span>
       </div>
+      <div id="agent-list"></div>
+      <!-- Keep agent-grid ID for backward compat with tests -->
+      <div id="agent-grid" class="agent-grid" style="display:none"></div>
+      <!-- Keep activity-feed element for backward compat but hidden -->
+      <div id="activity-feed" style="display:none"></div>
     </section>
 
     <!-- Event Log View -->
@@ -152,6 +143,6 @@
     </section>
   </main>
 
-  <script src="app.js?v=5"></script>
+  <script src="app.js?v=6"></script>
 </body>
 </html>

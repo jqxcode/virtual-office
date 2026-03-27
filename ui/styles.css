@@ -1702,3 +1702,61 @@ body {
   border-color: #ef4444;
   color: #ef4444;
 }
+
+/* === Click-to-Copy === */
+.click-to-copy {
+  cursor: pointer;
+  position: relative;
+  transition: color 0.15s;
+}
+
+.click-to-copy:hover {
+  color: #3b82f6;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+}
+
+.click-to-copy.copied {
+  color: #22c55e !important;
+}
+
+.click-to-copy .copy-toast {
+  position: absolute;
+  top: -1.6rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #22c55e;
+  color: #0d1117;
+  font-size: 0.6rem;
+  font-weight: 700;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 10;
+  animation: copy-toast-fade 1s ease-out forwards;
+}
+
+@keyframes copy-toast-fade {
+  0% { opacity: 1; transform: translateX(-50%) translateY(0); }
+  70% { opacity: 1; }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-4px); }
+}
+
+/* === View Events Link on Agent Cards === */
+.agent-view-events {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #3b82f6;
+  cursor: pointer;
+  text-decoration: none;
+  padding: 0.15rem 0;
+  transition: color 0.15s;
+  display: inline-block;
+  margin-top: 0.3rem;
+}
+
+.agent-view-events:hover {
+  color: #60a5fa;
+  text-decoration: underline;
+}

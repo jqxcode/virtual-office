@@ -241,6 +241,28 @@ function normalizeJobState(raw) {
   };
 }
 
+// --- Click-to-copy helper ---
+
+function makeClickToCopy(element) {
+  element.classList.add("click-to-copy");
+  element.title = "Click to copy";
+  element.addEventListener("click", function(e) {
+    e.stopPropagation();
+    var text = element.textContent.trim();
+    navigator.clipboard.writeText(text).then(function() {
+      element.classList.add("copied");
+      var toast = document.createElement("span");
+      toast.className = "copy-toast";
+      toast.textContent = "Copied!";
+      element.appendChild(toast);
+      setTimeout(function() {
+        element.classList.remove("copied");
+        if (toast.parentNode) toast.remove();
+      }, 1000);
+    });
+  });
+}
+
 // --- Top-level tab navigation ---
 
 function switchTopTab(tabName) {
@@ -1436,6 +1458,22 @@ function renderAgentList(agents) {
     }
     card.appendChild(tsLine);
 
+    // View Events link - navigates to Event Log filtered to this agent
+    var viewEventsLink = document.createElement("a");
+    viewEventsLink.className = "agent-view-events";
+    viewEventsLink.textContent = "View Events";
+    viewEventsLink.href = "#";
+    viewEventsLink.setAttribute("draggable", "false");
+    (function(agentKey) {
+      viewEventsLink.addEventListener("click", function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        selectedAgentFilter = agentKey;
+        switchTopTab("events");
+      });
+    })(name);
+    card.appendChild(viewEventsLink);
+
     // Click handler (suppress after drag to avoid accidental modal open)
     if (status === "busy") {
       card.classList.add("clickable");
@@ -1567,16 +1605,8 @@ function renderAgents(dashboard) {
     filteredAgents[name] = agents[name];
   });
 
-  // Render Mission Control left column
+  // Render agent list
   renderAgentList(filteredAgents);
-
-  // Render Mission Control right column — filtered to active group's agents
-  var groupAgentNames = visibleNames;
-  var groupEvents = latestEvents.filter(function(evt) {
-    var evtAgent = evt.agent || "";
-    return groupAgentNames.indexOf(evtAgent) !== -1;
-  });
-  renderActivityFeed(groupEvents);
 
   // Compute stats using all agents (not just filtered)
   computeStats(latestEvents, agents);
@@ -1604,9 +1634,16 @@ function populateAgentFilter() {
   var select = document.getElementById("filter-agent");
   if (!select) return;
   var agents = {};
+  // Include agents that have events
   allEvents.forEach(function(evt) {
     if (evt.agent) agents[evt.agent] = true;
   });
+  // Include agents from config (currently configured agents)
+  if (agentConfig && agentConfig.agents) {
+    Object.keys(agentConfig.agents).forEach(function(name) {
+      agents[name] = true;
+    });
+  }
   // Preserve current selection
   var current = select.value;
   // Clear options after "All Agents"
@@ -1917,8 +1954,11 @@ function renderScheduleTable() {
 
     // Job
     var tdJob = document.createElement("td");
-    tdJob.style.color = "#9ca3af";
-    tdJob.textContent = item.job;
+    var tdJobSpan = document.createElement("span");
+    tdJobSpan.textContent = item.job;
+    tdJobSpan.style.color = "#9ca3af";
+    makeClickToCopy(tdJobSpan);
+    tdJob.appendChild(tdJobSpan);
     tr.appendChild(tdJob);
 
     // Schedule
@@ -2123,6 +2163,7 @@ function renderQueueCards() {
     nameSpan.className = "queue-card-name";
     nameSpan.textContent = agentData.display_name || agentCfg.displayName || agentName;
     nameSpan.style.color = agentColor;
+    makeClickToCopy(nameSpan);
     header.appendChild(nameSpan);
 
     var qFilterBtn = document.createElement("button");
@@ -2243,6 +2284,7 @@ function renderQueueCards() {
       var jName = document.createElement("span");
       jName.className = "queue-card-job-name";
       jName.textContent = jobName;
+      makeClickToCopy(jName);
       jobRow.appendChild(jName);
 
       // Get queue depth from merged job data
@@ -2334,20 +2376,6 @@ async function poll() {
     } else if (activeTopTab === "agents" && lastDashboard) {
       // Always re-render agent list to pick up localStorage order changes
       renderAgents(lastDashboard);
-      // Also refresh activity feed with latest events
-      var mergedAgents = mergeConfigAndDashboard(agentConfig, lastDashboard);
-      // Filter events to active group
-      var visNames = [];
-      if (agentConfig && agentConfig.agents) {
-        Object.keys(agentConfig.agents).forEach(function(n) {
-          if (getAgentGroup(n) === activeGroup) visNames.push(n);
-        });
-      }
-      var grpEvts = latestEvents.filter(function(evt) {
-        return visNames.indexOf(evt.agent || "") !== -1;
-      });
-      renderActivityFeed(grpEvts);
-      computeStats(latestEvents, mergedAgents);
     }
     setConnected(true);
     updateTimestamp();
