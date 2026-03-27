@@ -1,14 +1,14 @@
 {
   "jobs": {
     "consolidate-agent-memories": {
-      "prompt": "Run memory consolidation. Working directory is Q:/src. Scan all sub-project memory dirs under C:/Users/qitxu/.claude/projects/Q--src*/memory/, compare against root memory at C:/Users/qitxu/.claude/projects/Q--src/memory/, copy new/updated files with ext_ prefix, remove duplicates, update MEMORY.md index (keep under 200 lines), and generate the daily HTML report to Q:/src/local_skills/session_management/memory-report-YYYYMMDD.html. Open the report in Edge when done.",
+      "prompt": "Run memory consolidation. Working directory is Q:/src. Scan all sub-project memory dirs under C:/Users/qitxu/.claude/projects/Q--src*/memory/, compare against root memory at C:/Users/qitxu/.claude/projects/Q--src/memory/, copy new/updated files with ext_ prefix, remove duplicates, update MEMORY.md index (keep under 200 lines), run permission audit, root hygiene, stale file cleanup, and report template audit (scan all agent .md files under C:/Users/qitxu/.claude/agents/ and job configs under Q:/src/personal_projects/virtual-office/config/jobs/*.json to verify HTML reports have VO subtitle, dark theme, Segoe UI, and are self-contained). Generate the daily HTML report to Q:/src/local_skills/session_management/memory-report-YYYYMMDD.html. The report MUST include a standard VO subtitle immediately below the main title: <p style=\"color:#888; font-size:13px; margin-top:-10px;\">Agent: Checker | Job: consolidate-agent-memories | Start: <ISO timestamp when job started> | Complete: <ISO timestamp when report is generated></p>. Open the report in Edge when done.",
       "maxRuns": 0,
       "enabled": true,
       "saveOutput": false,
       "description": "Consolidates all sub-project memories into root, deduplicates, generates HTML report"
     },
     "TODO-sprint-progress": {
-      "prompt": "Generate a sprint progress update now. You MUST save the report as a self-contained HTML file (inline CSS, no external dependencies) to Q:/src/personal_projects/virtual-office/output/sprint-progress-YYYYMMDD.html (using today's date). Also save a copy to Q:/src/personal_projects/virtual-office/output/sprint-progress-latest.html. Use the Segoe UI font, a blue header with sprint name/dates, summary cards for counts (completed/in-progress/not-started/blocked), a work items table, highlights, and risks sections. Open the report in Edge after saving.",
+      "prompt": "Generate a sprint progress update now. You MUST save the report as a self-contained HTML file (inline CSS, no external dependencies) to Q:/src/personal_projects/virtual-office/output/sprint-progress-YYYYMMDD.html (using today's date). Also save a copy to Q:/src/personal_projects/virtual-office/output/sprint-progress-latest.html. Use the Segoe UI font, a blue header with sprint name/dates, summary cards for counts (completed/in-progress/not-started/blocked), a work items table, highlights, and risks sections. The report MUST include a standard VO subtitle immediately below the main title: <p style=\"color:#888; font-size:13px; margin-top:-10px;\">Agent: Checker | Job: TODO-sprint-progress | Start: <ISO timestamp when job started> | Complete: <ISO timestamp when report is generated></p>. Open the report in Edge after saving.",
       "maxRuns": 0,
       "enabled": true,
       "saveOutput": false,
@@ -22,7 +22,7 @@
       "description": "Compares run results across runs and files GitHub issues for detected problems"
     },
     "YTD-OOF-Summary": {
-      "prompt": "Run the YTD-OOF-Summary job. Query both Teams channels (Absence and OOF/WFH/Late) via WorkIQ for all messages from Dec 1 of previous year through today. Filter for direct reports only, classify each absence as full-day OOF or BRB/partial, count only current-year working days, and generate the HTML report using the template. Open in Edge when done.",
+      "prompt": "Run the YTD-OOF-Summary job. Query both Teams channels (Absence and OOF/WFH/Late) via WorkIQ for all messages from Dec 1 of previous year through today. Filter for direct reports only, classify each absence as full-day OOF or BRB/partial, count only current-year working days, and generate the HTML report using the template. The report MUST include a standard VO subtitle immediately below the main title: <p style=\"color:#888; font-size:13px; margin-top:-10px;\">Agent: Checker | Job: YTD-OOF-Summary | Start: <ISO timestamp when job started> | Complete: <ISO timestamp when report is generated></p>. Open in Edge when done.",
       "maxRuns": 0,
       "enabled": true,
       "saveOutput": false,

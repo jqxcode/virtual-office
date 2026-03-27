@@ -1,7 +1,7 @@
 {
   "jobs": {
     "scan-all-mailboxes": {
-      "prompt": "Scan all enabled Gmail mailboxes for new emails. Run from Q:/src/personal_projects/gmail-manager/: python -m src --scan-all. After the scan completes, save a self-contained HTML summary report to Q:/src/personal_projects/virtual-office/output/emailer/scan-YYYYMMDD-HHMMSS.html (using local time, zero-padded) and also as scan-latest.html in the same directory. The report should include: mailbox name, message counts by category (auto-delete, review, keep, rollup), and a link to the full digest at http://localhost:8402/digest. Use inline CSS, Segoe UI font. Open the report in Edge after saving.",
+      "prompt": "Scan all enabled Gmail mailboxes for new emails. Run from Q:/src/personal_projects/gmail-manager/: python -m src --scan-all. After the scan completes, save a self-contained HTML summary report to Q:/src/personal_projects/virtual-office/output/emailer/scan-YYYYMMDD-HHMMSS.html (using local time, zero-padded) and also as scan-latest.html in the same directory. The report MUST include a standard VO subtitle immediately below the main title: <p style=\"color:#888; font-size:13px; margin-top:-10px;\">Agent: Emailer | Job: scan-all-mailboxes | Start: <ISO timestamp when job started> | Complete: <ISO timestamp when report is generated></p>. The report should also include: mailbox name, message counts by category (auto-delete, review, keep, rollup), and a link to the full digest at http://localhost:8402/digest. Use inline CSS, Segoe UI font. Open the report in Edge after saving.",
       "maxRuns": 0,
       "enabled": true,
       "saveOutput": false,

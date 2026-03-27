@@ -50,21 +50,15 @@
     },
     {
       "agent": "bug-killer",
-      "job": "resolve-merge-conflicts",
+      "job": "open-pr-maintenance",
       "cron": "3 * * * *",
-      "description": "Resolve merge conflicts for open PRs hourly at :03"
+      "description": "Open PR maintenance (merge conflicts + review comments) hourly at :03"
     },
     {
       "agent": "bug-killer",
       "job": "daily-summary",
-      "cron": "0 1 * * *",
-      "description": "Bug killer daily activity summary at 1am"
-    },
-    {
-      "agent": "bug-killer",
-      "job": "review-pr-comments",
-      "cron": "33 * * * *",
-      "description": "Address PR review comments hourly at :33"
+      "cron": "30 1 * * *",
+      "description": "Bug killer daily activity summary at 1:30am"
     },
     {
       "agent": "emailer",
