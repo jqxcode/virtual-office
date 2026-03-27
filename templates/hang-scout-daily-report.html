@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Virtual Office Daily 5W Report - {{DATE}}</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root { --bg: #0d1117; --card: #161b22; --border: #30363d; --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', -apple-system, sans-serif; background: var(--bg); color: var(--text); padding: 24px; max-width: 1440px; margin: 0 auto; font-size: 13px; }
+  h1 { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+  .subtitle { color: var(--muted); font-size: 12px; margin-bottom: 20px; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 24px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 16px; text-align: center; }
+  .card .num { font-size: 32px; font-weight: 700; line-height: 1.1; }
+  .card .lbl { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; }
+  .section { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-bottom: 20px; }
+  .section h2 { font-size: 16px; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+  .section h2 .icon { font-size: 18px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th { text-align: left; padding: 8px 10px; border-bottom: 2px solid var(--border); color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+  td { padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  td.notes-cell { max-width: 400px; font-size: 11px; color: var(--muted); line-height: 1.4; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: 600; }
+  .badge-green { background: #1a3a1a; color: #66bb6a; }
+  .badge-red { background: #3a1a1a; color: #ef5350; }
+  .badge-yellow { background: #3a3a1a; color: #ffa726; }
+  .badge-blue { background: #1a2a3a; color: #4fc3f7; }
+  .badge-gray { background: #2a2a2a; color: #8b949e; }
+  .agent-pill { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; background: color-mix(in srgb, var(--ac) 20%, transparent); color: var(--ac); }
+  .health-indicator { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 6px; }
+  .chart-container { height: 300px; position: relative; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .exec-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 800px) { .exec-grid { grid-template-columns: 1fr; } }
+  .kv { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid var(--border); }
+  .kv:last-child { border-bottom: none; }
+  .kv .k { color: var(--muted); }
+  .kv .v { font-weight: 600; }
+  .rec { padding: 8px 12px; background: rgba(88,166,255,0.08); border-left: 3px solid var(--accent); border-radius: 0 6px 6px 0; margin-bottom: 8px; font-size: 12px; }
+  .ba-bar { display: flex; height: 22px; border-radius: 4px; overflow: hidden; margin: 2px 0; }
+  .ba-bar div { display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 600; color: #fff; min-width: 0; }
+</style>
+</head>
+<body>
+
+<h1>Virtual Office Daily 5W Incident Report</h1>
+<p class="subtitle">{{VO_SUBTITLE}}</p>
+
+<!-- KPI Cards -->
+<div class="cards">
+  <div class="card">
+    <div class="num" style="color:{{HEALTH_COLOR}}">{{SYSTEM_HEALTH}}</div>
+    <div class="lbl">System Health</div>
+  </div>
+  <div class="card">
+    <div class="num">{{TOTAL_RUNS_7D}}</div>
+    <div class="lbl">Total Runs (7d)</div>
+  </div>
+  <div class="card">
+    <div class="num">{{RUNS_24H}}</div>
+    <div class="lbl">Runs (24h)</div>
+  </div>
+  <div class="card">
+    <div class="num" style="color:#ef5350">{{FAILURES_7D}}</div>
+    <div class="lbl">Failures (7d)</div>
+  </div>
+  <div class="card">
+    <div class="num">{{ACTIVE_AGENTS}}</div>
+    <div class="lbl">Active Agents</div>
+  </div>
+  <div class="card">
+    <div class="num" style="color:#ffa726">{{STALE_LOCKS_7D}}</div>
+    <div class="lbl">Stale Locks (7d)</div>
+  </div>
+  <div class="card">
+    <div class="num" style="color:{{HANGS_COLOR}}">{{HANGS_24H}}</div>
+    <div class="lbl">Hangs (24h)</div>
+  </div>
+</div>
+
+<!-- Executive Summary -->
+<div class="section">
+  <h2>Executive Summary</h2>
+  <div class="exec-grid">
+    <div>
+      <div class="kv"><span class="k">Who</span><span class="v">{{WHO}}</span></div>
+      <div class="kv"><span class="k">What</span><span class="v">{{WHAT}}</span></div>
+      <div class="kv"><span class="k">When</span><span class="v">{{WHEN}}</span></div>
+      <div class="kv"><span class="k">Where</span><span class="v">{{WHERE}}</span></div>
+      <div class="kv"><span class="k">Why</span><span class="v">{{WHY}}</span></div>
+    </div>
+    <div>
+      <div class="kv"><span class="k">Failure Rate</span><span class="v" style="color:{{FAILURE_RATE_COLOR}}">{{FAILURE_RATE}}</span></div>
+      <div class="kv"><span class="k">Stale Locks</span><span class="v" style="color:{{STALE_LOCKS_COLOR}}">{{STALE_LOCKS_DETAIL}}</span></div>
+      <div class="kv"><span class="k">Confirmed Hangs</span><span class="v" style="color:{{CONFIRMED_HANGS_COLOR}}">{{CONFIRMED_HANGS}}</span></div>
+      <div class="kv"><span class="k">Known Patterns</span><span class="v">{{KNOWN_PATTERNS}}</span></div>
+      <div class="kv"><span class="k">Top Risk</span><span class="v" style="color:#ffa726">{{TOP_RISK}}</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- 5W Incident Details -->
+<div class="section">
+  <h2>5W Incident Details (Last 24h)</h2>
+  <table>
+    <thead>
+      <tr><th>Timestamp</th><th>Agent</th><th>Job</th><th>Classification</th><th>Action</th><th>Notes</th></tr>
+    </thead>
+    <tbody>
+      {{INCIDENT_TABLE_ROWS}}
+    </tbody>
+  </table>
+</div>
+
+<!-- Known Pattern Summary -->
+<div class="section">
+  <h2>Known Hang Patterns</h2>
+  <table>
+    <thead>
+      <tr><th>Pattern ID</th><th>Description</th><th>Occurrences</th><th>Affected Agents</th><th>Safe to Kill</th><th>Tracking</th></tr>
+    </thead>
+    <tbody>
+      {{PATTERN_TABLE_ROWS}}
+    </tbody>
+  </table>
+</div>
+
+<!-- Runtime Trends Chart -->
+<div class="section">
+  <h2>Runtime Trends (7-day, avg minutes per agent)</h2>
+  <div class="chart-container">
+    <canvas id="runtimeChart"></canvas>
+  </div>
+</div>
+
+<!-- Runtime Summary Table -->
+<div class="section">
+  <h2>Runtime Summary by Job (7-day)</h2>
+  <table>
+    <thead>
+      <tr><th>Agent</th><th>Job</th><th>Runs (7d)</th><th>Runs (24h)</th><th>Status</th><th>Avg</th><th>Min</th><th>Max</th><th>Avg (24h)</th><th>Trend</th></tr>
+    </thead>
+    <tbody>
+      {{RUNTIME_TABLE_ROWS}}
+    </tbody>
+  </table>
+</div>
+
+<!-- Bug Autopilot Performance -->
+<div class="section">
+  <h2>Bug Autopilot Performance Analysis</h2>
+  <div class="exec-grid">
+    {{BA_PERF_SUMMARY}}
+  </div>
+  {{BA_PERF_NOTE}}
+
+  <h3 style="font-size:13px;margin:16px 0 10px;">Run Duration Breakdown (7d)</h3>
+  <table>
+    <thead><tr><th>Job</th><th>Runs</th><th>Avg</th><th>Max</th><th>Notes</th></tr></thead>
+    <tbody>
+      {{BA_DURATION_TABLE_ROWS}}
+    </tbody>
+  </table>
+</div>
+
+<!-- Grouped Bar Chart: Job Duration Comparison -->
+<div class="section">
+  <h2>Job Duration Comparison (7d avg vs 24h avg)</h2>
+  <div class="chart-container">
+    <canvas id="barChart"></canvas>
+  </div>
+</div>
+
+<!-- Recommendations -->
+<div class="section">
+  <h2>Recommendations</h2>
+  {{RECOMMENDATIONS}}
+</div>
+
+<script>
+// Runtime trends line chart
+const ctx1 = document.getElementById('runtimeChart').getContext('2d');
+new Chart(ctx1, {
+  type: 'line',
+  data: {
+    labels: {{TREND_LABELS}},
+    datasets: {{TREND_DATASETS}}
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { labels: { color: '#8b949e', font: { size: 11 } } },
+      tooltip: { callbacks: { label: (c) => c.dataset.label + ': ' + c.parsed.y + ' min' } }
+    },
+    scales: {
+      x: { ticks: { color: '#8b949e' }, grid: { color: '#30363d' } },
+      y: { title: { display: true, text: 'Avg Duration (min)', color: '#8b949e' }, ticks: { color: '#8b949e' }, grid: { color: '#30363d' } }
+    }
+  }
+});
+
+// Grouped bar chart
+const ctx2 = document.getElementById('barChart').getContext('2d');
+new Chart(ctx2, {
+  type: 'bar',
+  data: {
+    labels: {{BAR_LABELS}},
+    datasets: [
+      { label: '7d Avg (min)', data: {{BAR_AVG_7D}}, backgroundColor: '#4fc3f766', borderColor: '#4fc3f7', borderWidth: 1 },
+      { label: '24h Avg (min)', data: {{BAR_AVG_24H}}, backgroundColor: '#ffa72666', borderColor: '#ffa726', borderWidth: 1 }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { labels: { color: '#8b949e' } } },
+    scales: {
+      x: { ticks: { color: '#8b949e', maxRotation: 45 }, grid: { color: '#30363d' } },
+      y: { title: { display: true, text: 'Duration (min)', color: '#8b949e' }, ticks: { color: '#8b949e' }, grid: { color: '#30363d' } }
+    }
+  }
+});
+</script>
+
+<p style="text-align:center;color:var(--muted);font-size:10px;margin-top:24px;">
+  Generated by Virtual Office Hang Scout | {{DATE}}
+</p>
+</body>
+</html>
