@@ -714,6 +714,133 @@ try {
     Remove-TestRoot -Root $root
 }
 
+# ========================================
+# TC85: Live dashboard.json is valid JSON
+# ========================================
+Write-Host "`nTC85: Live dashboard.json is valid JSON" -ForegroundColor Cyan
+
+$LiveProjectRoot = Split-Path -Parent $PSScriptRoot
+if (-not (Test-Path (Join-Path $LiveProjectRoot "config/agents.json"))) {
+    $LiveProjectRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+}
+$LiveDashboardFile = Join-Path $LiveProjectRoot "state/dashboard.json"
+$LiveAgentsFile = Join-Path $LiveProjectRoot "config/agents.json"
+
+if (Test-Path $LiveDashboardFile) {
+    $dashParseOk = $true
+    $liveDash = $null
+    try {
+        $liveDash = Get-Content -Path $LiveDashboardFile -Raw | ConvertFrom-Json -AsHashtable
+    } catch {
+        $dashParseOk = $false
+    }
+    Assert-True $dashParseOk "dashboard.json is valid JSON"
+} else {
+    Write-Host "  [SKIP] dashboard.json not found (no live state)" -ForegroundColor Yellow
+}
+
+# ========================================
+# TC86: No stale agent keys in dashboard that don't exist in agents.json
+# ========================================
+Write-Host "`nTC86: No stale agent keys in dashboard" -ForegroundColor Cyan
+
+if ((Test-Path $LiveDashboardFile) -and (Test-Path $LiveAgentsFile)) {
+    if ($null -eq $liveDash) {
+        $liveDash = Get-Content -Path $LiveDashboardFile -Raw | ConvertFrom-Json -AsHashtable
+    }
+    $liveAgentsRaw = Get-Content -Path $LiveAgentsFile -Raw | ConvertFrom-Json -AsHashtable
+    $liveAgents = if ($liveAgentsRaw.ContainsKey("agents")) { $liveAgentsRaw["agents"] } else { $liveAgentsRaw }
+
+    $staleFound = $false
+    if ($liveDash.ContainsKey("agents")) {
+        foreach ($dashAgent in $liveDash["agents"].Keys) {
+            if (-not $liveAgents.ContainsKey($dashAgent)) {
+                $staleFound = $true
+                Write-Host "    Stale agent in dashboard: '$dashAgent'" -ForegroundColor Yellow
+            }
+        }
+    }
+    Assert-True (-not $staleFound) "No agent keys in dashboard.json that are missing from agents.json"
+} else {
+    Write-Host "  [SKIP] dashboard.json or agents.json not found" -ForegroundColor Yellow
+}
+
+# ========================================
+# TC87: All "running" entries have valid lock files with live PIDs (or should be "terminated")
+# ========================================
+Write-Host "`nTC87: All 'running' entries have valid lock files" -ForegroundColor Cyan
+
+if ((Test-Path $LiveDashboardFile)) {
+    if ($null -eq $liveDash) {
+        $liveDash = Get-Content -Path $LiveDashboardFile -Raw | ConvertFrom-Json -AsHashtable
+    }
+    $LiveStateDir = Join-Path $LiveProjectRoot "state"
+    $runningWithoutLock = $false
+
+    if ($liveDash.ContainsKey("agents")) {
+        foreach ($agentName in $liveDash["agents"].Keys) {
+            $agentData = $liveDash["agents"][$agentName]
+            if ($agentData -isnot [hashtable]) { continue }
+            foreach ($jobName in $agentData.Keys) {
+                $jobData = $agentData[$jobName]
+                if ($jobData -isnot [hashtable]) { continue }
+                if (-not $jobData.ContainsKey("status")) { continue }
+                if ($jobData["status"] -ne "running") { continue }
+
+                # Check lock file
+                $lockFile = Join-Path $LiveStateDir "agents" $agentName "lock"
+                if (-not (Test-Path $lockFile)) {
+                    $runningWithoutLock = $true
+                    Write-Host "    Running entry '$agentName/$jobName' has no lock file" -ForegroundColor Yellow
+                } else {
+                    # Validate PID in lock file
+                    try {
+                        $lockRaw = Get-Content -Path $lockFile -Raw -ErrorAction SilentlyContinue
+                        $lockObj = $lockRaw.Trim() | ConvertFrom-Json
+                        if ($null -ne $lockObj.PSObject.Properties['pid']) {
+                            $lockPid = [int]$lockObj.pid
+                            $proc = Get-Process -Id $lockPid -ErrorAction SilentlyContinue
+                            if ($null -eq $proc) {
+                                $runningWithoutLock = $true
+                                Write-Host "    Running entry '$agentName/$jobName' has dead PID $lockPid in lock file" -ForegroundColor Yellow
+                            }
+                        }
+                    } catch {
+                        # Lock file is malformed but exists -- not necessarily invalid during startup
+                    }
+                }
+            }
+        }
+    }
+    Assert-True (-not $runningWithoutLock) "All 'running' dashboard entries have valid lock files with live PIDs"
+} else {
+    Write-Host "  [SKIP] dashboard.json not found" -ForegroundColor Yellow
+}
+
+# ========================================
+# TC88: No legacy agent names (memo-checker) in dashboard state
+# ========================================
+Write-Host "`nTC88: No legacy agent names in dashboard state" -ForegroundColor Cyan
+
+if ((Test-Path $LiveDashboardFile)) {
+    if ($null -eq $liveDash) {
+        $liveDash = Get-Content -Path $LiveDashboardFile -Raw | ConvertFrom-Json -AsHashtable
+    }
+    $legacyFound = $false
+    $legacyNames = @("memo-checker")
+    if ($liveDash.ContainsKey("agents")) {
+        foreach ($agentName in $liveDash["agents"].Keys) {
+            if ($legacyNames -contains $agentName) {
+                $legacyFound = $true
+                Write-Host "    Legacy agent name in dashboard: '$agentName'" -ForegroundColor Yellow
+            }
+        }
+    }
+    Assert-True (-not $legacyFound) "No legacy agent names (memo-checker) in dashboard.json"
+} else {
+    Write-Host "  [SKIP] dashboard.json not found" -ForegroundColor Yellow
+}
+
 # --- Summary ---
 Write-Host "`n========================================" -ForegroundColor White
 Write-Host "Test-DashboardState: $script:Passed passed, $script:Failed failed" -ForegroundColor $(if ($script:Failed -gt 0) { "Red" } else { "Green" })
