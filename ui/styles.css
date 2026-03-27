@@ -1172,7 +1172,6 @@ body {
 
 .event-agent {
   font-weight: 500;
-  color: #3b82f6;
   white-space: nowrap;
   flex-shrink: 0;
   min-width: 100px;
@@ -1743,20 +1742,3 @@ body {
   100% { opacity: 0; transform: translateX(-50%) translateY(-4px); }
 }
 
-/* === View Events Link on Agent Cards === */
-.agent-view-events {
-  font-size: 0.72rem;
-  font-weight: 600;
-  color: #3b82f6;
-  cursor: pointer;
-  text-decoration: none;
-  padding: 0.15rem 0;
-  transition: color 0.15s;
-  display: inline-block;
-  margin-top: 0.3rem;
-}
-
-.agent-view-events:hover {
-  color: #60a5fa;
-  text-decoration: underline;
-}

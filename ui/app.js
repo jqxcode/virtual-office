@@ -6,14 +6,28 @@ var CONFIG = {
   API_BASE: ""
 };
 
-// --- Agent color map ---
+// --- Agent color map (single source of truth for all agent colors) ---
 var AGENT_COLORS = {
   "scrum-master": "#3b82f6",   // blue
   "bug-killer": "#ef4444",     // red
-  "emailer": "#22c55e"         // green
+  "emailer": "#22c55e",        // green
+  "checker": "#a855f7",        // purple
+  "poster": "#f59e0b",         // amber
+  "hang-scout": "#06b6d4"      // cyan
 };
+
+// --- Legacy agent name mapping ---
+// Maps old/renamed agent names to their current canonical names
+var LEGACY_AGENT_NAMES = {
+  "memo-checker": "checker"
+};
+
+function canonicalAgentName(name) {
+  return LEGACY_AGENT_NAMES[name] || name;
+}
 function getAgentColor(name) {
-  if (AGENT_COLORS[name]) return AGENT_COLORS[name];
+  var canonical = canonicalAgentName(name);
+  if (AGENT_COLORS[canonical]) return AGENT_COLORS[canonical];
   // Generate a consistent color from name hash for unknown agents
   var hash = 0;
   for (var i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
@@ -1190,17 +1204,37 @@ function computeStats(events, agents) {
   var elFailedWeek = document.getElementById("stat-failed-week");
   var elAgentsActive = document.getElementById("stat-agents-active");
   var elAgentsTotal = document.getElementById("stat-agents-total");
-  var elHeartbeat = document.getElementById("stat-heartbeat");
-  var elHeartbeatTime = document.getElementById("stat-heartbeat-time");
 
-  if (elCompletedToday) elCompletedToday.textContent = completedToday + " today";
+  if (elCompletedToday) {
+    elCompletedToday.textContent = completedToday + " today";
+    elCompletedToday.style.cursor = "pointer";
+    elCompletedToday.title = "Click to view completed events";
+    elCompletedToday.onclick = function() {
+      document.getElementById("filter-event-type").value = "completed";
+      document.getElementById("filter-time").value = "24h";
+      document.getElementById("filter-agent").value = "";
+      selectedAgentFilter = null;
+      switchTopTab("events");
+      if (allEvents.length > 0) renderFilteredEvents();
+    };
+  }
   if (elCompletedWeek) elCompletedWeek.textContent = completedWeek + " this week";
-  if (elFailedToday) elFailedToday.textContent = failedToday + " today" + (stalledToday > 0 ? " (" + explicitFailedToday + " failed + " + stalledToday + " stalled)" : "");
+  if (elFailedToday) {
+    elFailedToday.textContent = failedToday + " today" + (stalledToday > 0 ? " (" + explicitFailedToday + " failed + " + stalledToday + " stalled)" : "");
+    elFailedToday.style.cursor = "pointer";
+    elFailedToday.title = "Click to view failed events";
+    elFailedToday.onclick = function() {
+      document.getElementById("filter-event-type").value = "failed";
+      document.getElementById("filter-time").value = "24h";
+      document.getElementById("filter-agent").value = "";
+      selectedAgentFilter = null;
+      switchTopTab("events");
+      if (allEvents.length > 0) renderFilteredEvents();
+    };
+  }
   if (elFailedWeek) elFailedWeek.textContent = failedWeek + " this week" + (stalledWeek > 0 ? " (" + explicitFailedWeek + " failed + " + stalledWeek + " stalled)" : "");
   if (elAgentsActive) elAgentsActive.textContent = String(agentsActive);
   if (elAgentsTotal) elAgentsTotal.textContent = agentsTotal + " total";
-  if (elHeartbeat) elHeartbeat.textContent = isConnected ? "Operational" : "Disconnected";
-  if (elHeartbeatTime) elHeartbeatTime.textContent = isConnected ? new Date().toLocaleTimeString() : "--";
 }
 
 // --- Mission Control: Agent List (left column) ---
@@ -1458,22 +1492,6 @@ function renderAgentList(agents) {
     }
     card.appendChild(tsLine);
 
-    // View Events link - navigates to Event Log filtered to this agent
-    var viewEventsLink = document.createElement("a");
-    viewEventsLink.className = "agent-view-events";
-    viewEventsLink.textContent = "View Events";
-    viewEventsLink.href = "#";
-    viewEventsLink.setAttribute("draggable", "false");
-    (function(agentKey) {
-      viewEventsLink.addEventListener("click", function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        selectedAgentFilter = agentKey;
-        switchTopTab("events");
-      });
-    })(name);
-    card.appendChild(viewEventsLink);
-
     // Click handler (suppress after drag to avoid accidental modal open)
     if (status === "busy") {
       card.classList.add("clickable");
@@ -1634,9 +1652,9 @@ function populateAgentFilter() {
   var select = document.getElementById("filter-agent");
   if (!select) return;
   var agents = {};
-  // Include agents that have events
+  // Include agents that have events (map legacy names to canonical)
   allEvents.forEach(function(evt) {
-    if (evt.agent) agents[evt.agent] = true;
+    if (evt.agent) agents[canonicalAgentName(evt.agent)] = true;
   });
   // Include agents from config (currently configured agents)
   if (agentConfig && agentConfig.agents) {
@@ -1644,8 +1662,8 @@ function populateAgentFilter() {
       agents[name] = true;
     });
   }
-  // Preserve current selection
-  var current = select.value;
+  // Preserve current selection (also canonicalize)
+  var current = canonicalAgentName(select.value);
   // Clear options after "All Agents"
   while (select.options.length > 1) select.remove(1);
   Object.keys(agents).sort().forEach(function(name) {
@@ -1670,7 +1688,7 @@ function getFilteredEvents() {
   else if (timeFilter === "7d") timeMs = 604800000;
 
   return allEvents.filter(function(evt) {
-    if (agentFilter && evt.agent !== agentFilter) return false;
+    if (agentFilter && canonicalAgentName(evt.agent) !== agentFilter) return false;
     var evtType = evt.type || evt.event || "";
     if (typeFilter && evtType !== typeFilter) return false;
     if (timeMs) {
@@ -1716,7 +1734,9 @@ function renderFilteredEvents() {
 
     var agent = document.createElement("span");
     agent.className = "event-agent";
-    agent.textContent = evt.agent || "";
+    var evtAgentName = canonicalAgentName(evt.agent || "");
+    agent.textContent = evtAgentName;
+    agent.style.color = getAgentColor(evtAgentName);
     row.appendChild(agent);
 
     var job = document.createElement("span");

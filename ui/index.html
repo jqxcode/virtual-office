@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Virtual Office</title>
-  <link rel="stylesheet" href="styles.css?v=6">
+  <link rel="stylesheet" href="styles.css?v=7">
 </head>
 <body>
   <header class="header">
@@ -46,11 +46,6 @@
           <div class="stat-label">AGENTS WORKING</div>
           <div class="stat-primary" id="stat-agents-active">--</div>
           <div class="stat-secondary" id="stat-agents-total">--</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">SYSTEM HEARTBEAT</div>
-          <div class="stat-primary" id="stat-heartbeat">--</div>
-          <div class="stat-secondary" id="stat-heartbeat-time">--</div>
         </div>
       </div>
 
@@ -114,7 +109,7 @@
     <section id="view-queue" class="view" style="display:none">
       <!-- Per-agent queue cards -->
       <div class="section-header">
-        <span>Agent Queues</span>
+        <span>Agents</span>
         <span class="section-badge" id="queue-total-badge">--</span>
       </div>
       <div id="queue-cards" class="queue-cards-grid"></div>
@@ -143,6 +138,6 @@
     </section>
   </main>
 
-  <script src="app.js?v=6"></script>
+  <script src="app.js?v=7"></script>
 </body>
 </html>
