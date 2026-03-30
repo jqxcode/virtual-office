@@ -399,9 +399,8 @@ if (Test-Path $lockFile) {
 # --- Run loop (handles queue drain) ---
 $keepRunning = $true
 while ($keepRunning) {
-    # Create agent-level lock (pid added after process starts)
-    $lockContent = @{ ts = (Get-Date -Format "o"); job = $Job } | ConvertTo-Json -Compress
-    Write-AtomicFile -Path $lockFile -Content $lockContent
+    # Record the lock timestamp (lock file is written atomically with PID after process starts)
+    $lockTs = (Get-Date -Format "o")
 
     # Step 5: Check counter / maxRuns
     $maxRuns = 0
@@ -466,8 +465,8 @@ while ($keepRunning) {
 
         $proc = [System.Diagnostics.Process]::Start($pinfo)
 
-        # Update lock with PID
-        $lockContent = @{ ts = (Get-Date -Format "o"); job = $Job; pid = $proc.Id; run_id = $runId } | ConvertTo-Json -Compress
+        # Write lock atomically with PID -- single write, no PID-less window
+        $lockContent = @{ ts = $lockTs; job = $Job; pid = $proc.Id; run_id = $runId } | ConvertTo-Json -Compress
         Write-AtomicFile -Path $lockFile -Content $lockContent
 
         $output = $proc.StandardOutput.ReadToEnd()
