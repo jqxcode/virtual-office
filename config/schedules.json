@@ -31,12 +31,6 @@
       "description": "Bug autopilot (live) at 8pm daily"
     },
     {
-      "agent": "checker",
-      "job": "TODO-compare-runs",
-      "cron": "0 11 * * *",
-      "description": "Compare results and file GitHub issues at 11am daily"
-    },
-    {
       "agent": "bug-killer",
       "job": "scan-and-fix",
       "cron": "0 10 * * *",
