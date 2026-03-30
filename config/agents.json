@@ -48,6 +48,14 @@
       "description": "Detects hung agent jobs, diagnoses via process tree and py-spy, kills if safe, files issues for new patterns",
       "staleLockTimeoutMinutes": 15,
       "group": "Other Agents"
+    },
+    "dreamer": {
+      "displayName": "Dreamer",
+      "icon": "",
+      "agentFile": "~/.claude/agents/dreamer.md",
+      "description": "Tracks ideas, visions, and wish-list items - inventories dreams, plans next steps, and resumes explorations",
+      "staleLockTimeoutMinutes": 30,
+      "group": "Other Agents"
     }
   }
 }
