@@ -1,7 +1,7 @@
 {
   "jobs": {
     "Bug-Autopilot-Adoption-daily-summary": {
-      "prompt": "Post the daily Bug-AutoPilot Triaged summary to the Teams Bug-Autopilot channel. Follow your workflow: (1) Fetch all work items from ADO query cf42325a-4ac0-4420-9d0e-c460ff45f5c2, (2) Analyze and classify the data, (3) Build the Teams message JSON using the exact template format -- include the standard VO subtitle as a gray paragraph after the subject: <p style='color:gray;font-size:12px;'>Agent: Poster | Job: Bug-Autopilot-Adoption-daily-summary | Generated: YYYY-MM-DD</p>, (4) Post to Teams via Graph API. Save the payload to Q:/src/tmp/poster-daily.json before posting. Use today's date in the subject line.",
+      "prompt": "IMPORTANT: Before generating any report, read and follow ALL rules in Q:/src/personal_projects/virtual-office/config/report-rules.md. Post the daily Bug-AutoPilot Triaged summary to the Teams Bug-Autopilot channel. Follow your workflow: (1) Fetch all work items from ADO query cf42325a-4ac0-4420-9d0e-c460ff45f5c2, (2) Analyze and classify the data, (3) Build the Teams message JSON using the exact template format -- include the standard VO subtitle as a gray paragraph after the subject: <p style='color:gray;font-size:12px;'>Agent: Poster | Job: Bug-Autopilot-Adoption-daily-summary | Generated: YYYY-MM-DD</p>, (4) Post to Teams via Graph API. Save the payload to Q:/src/tmp/poster-daily.json before posting. Use today's date in the subject line.",
       "maxRuns": 0,
       "enabled": true,
       "saveOutput": false,
