@@ -18,8 +18,14 @@
     .badge-failed { background: #5c1a1a; color: #f44336; border-radius: 4px; padding: 2px 8px; font-size: 12px; font-weight: bold; }
     .badge-skipped { background: #3a3a1a; color: #ffb300; border-radius: 4px; padding: 2px 8px; font-size: 12px; font-weight: bold; }
     .badge-noaction { background: #1a1a3a; color: #9e9e9e; border-radius: 4px; padding: 2px 8px; font-size: 12px; font-weight: bold; }
+    .badge-build-ok { background: #1a3a1a; color: #66bb6a; border-radius: 4px; padding: 2px 8px; font-size: 12px; font-weight: bold; }
+    .badge-build-fail { background: #5c1a1a; color: #ef5350; border-radius: 4px; padding: 2px 8px; font-size: 12px; font-weight: bold; }
+    .badge-build-running { background: #1a2a4a; color: #42a5f5; border-radius: 4px; padding: 2px 8px; font-size: 12px; font-weight: bold; }
+    .badge-nudged { background: #3a2a1a; color: #ffa726; border-radius: 4px; padding: 2px 8px; font-size: 12px; font-weight: bold; }
     .summary-row { color: #aaa; font-size: 14px; margin-bottom: 8px; }
     .no-prs { color: #888; font-style: italic; padding: 16px 0; }
+    a { color: #00d4ff; text-decoration: none; }
+    a:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
@@ -33,13 +39,29 @@
       <thead>
         <tr>
           <th>Repo</th>
-          <th>PR #</th>
+          <th>PR</th>
           <th>Title</th>
-          <th>Branch</th>
-          <th>Conflicts Resolved</th>
-          <th>Comments Addressed</th>
+          <th>Conflicts</th>
+          <th>Comments</th>
+          <th>Builds</th>
+          <th>Nudge</th>
           <th>Result</th>
         </tr>
+        <!--
+          PR column: must be a clickable link.
+          - GitHub PRs: <a href="https://github.com/{org}/{repo}/pull/{number}">#{number}</a>
+          - ADO PRs: <a href="https://domoreexp.visualstudio.com/Teamspace/_git/teams-modular-packages/pullrequest/{number}">#{number}</a>
+
+          Builds column (ADO PRs only):
+          - <span class="badge-build-ok">All Green</span>
+          - <span class="badge-build-fail">N Failed</span> (with details in Details section)
+          - <span class="badge-build-running">Running</span>
+          - Leave empty for GitHub PRs (no build integration yet)
+
+          Nudge column:
+          - <span class="badge-nudged">Nudged</span> if +reviewready was posted
+          - Empty if not needed or already approved
+        -->
       </thead>
       <tbody>
         {{SUMMARY_TABLE_ROWS}}
