@@ -14,13 +14,6 @@
       "saveOutput": false,
       "description": "Queries ADO work items and meeting notes to generate sprint progress report"
     },
-    "TODO-compare-runs": {
-      "prompt": "Compare all scrum-master reports and create GitHub issues for detected problems. Run: python Q:/src/personal_projects/virtual-office/runner/Compare-Runs.py (without --dry-run flag to actually create issues). This will parse ADO autopilot HTML reports and bug autopilot investigations.json, compare across runs, generate a summary at Q:/src/personal_projects/virtual-office/output/scrum-master/run-summaries/, and create GitHub issues in teams-microsoft/ado-autopilot and teams-microsoft/bug-autopilot repos. Issues that were already created (tracked in issue-state.json) will be skipped. Open the comparison summary in Edge after completion.",
-      "maxRuns": 0,
-      "enabled": true,
-      "saveOutput": false,
-      "description": "Compares run results across runs and files GitHub issues for detected problems"
-    },
     "YTD-OOF-Summary": {
       "prompt": "Run the YTD-OOF-Summary job. Query both Teams channels (Absence and OOF/WFH/Late) via WorkIQ for all messages from Dec 1 of previous year through today. Filter for direct reports only, classify each absence as full-day OOF or BRB/partial, count only current-year working days. You MUST use the fixed template at Q:/src/personal_projects/virtual-office/templates/checker-ytd-oof-summary.html. Read the template file, then replace all {{PLACEHOLDER}} values with actual data. Do NOT redesign the layout, change colors, rearrange sections, or generate HTML from scratch. Replace {{VO_SUBTITLE}} with: Agent: Checker | Job: YTD-OOF-Summary | Start: <PST timestamp when job started> | Complete: <PST timestamp when report is generated>. Open in Edge when done.",
       "maxRuns": 0,
