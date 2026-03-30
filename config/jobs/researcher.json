@@ -1,0 +1,18 @@
+{
+  "jobs": {
+    "research-ICM-with-TMP": {
+      "displayName": "Research ICM with TMP",
+      "prompt": "Investigate the given ICM incident by combining customer log analysis with TMP (teams-modular-packages) code tracing. Follow the research-ICM-with-TMP methodology: (1) Read ICM incident via Edge CDP or ICM MCP - extract customer tenant, affected users, repro steps, error messages, attachments. (2) Download and extract log bundles (zip/7z) to /tmp/. (3) Search for error patterns across all log files, build timeline per meeting/call, cross-reference users (map OIDs, emails with casing, MRIs). (4) Trace the error in TMP code - start from the error message, trace upstream through the component chain, identify data sources. (5) Check feature flags in customer's settings.json. (6) Form hypothesis and validate with specific log lines and code references. Compare success vs failure cases. (7) Create analysis doc at docs/icm-<number>-<description>.md with sections: Issue, Key Users, Tenant Config, Logs, Code Chain, Root Cause, Actions, Open Questions. (8) File ADO bug in MSTeams project (requires Severity field). (9) Create fix PR with feature flag. (10) Add diagnostic logging PR if observability gaps found. (11) Update TSG in SkypeTeams-SRE repo if new pattern. (12) Post ICM comment with findings. (13) Send Teams messages to reviewers via agency copilot --mcp teams. Reference methodology: ~/.claude/agents/researcher.md and Q:/src/local_skills/cmd_meetings/research-ICM-with-TMP-job.md",
+      "requiresInput": true,
+      "inputPrompt": "Enter ICM number and brief description (e.g., '756347322 - BDO meeting notes 403')",
+      "schedule": "manual"
+    },
+    "research-screenshot-with-TMP": {
+      "displayName": "Research Screenshot with TMP",
+      "prompt": "Investigate a UI element shown in a screenshot by tracing it back to its source code in TMP (teams-modular-packages) and finding the PR that introduced it. Follow this methodology: (1) Read the latest screenshot from //tsclient/C/Users/qitxu/Pictures/Screenshots/ (or use provided path). (2) Identify key UI text strings, labels, buttons, and layout patterns visible in the screenshot. (3) Search TMP i18n/localization files (survey.json, strings files under services-io-browser-i18n) for exact text matches. (4) If no exact match, try camelCase/PascalCase key variants, or search for conceptual terms describing the feature. (5) Once localization keys are found, grep TMP source (.ts/.tsx files) for those keys to find the component code that references them. (6) Use git blame on the component file to identify the commit that introduced the feature. (7) Extract the PR number from the merge commit message (format: 'Merged PR NNNNNN: ...'). (8) Look up the PR details and open it in Edge at https://domoreexp.visualstudio.com/Teamspace/_git/teams-modular-packages/pullrequest/<PR_ID>. (9) Report: code location (package/file/lines), localization key prefix, PR number, author, and merge date.",
+      "requiresInput": true,
+      "inputPrompt": "Enter path to screenshot or leave blank for latest host screenshot",
+      "schedule": "manual"
+    }
+  }
+}
