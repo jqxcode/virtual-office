@@ -1,7 +1,7 @@
 {
   "jobs": {
     "scan-and-fix": {
-      "prompt": "Scan repos for open issues (bugs, feature requests, enhancements -- all types, not just bugs). First, discover new repos by running `find /q/src -maxdepth 4 -name \".git\" -type d` and comparing against the known target repos table. For any new repo found: check if it has uncommitted changes on non-default branches (skip those); if clean, run `git pull` to sync. Then for each known target repo, pick the highest-priority unfixed issue, analyze the root cause, implement a fix, and submit a PR. In the scan report, add a 'New Repos Detected' section listing any new repos with their path and a copyable CLI suggestion to add them. Follow the instructions in your agent file.",
+      "prompt": "Scan repos for open issues (bugs, feature requests, enhancements -- all types, not just bugs). First, discover new repos by running `find /q/src -maxdepth 4 -name \".git\" -type d` and comparing against the known target repos table. For any new repo found: check if it has uncommitted changes on non-default branches (skip those); if clean, run `git pull` to sync. Then for each known target repo, pick the highest-priority unfixed issue, analyze the root cause, implement a fix, and submit a PR. If NO new fixes were implemented (no PRs submitted, no code changes pushed -- only stale issue closures or deferrals to open-pr-maintenance), do NOT generate an HTML report. Just output a one-line summary like 'No new bugs to fix. Closed N stale issues, deferred N to open-pr-maintenance.' and exit. Only generate a full report when actual code work was done (PR submitted, fix implemented). Follow the instructions in your agent file.",
       "maxRuns": 0,
       "enabled": true,
       "saveOutput": false,
