@@ -242,12 +242,18 @@ try {
 
                 # Deduplicate: audit and events may have overlapping entries
                 # Use a hash set on normalized keys (timestamp+agent+job+event)
+                # Truncate timestamp to seconds precision (first 19 chars: YYYY-MM-DDTHH:MM:SS)
+                # because events.jsonl and audit log record slightly different sub-second
+                # timestamps for the same logical event, causing the full timestamp key to miss
+                # duplicates (e.g. "2026-03-15T23:16:23.5613337" vs "2026-03-15T23:16:23.5447693").
                 $seen = [System.Collections.Generic.HashSet[string]]::new()
                 $deduped = [System.Collections.Generic.List[string]]::new()
                 foreach ($line in $nonEmpty) {
                     $ts = ""; $ag = ""; $jb = ""; $ev = ""
                     $m = [regex]::Match($line, '"timestamp"\s*:\s*"([^"]+)"')
                     if ($m.Success) { $ts = $m.Groups[1].Value }
+                    # Truncate to seconds precision to match audit vs events.jsonl sub-second drift
+                    if ($ts.Length -gt 19) { $ts = $ts.Substring(0, 19) }
                     $m = [regex]::Match($line, '"agent"\s*:\s*"([^"]+)"')
                     if ($m.Success) { $ag = $m.Groups[1].Value }
                     $m = [regex]::Match($line, '"job"\s*:\s*"([^"]+)"')
