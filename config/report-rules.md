@@ -30,3 +30,7 @@ All PR numbers, bug IDs, issue numbers, and work item IDs MUST be clickable hype
 ## 7. ASCII Only
 
 Use only ASCII characters in report content. No emojis, em dashes, arrows, or unicode. Use plain hyphens (-), -> for arrows, and ... for ellipsis.
+
+## 8. No Teams Posting
+
+NEVER post to Teams channels or send Teams messages unless the job prompt EXPLICITLY instructs you to post to a specific channel. Generating an HTML report is NOT the same as posting it. Only the poster agent has Teams posting authority. Violation of this rule is a critical failure.
