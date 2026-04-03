@@ -74,6 +74,18 @@
     },
     {
       "agent": "poster",
+      "job": "ICM-daily-summary-Notes",
+      "cron": "30 12 * * 1-5",
+      "description": "Notes customer ICM daily summary to Teams at 12:30pm weekdays"
+    },
+    {
+      "agent": "poster",
+      "job": "ICM-daily-summary-Join",
+      "cron": "0 9 * * 1-5",
+      "description": "Meeting Join customer ICM daily summary to Teams at 9am weekdays"
+    },
+    {
+      "agent": "poster",
       "job": "Bug-Autopilot-Adoption-daily-summary",
       "cron": "30 7 * * *",
       "description": "Bug-AutoPilot daily summary post to Teams at 7:30am"
@@ -89,6 +101,18 @@
       "job": "daily-report",
       "cron": "0 0 * * *",
       "description": "Daily 5W incident report at midnight"
+    },
+    {
+      "agent": "checker",
+      "job": "resolve-bugs-cleanup",
+      "cron": "30 11 * * 1",
+      "description": "Auto-close stale Resolved bugs every Monday at 11:30am"
+    },
+    {
+      "agent": "poster",
+      "job": "BA-Perf-Analysis-posting",
+      "cron": "0 21 * * *",
+      "description": "Bug Autopilot Performance Analysis post to Teams at 9pm daily"
     }
   ]
 }

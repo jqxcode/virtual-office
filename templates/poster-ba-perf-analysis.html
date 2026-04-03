@@ -1,0 +1,75 @@
+<!--
+  Poster Template: BA-Perf-Analysis-posting
+  Used by: poster agent, BA-Perf-Analysis-posting job
+  Target: Teams Graph API message body.content (HTML fragment, not full page)
+
+  Variables (replace when generating):
+    {{SUBJECT}}            - "Bug Autopilot Performance Report (YYYY-MM-DD)" (set in JSON "subject" field, not in body)
+    {{DATE}}               - Report date (YYYY-MM-DD)
+    {{RUN_SUMMARY_TABLE}}  - Run summary rows (see row template below)
+    {{ALERTS_SECTION}}     - Outlier alerts, threshold breaches, trend alerts (<li> items)
+    {{TOP_SLOWEST_BUGS}}   - Top 5 slowest bugs rows (see row template below)
+    {{VO_SUBTITLE}}        - Agent: Poster | Job: BA-Perf-Analysis-posting | Generated: YYYY-MM-DD HH:MM PST
+
+  Run summary row template (one per run):
+    <tr style="{{ROW_STYLE}}">
+      <td style="padding:6px;border:1px solid #ddd;">{{RUN_ID}}</td>
+      <td style="padding:6px;border:1px solid #ddd;">{{CONFIG}}</td>
+      <td style="padding:6px;border:1px solid #ddd;">{{BUGS_PROCESSED}}</td>
+      <td style="padding:6px;border:1px solid #ddd;">{{BUGS_ERRORED}}</td>
+      <td style="padding:6px;border:1px solid #ddd;">{{DURATION}}</td>
+      <td style="padding:6px;border:1px solid #ddd;">{{STATUS}}</td>
+    </tr>
+
+  ROW_STYLE values:
+    Odd row:  background-color:#f0f0f0;
+    Even row: (empty)
+
+  Top slowest bugs row template:
+    <tr style="{{ROW_STYLE}}">
+      <td style="padding:6px;border:1px solid #ddd;">{{RANK}}</td>
+      <td style="padding:6px;border:1px solid #ddd;"><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/{{BUG_ID}}">{{BUG_ID}}</a></td>
+      <td style="padding:6px;border:1px solid #ddd;">{{BUG_TITLE}}</td>
+      <td style="padding:6px;border:1px solid #ddd;">{{BUG_DURATION}}</td>
+    </tr>
+
+  ALERTS_SECTION: list of <li> items for each alert. If no alerts, use:
+    <li>No alerts -- all metrics within normal range.</li>
+
+  Alert types:
+    - Outlier: "OUTLIER: {{STEP}} max ({{MAX}}s) is {{MULT}}x the avg ({{AVG}}s) in run {{RUN_ID}}"
+    - Threshold: "THRESHOLD: {{STEP}} p95 ({{P95}}s) exceeds limit ({{LIMIT}}s)"
+    - Trend: "TREND: {{STEP}} avg increased {{PCT}}% vs 7-day baseline"
+-->
+<h3>Run Summary (24h)</h3>
+<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;width:100%;font-size:13px;">
+  <tr style="background-color:#1a1a2e;color:white;">
+    <th style="padding:8px;border:1px solid #ddd;">Run ID</th>
+    <th style="padding:8px;border:1px solid #ddd;">Config</th>
+    <th style="padding:8px;border:1px solid #ddd;">Bugs Processed</th>
+    <th style="padding:8px;border:1px solid #ddd;">Bugs Errored</th>
+    <th style="padding:8px;border:1px solid #ddd;">Duration</th>
+    <th style="padding:8px;border:1px solid #ddd;">Status</th>
+  </tr>
+  {{RUN_SUMMARY_TABLE}}
+</table>
+
+<h3>Alerts</h3>
+<ul>
+  {{ALERTS_SECTION}}
+</ul>
+
+<h3>Top 5 Slowest Bugs (24h)</h3>
+<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;width:100%;font-size:13px;">
+  <tr style="background-color:#1a1a2e;color:white;">
+    <th style="padding:8px;border:1px solid #ddd;">#</th>
+    <th style="padding:8px;border:1px solid #ddd;">Bug ID</th>
+    <th style="padding:8px;border:1px solid #ddd;">Title</th>
+    <th style="padding:8px;border:1px solid #ddd;">Duration</th>
+  </tr>
+  {{TOP_SLOWEST_BUGS}}
+</table>
+
+<br/>
+<p>CC: <at id="0">Josh Xu</at></p>
+<p style="color:#f0f0f0;font-size:1px;line-height:1px;">{{VO_SUBTITLE}}</p>
