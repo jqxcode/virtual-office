@@ -110,7 +110,7 @@
     },
     {
       "agent": "poster",
-      "job": "BA-Perf-Analysis-posting",
+      "job": "BAP-Perf-Analysis-posting",
       "cron": "0 21 * * *",
       "description": "Bug Autopilot Performance Analysis post to Teams at 9pm daily"
     }

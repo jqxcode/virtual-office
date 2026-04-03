@@ -1,0 +1,68 @@
+<!--
+  Poster Template: ICM-daily-summary-Join
+  Used by: poster agent, ICM-daily-summary-Join job
+  Target: Teams Graph API message body.content (HTML fragment, not full page)
+
+  Variables (replace when generating):
+    {{SUBJECT}}       - Message subject (set in JSON "subject" field, not in body)
+    {{DATE}}          - Report date (YYYY-MM-DD)
+    {{ICM_ROWS}}      - Table rows (see row template below)
+    {{ACTION_ITEMS}}  - <li> items for action needed section
+    {{VO_SUBTITLE}}   - Agent: Poster | Job: ICM-daily-summary-Join | Generated: YYYY-MM-DD HH:MM PST
+
+  Row template (one per ICM):
+    <tr style="{{ROW_STYLE}}">
+      <td style="padding:6px;border:1px solid #ddd;"><a href="https://portal.microsofticm.com/imp/v5/incidents/details/{{ICM_ID}}/summary">{{ICM_ID}}</a></td>
+      <td style="padding:6px;border:1px solid #ddd;">{{SEV}}</td>
+      <td style="padding:6px;border:1px solid #ddd;">{{OWNER}}</td>
+      <td style="padding:6px;border:1px solid #ddd;">{{ICM_SINCE}}</td>
+      <td style="padding:6px;border:1px solid #ddd;">{{AGE_IDLE}}</td>
+      <td style="padding:6px;border:1px solid #ddd;">{{OWNER_ENGAGED_ON}}</td>
+      <td style="padding:6px;border:1px solid #ddd;">{{SUMMARY}}</td>
+      <td style="padding:6px;border:1px solid #ddd;">{{UPDATE_NEEDED}}</td>
+    </tr>
+
+  ROW_STYLE values:
+    Update Needed = Yes:  background-color:#FFF3CD;
+    Normal odd row:       background-color:#f0f0f0;
+    Normal even row:      (empty)
+
+  OWNER values:
+    Assigned:   Owner display name
+    Unassigned: <i>unassigned</i><br/>(cc: DRI Name)
+
+  ICM_SINCE: MM/DD format (no year)
+  AGE_IDLE: e.g., "20d / idle 2d"
+  OWNER_ENGAGED_ON: MM/DD format, or "-" for unassigned
+
+  UPDATE_NEEDED values:
+    Yes: <b style="color:red;">Yes - {{REASON}}</b>
+    No:  No - {{REASON}}
+
+  Sort order: Update Needed = Yes rows first, then by CreateDate asc (oldest first).
+
+  ACTION_ITEMS template:
+    <li><a href="https://portal.microsofticm.com/imp/v5/incidents/details/{{ICM_ID}}/summary">{{ICM_ID}}</a> - {{REASON}}</li>
+-->
+<p>Meeting Join Active ICMs - Daily Summary ({{DATE}})</p>
+<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;width:100%;font-size:13px;">
+  <tr style="background-color:#0078D4;color:white;">
+    <th style="padding:8px;border:1px solid #ddd;">ICM</th>
+    <th style="padding:8px;border:1px solid #ddd;">Sev</th>
+    <th style="padding:8px;border:1px solid #ddd;">Owner</th>
+    <th style="padding:8px;border:1px solid #ddd;">ICM Since</th>
+    <th style="padding:8px;border:1px solid #ddd;">Age / Idle</th>
+    <th style="padding:8px;border:1px solid #ddd;">Owner Engaged On</th>
+    <th style="padding:8px;border:1px solid #ddd;">Summary</th>
+    <th style="padding:8px;border:1px solid #ddd;">Update Needed</th>
+  </tr>
+  {{ICM_ROWS}}
+</table>
+<br/>
+<b>Action needed:</b>
+<ul>
+  {{ACTION_ITEMS}}
+</ul>
+<br/>
+<p>CC: <at id="0">Josh Xu</at></p>
+<p style="color:#f0f0f0;font-size:1px;line-height:1px;">{{VO_SUBTITLE}}</p>

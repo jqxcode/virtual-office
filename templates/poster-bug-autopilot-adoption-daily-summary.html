@@ -1,0 +1,135 @@
+<!--
+  Poster Template: Bug-Autopilot-Adoption-daily-summary
+  Used by: poster agent, Bug-Autopilot-Adoption-daily-summary job
+  Target: Teams Graph API message body.content (HTML fragment, not full page)
+
+  Variables (replace when generating):
+    {{SUBJECT}}              - Message subject (set in JSON "subject" field, not in body)
+    {{DATE}}                 - Report date (YYYY-MM-DD)
+    {{SUMMARY_STATS}}        - Summary statistics section (see template below)
+    {{BUG_TABLE_ROWS}}       - State distribution table rows
+    {{AREA_PATH_BREAKDOWN}}  - Area path grouping table rows
+    {{SEV1_COUNT}}           - Number of Sev1 critical bugs
+    {{SEV1_ROWS}}            - Sev1 critical bugs table rows
+    {{CLOSED_COUNT}}         - Number of recently closed bugs
+    {{CLOSED_ROWS}}          - Recently closed bugs table rows
+    {{KEY_INSIGHTS_POSITIVE}} - Green column bullet points ([+] What Bug-AutoPilot Did Well)
+    {{KEY_INSIGHTS_FOCUS}}   - Orange column bullet points ([!] Areas of Focus)
+    {{VO_SUBTITLE}}          - Agent: Poster | Job: Bug-Autopilot-Adoption-daily-summary | Generated: YYYY-MM-DD HH:MM PST
+
+  SUMMARY_STATS template (replace values):
+    <table border="1" cellpadding="8" cellspacing="0" style="border-collapse:collapse;width:100%;font-size:13px;">
+      <tr style="background-color:#1a1a2e;color:white;">
+        <th style="padding:8px;border:1px solid #ddd;">Total Bugs</th>
+        <th style="padding:8px;border:1px solid #ddd;">AutopilotDone</th>
+        <th style="padding:8px;border:1px solid #ddd;">AutopilotRouted</th>
+        <th style="padding:8px;border:1px solid #ddd;">Closed</th>
+        <th style="padding:8px;border:1px solid #ddd;">Sev1 Critical</th>
+      </tr>
+      <tr style="text-align:center;font-size:18px;font-weight:bold;">
+        <td style="padding:8px;border:1px solid #ddd;">{{TOTAL}}</td>
+        <td style="padding:8px;border:1px solid #ddd;color:green;">{{DONE}}</td>
+        <td style="padding:8px;border:1px solid #ddd;color:blue;">{{ROUTED}}</td>
+        <td style="padding:8px;border:1px solid #ddd;color:purple;">{{CLOSED}}</td>
+        <td style="padding:8px;border:1px solid #ddd;color:red;">{{SEV1}}</td>
+      </tr>
+    </table>
+
+  BUG_TABLE_ROWS (state distribution) row template:
+    <tr style="{{ROW_STYLE}}">
+      <td style="padding:6px;border:1px solid #ddd;">{{STATE}}</td>
+      <td style="padding:6px;border:1px solid #ddd;text-align:center;">{{COUNT}}</td>
+      <td style="padding:6px;border:1px solid #ddd;">{{DETAILS}}</td>
+    </tr>
+  ROW_STYLE: alternating background-color:#f0f0f0;
+
+  AREA_PATH_BREAKDOWN row template:
+    <tr style="{{ROW_STYLE}}">
+      <td style="padding:6px;border:1px solid #ddd;">{{AREA_GROUP}}</td>
+      <td style="padding:6px;border:1px solid #ddd;text-align:center;">{{COUNT}}</td>
+      <td style="padding:6px;border:1px solid #ddd;text-align:center;">{{SHARE_PCT}}</td>
+    </tr>
+  ROW_STYLE: alternating background-color:#f0f0f0;
+  Sort: by share descending.
+
+  SEV1_ROWS row template:
+    <tr style="{{ROW_STYLE}}">
+      <td style="padding:6px;border:1px solid #ddd;"><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/{{ID}}">{{ID}}</a></td>
+      <td style="padding:6px;border:1px solid #ddd;">{{TITLE}}</td>
+      <td style="padding:6px;border:1px solid #ddd;">{{STATE}}</td>
+      <td style="padding:6px;border:1px solid #ddd;">{{OWNER}}</td>
+      <td style="padding:6px;border:1px solid #ddd;">{{AUTOPILOT_TAG}}</td>
+    </tr>
+  ROW_STYLE: alternating background-color:#fff0f0;
+
+  CLOSED_ROWS row template:
+    <tr style="{{ROW_STYLE}}">
+      <td style="padding:6px;border:1px solid #ddd;"><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/{{ID}}">{{ID}}</a></td>
+      <td style="padding:6px;border:1px solid #ddd;">{{TITLE}}</td>
+      <td style="padding:6px;border:1px solid #ddd;">{{REASON_STYLED}}</td>
+      <td style="padding:6px;border:1px solid #ddd;">{{OWNER}}</td>
+    </tr>
+  ROW_STYLE: alternating background-color:#f0f0f0;
+  REASON_STYLED: <span style="color:green;">Verified</span> or <span style="color:gray;">Rejected</span> / <span style="color:gray;">Duplicate</span>
+-->
+<p><a href="https://domoreexp.visualstudio.com/MSTeams/_queries/query/cf42325a-4ac0-4420-9d0e-c460ff45f5c2/">View Full Query in ADO</a></p>
+<hr/>
+<h3>Summary</h3>
+{{SUMMARY_STATS}}
+<h3>State Distribution</h3>
+<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;width:100%;font-size:13px;">
+  <tr style="background-color:#1a1a2e;color:white;">
+    <th style="padding:8px;border:1px solid #ddd;">State</th>
+    <th style="padding:8px;border:1px solid #ddd;">Count</th>
+    <th style="padding:8px;border:1px solid #ddd;">Details</th>
+  </tr>
+  {{BUG_TABLE_ROWS}}
+</table>
+<h3>Top Area Paths</h3>
+<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;width:100%;font-size:13px;">
+  <tr style="background-color:#1a1a2e;color:white;">
+    <th style="padding:8px;border:1px solid #ddd;">Area Group</th>
+    <th style="padding:8px;border:1px solid #ddd;">Count</th>
+    <th style="padding:8px;border:1px solid #ddd;">Share %</th>
+  </tr>
+  {{AREA_PATH_BREAKDOWN}}
+</table>
+<h3>Key Insights</h3>
+<table border="1" cellpadding="10" cellspacing="0" style="border-collapse:collapse;width:100%;font-size:13px;">
+  <tr>
+    <td style="padding:10px;border:1px solid #ddd;background-color:#f0fff0;vertical-align:top;width:50%;">
+      <b>[+] What Bug-AutoPilot Did Well</b><br/>
+      {{KEY_INSIGHTS_POSITIVE}}
+    </td>
+    <td style="padding:10px;border:1px solid #ddd;background-color:#fff8f0;vertical-align:top;width:50%;">
+      <b>[!] Areas of Focus</b><br/>
+      {{KEY_INSIGHTS_FOCUS}}
+    </td>
+  </tr>
+</table>
+<h3>Sev1 Critical Bugs ({{SEV1_COUNT}})</h3>
+<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;width:100%;font-size:13px;">
+  <tr style="background-color:#4a0000;color:white;">
+    <th style="padding:8px;border:1px solid #ddd;">ID</th>
+    <th style="padding:8px;border:1px solid #ddd;">Title</th>
+    <th style="padding:8px;border:1px solid #ddd;">State</th>
+    <th style="padding:8px;border:1px solid #ddd;">Owner</th>
+    <th style="padding:8px;border:1px solid #ddd;">Autopilot</th>
+  </tr>
+  {{SEV1_ROWS}}
+</table>
+<h3>Recently Closed Bugs ({{CLOSED_COUNT}})</h3>
+<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;width:100%;font-size:13px;">
+  <tr style="background-color:#1a1a2e;color:white;">
+    <th style="padding:8px;border:1px solid #ddd;">ID</th>
+    <th style="padding:8px;border:1px solid #ddd;">Title</th>
+    <th style="padding:8px;border:1px solid #ddd;">Reason</th>
+    <th style="padding:8px;border:1px solid #ddd;">Owner</th>
+  </tr>
+  {{CLOSED_ROWS}}
+</table>
+<br/>
+<p style="color:gray;font-size:12px;">{{VO_SUBTITLE}}</p>
+<p style="color:gray;font-size:12px;">Generated by Bug-AutoPilot Report -- {{DATE}} -- Query covers bugs changed in last 180 days tagged AutopilotDone or AutopilotRouted</p>
+<br/>
+<p>CC: <at id="0">Madhu Sudan</at> <at id="1">Naveen Shrivastava</at> <at id="2">Josh Xu</at> <at id="3">Poorva Agrawal</at> <at id="4">Karthika Reddy S</at> <at id="5">Priyanka Prakash</at> <at id="6">Pritesh Kanani</at></p>

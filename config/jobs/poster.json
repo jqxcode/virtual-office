@@ -21,8 +21,8 @@
       "saveOutput": false,
       "description": "Queries ADO Bug-AutoPilot Triaged items and posts formatted summary to Teams Bug-Autopilot channel"
     },
-    "BA-Perf-Analysis-posting": {
-      "prompt": "IMPORTANT: Before generating any report, read and follow ALL rules in Q:/src/personal_projects/virtual-office/config/report-rules.md. Run the BA-Perf-Analysis-posting job. Read the latest hang-scout daily report from Q:/src/personal_projects/virtual-office/output/hang-scout/daily-report-latest.html. Extract the Bug Autopilot Performance Analysis section. If no report exists for today or no BA perf section found, output 'No BA perf data for today.' and exit. Otherwise, build a Teams message using the fixed template at Q:/src/personal_projects/virtual-office/templates/poster-ba-perf-analysis.html. Post to Teams Test Autopilot channel (channel ID in your agent definition). CC Josh Xu only. Save payload to Q:/src/tmp/poster-ba-perf.json before posting.",
+    "BAP-Perf-Analysis-posting": {
+      "prompt": "IMPORTANT: Before generating any report, read and follow ALL rules in Q:/src/personal_projects/virtual-office/config/report-rules.md. Run the BAP-Perf-Analysis-posting job. Read the latest hang-scout daily report from Q:/src/personal_projects/virtual-office/output/hang-scout/daily-report-latest.html. Extract the Bug Autopilot Performance Analysis section. If no report exists for today or no BA perf section found, output 'No BA perf data for today.' and exit. Otherwise, build a Teams message using the fixed template at Q:/src/personal_projects/virtual-office/templates/poster-ba-perf-analysis.html. Post to Teams Test Autopilot channel (channel ID in your agent definition). CC Josh Xu only. Save payload to Q:/src/tmp/poster-ba-perf.json before posting.",
       "maxRuns": 0,
       "enabled": true,
       "saveOutput": false,
