@@ -1,7 +1,7 @@
 {
   "schedules": [
     {
-      "agent": "checker",
+      "agent": "auditor",
       "job": "TODO-sprint-progress",
       "cron": "0 7 * * 1-5",
       "description": "Sprint progress report weekday mornings at 7am"
@@ -49,7 +49,7 @@
       "description": "Open PR maintenance (merge conflicts + review comments) hourly at :03"
     },
     {
-      "agent": "checker",
+      "agent": "auditor",
       "job": "teams-posting-audit",
       "cron": "0 6 * * 1",
       "description": "Teams posting permission audit every Monday at 6am"
@@ -67,13 +67,13 @@
       "description": "Gmail scan all mailboxes at 7am daily"
     },
     {
-      "agent": "checker",
+      "agent": "auditor",
       "job": "consolidate-agent-memories",
       "cron": "0 3 * * *",
       "description": "Memory consolidation and report at 3am daily"
     },
     {
-      "agent": "checker",
+      "agent": "auditor",
       "job": "YTD-OOF-Summary",
       "cron": "0 6 L * *",
       "description": "YTD OOF summary report on the last day of each month at 6am"
@@ -109,7 +109,7 @@
       "description": "Daily 5W incident report at midnight"
     },
     {
-      "agent": "checker",
+      "agent": "auditor",
       "job": "resolve-bugs-cleanup",
       "cron": "30 11 * * 1",
       "description": "Auto-close stale Resolved bugs every Monday at 11:30am"

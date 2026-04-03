@@ -11,7 +11,7 @@ var AGENT_COLORS = {
   "scrum-master": "#3b82f6",   // blue
   "bug-killer": "#ef4444",     // red
   "emailer": "#22c55e",        // green
-  "checker": "#a855f7",        // purple
+  "auditor": "#a855f7",        // purple
   "poster": "#f59e0b",         // amber
   "hang-scout": "#06b6d4"      // cyan
 };
@@ -19,7 +19,8 @@ var AGENT_COLORS = {
 // --- Legacy agent name mapping ---
 // Maps old/renamed agent names to their current canonical names
 var LEGACY_AGENT_NAMES = {
-  "memo-checker": "checker"
+  "memo-checker": "auditor",
+  "checker": "auditor"
 };
 
 function canonicalAgentName(name) {
@@ -85,6 +86,12 @@ async function fetchErrors() {
 
 async function fetchSchedules() {
   var response = await fetch(CONFIG.API_BASE + "/api/schedules", { cache: "no-store" });
+  if (!response.ok) throw new Error("HTTP " + response.status);
+  return await response.json();
+}
+
+async function fetchReports() {
+  var response = await fetch(CONFIG.API_BASE + "/api/reports", { cache: "no-store" });
   if (!response.ok) throw new Error("HTTP " + response.status);
   return await response.json();
 }
@@ -2367,6 +2374,153 @@ function renderQueueCards() {
   if (totalBadge) totalBadge.textContent = totalQueueDepth;
 }
 
+// --- Recent Reports ---
+
+var reportsData = null;
+var reportsRows = [];
+var reportsSortCol = 2; // default sort by date
+var reportsSortAsc = false; // newest first
+
+function formatFileSize(bytes) {
+  if (bytes < 1024) return bytes + " B";
+  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + " KB";
+  return (bytes / 1048576).toFixed(1) + " MB";
+}
+
+function flattenReports(data) {
+  var rows = [];
+  if (!data || !data.agents) return rows;
+  Object.keys(data.agents).forEach(function(agentName) {
+    var jobs = data.agents[agentName];
+    Object.keys(jobs).forEach(function(jobName) {
+      jobs[jobName].forEach(function(file) {
+        rows.push({
+          agent: agentName,
+          job: jobName,
+          name: file.name,
+          date: file.date,
+          size: file.size,
+          url: file.url || file.path
+        });
+      });
+    });
+  });
+  return rows;
+}
+
+function populateReportsAgentFilter(rows) {
+  var sel = document.getElementById("reports-agent-filter");
+  if (!sel) return;
+  var agents = {};
+  rows.forEach(function(r) { agents[r.agent] = true; });
+  var current = sel.value;
+  sel.innerHTML = '<option value="">All Agents</option>';
+  Object.keys(agents).sort().forEach(function(a) {
+    var opt = document.createElement("option");
+    opt.value = a;
+    opt.textContent = a;
+    sel.appendChild(opt);
+  });
+  sel.value = current;
+}
+
+function getFilteredSortedReports() {
+  var search = (document.getElementById("reports-search") || {}).value || "";
+  search = search.toLowerCase();
+  var agentFilter = (document.getElementById("reports-agent-filter") || {}).value || "";
+
+  var filtered = reportsRows.filter(function(r) {
+    if (agentFilter && r.agent !== agentFilter) return false;
+    if (search && r.name.toLowerCase().indexOf(search) === -1 &&
+        r.job.toLowerCase().indexOf(search) === -1 &&
+        r.agent.toLowerCase().indexOf(search) === -1) return false;
+    return true;
+  });
+
+  var col = reportsSortCol;
+  var asc = reportsSortAsc;
+  var dir = asc ? 1 : -1;
+  filtered.sort(function(a, b) {
+    var av, bv;
+    if (col === 0) { av = a.agent; bv = b.agent; }
+    else if (col === 1) { av = a.job; bv = b.job; }
+    else if (col === 2) { av = a.date; bv = b.date; }
+    else if (col === 3) { av = a.name; bv = b.name; }
+    else if (col === 4) { av = a.size; bv = b.size; return (av - bv) * dir; }
+    else { av = a.agent; bv = b.agent; }
+    return av < bv ? -dir : av > bv ? dir : 0;
+  });
+
+  return filtered;
+}
+
+function renderReportsTable() {
+  var container = document.getElementById("reports-tree");
+  if (!container) return;
+
+  var filtered = getFilteredSortedReports();
+  var badge = document.getElementById("reports-badge");
+  if (badge) badge.textContent = filtered.length + "/" + reportsRows.length;
+
+  if (filtered.length === 0) {
+    container.innerHTML = '<div class="placeholder-message">No reports found</div>';
+    return;
+  }
+
+  var cols = ["Agent", "Job", "Date", "Report", "Size"];
+  var html = '<table id="reports-table"><thead><tr>';
+  cols.forEach(function(c, i) {
+    var cls = "";
+    if (i === reportsSortCol) cls = reportsSortAsc ? " class=\"sort-asc\"" : " class=\"sort-desc\"";
+    html += "<th data-col=\"" + i + "\"" + cls + ">" + c + "</th>";
+  });
+  html += "</tr></thead><tbody>";
+
+  filtered.forEach(function(r) {
+    var color = getAgentColor(r.agent);
+    html += "<tr>";
+    html += '<td><span class="report-agent-pill" style="background:' + color + '">' + r.agent + "</span></td>";
+    html += "<td>" + r.job + "</td>";
+    html += "<td>" + r.date + "</td>";
+    html += '<td><a class="report-file-link" href="' + r.url + '" target="_blank">' + r.name + "</a></td>";
+    html += '<td class="num">' + formatFileSize(r.size) + "</td>";
+    html += "</tr>";
+  });
+
+  html += "</tbody></table>";
+  container.innerHTML = html;
+
+  // Attach sort handlers
+  var ths = container.querySelectorAll("#reports-table th");
+  ths.forEach(function(th) {
+    th.addEventListener("click", function() {
+      var col = parseInt(th.getAttribute("data-col"));
+      if (col === reportsSortCol) {
+        reportsSortAsc = !reportsSortAsc;
+      } else {
+        reportsSortCol = col;
+        reportsSortAsc = col === 4 ? false : true; // size defaults desc
+      }
+      renderReportsTable();
+    });
+  });
+}
+
+function renderReportsTree(data) {
+  reportsData = data;
+  reportsRows = flattenReports(data);
+  populateReportsAgentFilter(reportsRows);
+  renderReportsTable();
+}
+
+// Attach filter event listeners once DOM is ready
+document.addEventListener("DOMContentLoaded", function() {
+  var searchEl = document.getElementById("reports-search");
+  var filterEl = document.getElementById("reports-agent-filter");
+  if (searchEl) searchEl.addEventListener("input", renderReportsTable);
+  if (filterEl) filterEl.addEventListener("change", renderReportsTable);
+});
+
 // --- Polling ---
 
 async function poll() {
@@ -2431,6 +2585,16 @@ async function poll() {
       renderQueueCards();
     } catch (e) {
       console.warn("Schedules fetch failed:", e.message);
+    }
+  }
+
+  // Refresh reports on agents tab
+  if (activeTopTab === "agents") {
+    try {
+      var reports = await fetchReports();
+      renderReportsTree(reports);
+    } catch (e) {
+      console.warn("Reports fetch failed:", e.message);
     }
   }
 }

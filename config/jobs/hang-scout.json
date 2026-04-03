@@ -23,7 +23,7 @@
             "hangThresholdMinutes": 30,
             "killThresholdMinutes": 60
           },
-          "checker": {
+          "auditor": {
             "hangThresholdMinutes": 20,
             "killThresholdMinutes": 30
           },

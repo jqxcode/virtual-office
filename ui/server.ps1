@@ -554,6 +554,50 @@ try {
                     }
                 }
             }
+            elseif ($urlPath -eq "/api/reports") {
+                # Scan output/ for HTML report files, grouped by agent -> job
+                $OutputDir = Join-Path (Split-Path $UiDir -Parent) "output"
+                $result = @{}
+                if (Test-Path $OutputDir) {
+                    $htmlFiles = Get-ChildItem -Path $OutputDir -Filter "*.html" -Recurse -File -ErrorAction SilentlyContinue
+                    foreach ($f in $htmlFiles) {
+                        # Skip *-latest.html symlinks/copies
+                        if ($f.Name -match '-latest\.html$') { continue }
+                        # Determine agent and job from path
+                        $relPath = $f.FullName.Substring($OutputDir.Length + 1).Replace('\', '/')
+                        $parts = $relPath -split '/'
+                        if ($parts.Count -ge 2) {
+                            $agentName = $parts[0]
+                            $jobBase = $f.BaseName -replace '-\d{8}.*$', '' -replace '-\d{4}-\d{2}-\d{2}.*$', ''
+                        } else {
+                            $agentName = "root"
+                            $jobBase = $f.BaseName -replace '-\d{8}.*$', '' -replace '-\d{4}-\d{2}-\d{2}.*$', ''
+                        }
+                        if (-not $result.ContainsKey($agentName)) { $result[$agentName] = @{} }
+                        if (-not $result[$agentName].ContainsKey($jobBase)) { $result[$agentName][$jobBase] = @() }
+                        $filePath = $f.FullName.Replace('\', '/')
+                        $result[$agentName][$jobBase] += [PSCustomObject]@{
+                            name = $f.Name
+                            path = "file:///$filePath"
+                            url  = "/api/output/" + $relPath
+                            date = $f.LastWriteTime.ToString("yyyy-MM-dd")
+                            size = $f.Length
+                        }
+                    }
+                }
+                # Sort each job list by date desc and take top 5
+                $agentsObj = [PSCustomObject]@{}
+                foreach ($agentName in ($result.Keys | Sort-Object)) {
+                    $jobsObj = [PSCustomObject]@{}
+                    foreach ($jobName in ($result[$agentName].Keys | Sort-Object)) {
+                        $sorted = $result[$agentName][$jobName] | Sort-Object { $_.date } -Descending | Select-Object -First 5
+                        $jobsObj | Add-Member -NotePropertyName $jobName -NotePropertyValue @($sorted) -Force
+                    }
+                    $agentsObj | Add-Member -NotePropertyName $agentName -NotePropertyValue $jobsObj -Force
+                }
+                $response = [PSCustomObject]@{ agents = $agentsObj }
+                Send-TextResponse $context 200 "application/json" ($response | ConvertTo-Json -Depth 10)
+            }
             else {
                 # Serve static files from ui/
                 if ($urlPath -eq "/") {

@@ -25,11 +25,11 @@
       "group": "Other Agents",
       "portalUrl": "http://localhost:8402/"
     },
-    "checker": {
-      "displayName": "Checker",
+    "auditor": {
+      "displayName": "Auditor",
       "icon": "",
-      "agentFile": "~/.claude/agents/checker.md",
-      "description": "Consolidates memories, generates sprint progress reports, compares run results, and generates daily HTML reports",
+      "agentFile": "~/.claude/agents/auditor.md",
+      "description": "Consolidates memories, generates sprint progress reports, compares run results, audits permissions, and generates daily HTML reports",
       "staleLockTimeoutMinutes": 120,
       "group": "Other Agents"
     },
@@ -56,6 +56,14 @@
       "description": "Tracks ideas, visions, and wish-list items - inventories dreams, plans next steps, and resumes explorations",
       "staleLockTimeoutMinutes": 30,
       "group": "Other Agents"
+    },
+    "researcher": {
+      "displayName": "Researcher",
+      "icon": "",
+      "agentFile": "~/.claude/agents/researcher.md",
+      "description": "Deep research agent - combines log analysis, code tracing, Kusto telemetry, Edge CDP scraping, Graph API lookups, ADO operations, and Agency Teams messaging to investigate complex issues end-to-end",
+      "staleLockTimeoutMinutes": 180,
+      "group": "Work Agents"
     }
   }
 }

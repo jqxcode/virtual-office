@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Virtual Office</title>
-  <link rel="stylesheet" href="styles.css?v=7">
+  <link rel="stylesheet" href="styles.css?v=8">
 </head>
 <body>
   <header class="header">
@@ -62,6 +62,19 @@
       <div id="agent-grid" class="agent-grid" style="display:none"></div>
       <!-- Keep activity-feed element for backward compat but hidden -->
       <div id="activity-feed" style="display:none"></div>
+
+      <!-- Recent Reports -->
+      <div class="section-header" style="margin-top:1.5rem">
+        <span>Recent Reports</span>
+        <span class="section-badge" id="reports-badge">--</span>
+      </div>
+      <div id="reports-filter-bar" style="display:flex;gap:8px;margin-bottom:8px;align-items:center;">
+        <input type="text" id="reports-search" placeholder="Filter by name..." style="flex:1;padding:6px 10px;background:var(--card);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;outline:none;">
+        <select id="reports-agent-filter" style="padding:6px 10px;background:var(--card);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;outline:none;">
+          <option value="">All Agents</option>
+        </select>
+      </div>
+      <div id="reports-tree"></div>
     </section>
 
     <!-- Event Log View -->
@@ -138,6 +151,6 @@
     </section>
   </main>
 
-  <script src="app.js?v=7"></script>
+  <script src="app.js?v=8"></script>
 </body>
 </html>

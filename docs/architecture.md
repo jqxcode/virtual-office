@@ -76,7 +76,7 @@ which requires administrator privileges. See design-decisions.md for rationale.
 | bug-killer | Bug Killer | Work Agents | Scans repos for open issues, creates fix PRs, maintains open PRs | 180 |
 | poster | Poster | Work Agents | Posts daily Bug-AutoPilot summary to Teams channel | 30 |
 | emailer | Emailer | Other Agents | Manages Gmail inboxes -- scan, classify, digest (portal: localhost:8402) | 60 |
-| checker | Checker | Other Agents | Memory consolidation, sprint progress, compare-runs, OOF summary, report audit | 120 |
+| auditor | Checker | Other Agents | Memory consolidation, sprint progress, compare-runs, OOF summary, report audit | 120 |
 | hang-scout | Hang Scout | Other Agents | Hung job detection, py-spy diagnosis, daily 5W incident report | 15 |
 
 ### Agent Rename History
@@ -160,7 +160,7 @@ hangDetection:
     scrum-master:  hang=60  kill=120
     bug-killer:    hang=90  kill=180
     emailer:       hang=30  kill=60
-    checker:       hang=20  kill=30
+    auditor:       hang=20  kill=30
     poster:        hang=15  kill=30
 ```
 

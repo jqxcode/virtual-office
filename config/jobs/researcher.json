@@ -7,6 +7,13 @@
       "inputPrompt": "Enter ICM number and brief description (e.g., '756347322 - BDO meeting notes 403')",
       "schedule": "manual"
     },
+    "tool-Edge-Browser": {
+      "displayName": "Edge Browser Tab Tool",
+      "prompt": "Use the Edge Browser tab tool to query or manage open browser tabs. The tool is at Q:\\src\\personal_projects\\edge-tab-exporter\\get-tabs.py. Full docs: Q:/src/local_skills/data_tools/tool-Edge-Browser.md. Available commands:\n\n- List all tabs: python get-tabs.py --summary\n- List URLs only: python get-tabs.py --urls\n- Filter by group: python get-tabs.py --group <name>\n- Full JSON: python get-tabs.py\n- Close duplicate tabs: python get-tabs.py --close-dupes\n- Close all tabs in a group: python get-tabs.py --close-group <name>\n- Check if URL is open: python get-tabs.py --is-open <url>\n\nRequires: Edge with --remote-debugging-port=9222 + Tab Exporter extension loaded from Q:\\src\\personal_projects\\edge-tab-exporter\\.\n\nExecute the user's request using the appropriate command. Report what was found or what action was taken.",
+      "requiresInput": true,
+      "inputPrompt": "What do you want to do? (e.g., 'list all tabs', 'close dupes', 'close AAP group', 'check if url X is open')",
+      "schedule": "manual"
+    },
     "research-screenshot-with-TMP": {
       "displayName": "Research Screenshot with TMP",
       "prompt": "Investigate a UI element shown in a screenshot by tracing it back to its source code in TMP (teams-modular-packages) and finding the PR that introduced it. Follow this methodology: (1) Read the latest screenshot from //tsclient/C/Users/qitxu/Pictures/Screenshots/ (or use provided path). (2) Identify key UI text strings, labels, buttons, and layout patterns visible in the screenshot. (3) Search TMP i18n/localization files (survey.json, strings files under services-io-browser-i18n) for exact text matches. (4) If no exact match, try camelCase/PascalCase key variants, or search for conceptual terms describing the feature. (5) Once localization keys are found, grep TMP source (.ts/.tsx files) for those keys to find the component code that references them. (6) Use git blame on the component file to identify the commit that introduced the feature. (7) Extract the PR number from the merge commit message (format: 'Merged PR NNNNNN: ...'). (8) Look up the PR details and open it in Edge at https://domoreexp.visualstudio.com/Teamspace/_git/teams-modular-packages/pullrequest/<PR_ID>. (9) Report: code location (package/file/lines), localization key prefix, PR number, author, and merge date.",

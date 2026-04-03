@@ -44,6 +44,11 @@
   .rec { padding: 8px 12px; background: rgba(88,166,255,0.08); border-left: 3px solid var(--accent); border-radius: 0 6px 6px 0; margin-bottom: 8px; font-size: 12px; }
   .ba-bar { display: flex; height: 22px; border-radius: 4px; overflow: hidden; margin: 2px 0; }
   .ba-bar div { display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 600; color: #fff; min-width: 0; }
+  table.sortable th { cursor: pointer; user-select: none; position: relative; padding-right: 18px; }
+  table.sortable th:hover { color: var(--accent); }
+  table.sortable th::after { content: ''; position: absolute; right: 4px; top: 50%; transform: translateY(-50%); font-size: 10px; color: var(--muted); }
+  table.sortable th.sort-asc::after { content: ' ^'; }
+  table.sortable th.sort-desc::after { content: ' v'; }
 </style>
 </head>
 <body>
@@ -74,11 +79,11 @@
     <div class="lbl">Active Agents</div>
   </div>
   <div class="card">
-    <div class="num" style="color:#ffa726">{{STALE_LOCKS_7D}}</div>
-    <div class="lbl">Stale Locks (7d)</div>
+    <div class="num" style="color:{{HANGS_COLOR}}">{{HANGS_7D}}</div>
+    <div class="lbl">Hangs (7d)</div>
   </div>
   <div class="card">
-    <div class="num" style="color:{{HANGS_COLOR}}">{{HANGS_24H}}</div>
+    <div class="num" style="color:{{HANGS_24H_COLOR}}">{{HANGS_24H}}</div>
     <div class="lbl">Hangs (24h)</div>
   </div>
 </div>
@@ -96,8 +101,7 @@
     </div>
     <div>
       <div class="kv"><span class="k">Failure Rate</span><span class="v" style="color:{{FAILURE_RATE_COLOR}}">{{FAILURE_RATE}}</span></div>
-      <div class="kv"><span class="k">Stale Locks</span><span class="v" style="color:{{STALE_LOCKS_COLOR}}">{{STALE_LOCKS_DETAIL}}</span></div>
-      <div class="kv"><span class="k">Confirmed Hangs</span><span class="v" style="color:{{CONFIRMED_HANGS_COLOR}}">{{CONFIRMED_HANGS}}</span></div>
+      <div class="kv"><span class="k">Hangs (7d)</span><span class="v" style="color:{{HANGS_DETAIL_COLOR}}">{{HANGS_DETAIL}}</span></div>
       <div class="kv"><span class="k">Known Patterns</span><span class="v">{{KNOWN_PATTERNS}}</span></div>
       <div class="kv"><span class="k">Top Risk</span><span class="v" style="color:#ffa726">{{TOP_RISK}}</span></div>
     </div>
@@ -141,7 +145,7 @@
 <!-- Runtime Summary Table -->
 <div class="section">
   <h2>Runtime Summary by Job (7-day)</h2>
-  <table>
+  <table class="sortable" id="runtimeTable">
     <thead>
       <tr><th>Agent</th><th>Job</th><th>Runs (7d)</th><th>Runs (24h)</th><th>Status</th><th>Avg</th><th>Min</th><th>Max</th><th>Avg (24h)</th><th>Trend</th></tr>
     </thead>
@@ -206,6 +210,8 @@ new Chart(ctx1, {
 });
 
 // Grouped bar chart
+// BAR_LABELS must use FULL agent and job names -- no abbreviations.
+// Use arrays for 2-line labels, e.g. ["bug-killer", "open-pr-maintenance"] instead of "bk/open-pr-maint".
 const ctx2 = document.getElementById('barChart').getContext('2d');
 new Chart(ctx2, {
   type: 'bar',
@@ -221,10 +227,38 @@ new Chart(ctx2, {
     maintainAspectRatio: false,
     plugins: { legend: { labels: { color: '#8b949e' } } },
     scales: {
-      x: { ticks: { color: '#8b949e', maxRotation: 45 }, grid: { color: '#30363d' } },
+      x: { ticks: { color: '#8b949e', maxRotation: 45, autoSkip: false }, grid: { color: '#30363d' } },
       y: { title: { display: true, text: 'Duration (min)', color: '#8b949e' }, ticks: { color: '#8b949e' }, grid: { color: '#30363d' } }
     }
   }
+});
+</script>
+
+<script>
+// Sortable table columns
+document.querySelectorAll('table.sortable').forEach(table => {
+  const headers = table.querySelectorAll('th');
+  headers.forEach((th, colIdx) => {
+    th.addEventListener('click', () => {
+      const tbody = table.querySelector('tbody');
+      const rows = Array.from(tbody.querySelectorAll('tr'));
+      const isAsc = th.classList.contains('sort-asc');
+      headers.forEach(h => h.classList.remove('sort-asc', 'sort-desc'));
+      th.classList.add(isAsc ? 'sort-desc' : 'sort-asc');
+      const dir = isAsc ? -1 : 1;
+      rows.sort((a, b) => {
+        const aCell = a.cells[colIdx];
+        const bCell = b.cells[colIdx];
+        const aText = (aCell.textContent || '').trim();
+        const bText = (bCell.textContent || '').trim();
+        const aNum = parseFloat(aText.replace(/[^0-9.\-]/g, ''));
+        const bNum = parseFloat(bText.replace(/[^0-9.\-]/g, ''));
+        if (!isNaN(aNum) && !isNaN(bNum)) return (aNum - bNum) * dir;
+        return aText.localeCompare(bText) * dir;
+      });
+      rows.forEach(r => tbody.appendChild(r));
+    });
+  });
 });
 </script>
 

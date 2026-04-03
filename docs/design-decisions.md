@@ -31,7 +31,7 @@
 
 **Why**: As the job count grew, short generic names became ambiguous. `detect` could mean anything; `detect-hang` is self-documenting. `bug-autopilot` was ambiguous once `bug-autopilot-notes` was added for Meeting Notes. `consolidate` did not indicate the scope (memories vs. reports vs. data).
 
-## Agent Rename: memo-checker -> checker
+## Agent Rename: memo-checker -> checker -> auditor
 
 **Decision**: Renamed `memo-checker` to `checker` with displayName "Checker".
 
@@ -52,7 +52,7 @@ The two-tier threshold (hang vs. kill) provides graduated response:
 scrum-master:  hang=60min   kill=120min
 bug-killer:    hang=90min   kill=180min
 emailer:       hang=30min   kill=60min
-checker:       hang=20min   kill=30min
+auditor:       hang=20min   kill=30min
 poster:        hang=15min   kill=30min
 hang-scout:    excluded (cannot detect its own hangs)
 ```

@@ -1,0 +1,41 @@
+{
+  "jobs": {
+    "consolidate-agent-memories": {
+      "prompt": "IMPORTANT: Before generating any report, read and follow ALL rules in Q:/src/personal_projects/virtual-office/config/report-rules.md. Run memory consolidation. Working directory is Q:/src. Scan all sub-project memory dirs under C:/Users/qitxu/.claude/projects/Q--src*/memory/, compare against root memory at C:/Users/qitxu/.claude/projects/Q--src/memory/, copy new/updated files with ext_ prefix, remove duplicates, update MEMORY.md index (keep under 200 lines), run permission audit, root hygiene, stale file cleanup, and report template audit (scan all agent .md files under C:/Users/qitxu/.claude/agents/ and job configs under Q:/src/personal_projects/virtual-office/config/jobs/*.json to verify HTML reports have VO subtitle, dark theme, Segoe UI, and are self-contained). If no meaningful work was done (no new memories found, no duplicates removed, no conflicts detected, and no stale files cleaned), do NOT generate an HTML report -- just output 'Memory consolidation: no changes found.' and exit. Only generate a full report when at least one memory was added, updated, deduplicated, or cleaned up. You MUST use the fixed template at Q:/src/personal_projects/virtual-office/templates/auditor-memory-consolidation.html. Read the template file, then replace all {{PLACEHOLDER}} values with actual data. Replace {{VO_SUBTITLE}} with: Agent: Auditor | Job: consolidate-agent-memories | Start: <PST timestamp when job started> | Complete: <PST timestamp when report is generated>. Save the report to Q:/src/local_skills/session_management/memory-report-YYYYMMDD.html. Open the report in Edge when done.",
+      "maxRuns": 0,
+      "enabled": true,
+      "saveOutput": false,
+      "description": "Consolidates all sub-project memories into root, deduplicates, generates HTML report"
+    },
+    "TODO-sprint-progress": {
+      "prompt": "IMPORTANT: Before generating any report, read and follow ALL rules in Q:/src/personal_projects/virtual-office/config/report-rules.md. Generate a sprint progress update now. You MUST use the fixed template at Q:/src/personal_projects/virtual-office/templates/scrum-master-sprint-progress.html. Read the template file, then replace all {{PLACEHOLDER}} values with actual data from ADO. Replace {{VO_SUBTITLE}} with: Agent: Auditor | Job: TODO-sprint-progress | Start: <PST timestamp when job started> | Complete: <PST timestamp when report is generated>. Save the report to Q:/src/personal_projects/virtual-office/output/sprint-progress-YYYYMMDD.html (using today's date). Also save a copy to Q:/src/personal_projects/virtual-office/output/sprint-progress-latest.html. Open the report in Edge after saving.",
+      "maxRuns": 0,
+      "enabled": true,
+      "saveOutput": false,
+      "description": "Queries ADO work items and meeting notes to generate sprint progress report"
+    },
+    "YTD-OOF-Summary": {
+      "prompt": "IMPORTANT: Before generating any report, read and follow ALL rules in Q:/src/personal_projects/virtual-office/config/report-rules.md. Run the YTD-OOF-Summary job. Query both Teams channels (Absence and OOF/WFH/Late) via WorkIQ for all messages from Dec 1 of previous year through today. Filter for direct reports only, classify each absence as full-day OOF or BRB/partial, count only current-year working days. You MUST use the fixed template at Q:/src/personal_projects/virtual-office/templates/auditor-ytd-oof-summary.html. Read the template file, then replace all {{PLACEHOLDER}} values with actual data. Replace {{VO_SUBTITLE}} with: Agent: Auditor | Job: YTD-OOF-Summary | Start: <PST timestamp when job started> | Complete: <PST timestamp when report is generated>. Open in Edge when done.",
+      "maxRuns": 0,
+      "enabled": true,
+      "saveOutput": false,
+      "description": "Monthly YTD OOF summary for direct reports from Teams channels"
+    },
+    "teams-posting-audit": {
+      "prompt": "IMPORTANT: Read Q:/src/personal_projects/virtual-office/config/report-rules.md Rule #8 and Rule #9 first. Run a Teams posting permission audit across all VO agent definitions and job configs. Scan: (1) All agent .md files in C:/Users/qitxu/.claude/agents/*.md -- search for keywords: Teams, channel, post, message, Graph API, graph.microsoft.com, chatMessage, @mention, agency copilot, send, notify. (2) All job configs in Q:/src/personal_projects/virtual-office/config/jobs/*.json -- same keywords. (3) All runner scripts in Q:/src/personal_projects/virtual-office/runner/ -- same keywords. For EACH match found, classify as: AUTHORIZED (poster agent job with explicit channel ID + fixed template in templates/), READ-ONLY (Graph API GET for data ingestion, not posting), DEPRECATED (has explicit deprecation note), or VIOLATION (unauthorized posting instruction -- any agent other than poster that posts to Teams, any posting without explicit channel ID, any posting without a fixed template). File a GitHub issue in jqxcode/virtual-office for each VIOLATION found, with the file path, line number, exact text, and recommended fix. If no violations found, output 'Teams posting audit: all clear.' and exit. Do NOT generate an HTML report for this job.",
+      "maxRuns": 0,
+      "enabled": true,
+      "saveOutput": false,
+      "description": "Weekly audit of all agent defs and job configs for unauthorized Teams posting instructions"
+    },
+    "resolve-bugs-cleanup": {
+      "prompt": "IMPORTANT: Before generating any report, read and follow ALL rules in Q:/src/personal_projects/virtual-office/config/report-rules.md. Run the resolve-bugs-cleanup job in dry-run mode. Query ADO for all Resolved bugs assigned to qitxu@microsoft.com or under Meeting Join (all sub-areas) / Meeting Notes area paths. Validate each bug: resolved for at least 1 day, linked PRs are merged, no comments in last 3 days, not blocked. Close validated bugs automatically (auto-close mode). Use wit_update_work_item to set System.State to Closed and add a comment: Auto-closed by Virtual Office Auditor agent. You MUST use the fixed template at Q:/src/personal_projects/virtual-office/templates/auditor-resolve-bugs-cleanup.html. Read the template file, then replace all {{PLACEHOLDER}} values with actual data. Replace {{VO_SUBTITLE}} with: Agent: Auditor | Job: resolve-bugs-cleanup | Start: <PST timestamp when job started> | Complete: <PST timestamp when report is generated>. Save report to Q:/src/personal_projects/virtual-office/output/resolve-bugs-cleanup-YYYYMMDD.html. Open in Edge when done.",
+      "maxRuns": 0,
+      "enabled": true,
+      "saveOutput": false,
+      "mode": "auto-close",
+      "stalenessThresholdDays": 1,
+      "description": "Auto-close stale Resolved bugs assigned to me or in my area paths"
+    }
+  }
+}
