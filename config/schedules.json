@@ -49,6 +49,12 @@
       "description": "Open PR maintenance (merge conflicts + review comments) hourly at :03"
     },
     {
+      "agent": "checker",
+      "job": "teams-posting-audit",
+      "cron": "0 6 * * 1",
+      "description": "Teams posting permission audit every Monday at 6am"
+    },
+    {
       "agent": "bug-killer",
       "job": "daily-summary",
       "cron": "30 1 * * *",

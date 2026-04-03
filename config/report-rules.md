@@ -34,3 +34,13 @@ Use only ASCII characters in report content. No emojis, em dashes, arrows, or un
 ## 8. No Teams Posting
 
 NEVER post to Teams channels or send Teams messages unless the job prompt EXPLICITLY instructs you to post to a specific channel. Generating an HTML report is NOT the same as posting it. Only the poster agent has Teams posting authority. Violation of this rule is a critical failure.
+
+## 9. Teams Activity Audit Trail
+
+Before ANY Teams Graph API call (POST message, create channel, DELETE message), you MUST append a JSONL entry to the monthly audit log at `Q:/src/personal_projects/virtual-office/output/audit/YYYY-MM.jsonl` with this format:
+
+```json
+{"action":"teams_post","agent":"<agent>","job":"<job>","run_id":"<run_id>","timestamp":"<ISO8601-PST>","details":{"channel_id":"<channel_id>","channel_name":"<name>","message_subject":"<subject>","mentions":["<name1>","<name2>"],"http_status":<code>}}
+```
+
+For channel creation use `"action":"teams_channel_create"`. For message deletion use `"action":"teams_message_delete"`. Log AFTER the API call completes so `http_status` reflects the actual result. If the API call fails, still log it with the error status code.
