@@ -28,6 +28,13 @@
       "saveOutput": false,
       "description": "Weekly audit of all agent defs and job configs for unauthorized Teams posting instructions"
     },
+    "consolidate-Edge-reports": {
+      "prompt": "Consolidate Edge browser tabs by moving ungrouped report tabs into their corresponding tab groups, then close duplicates. Run these commands in sequence: python Q:/src/personal_projects/edge-tab-exporter/get-tabs.py --move-to-group AAP \"ado-autopilot/reports/\" && python Q:/src/personal_projects/edge-tab-exporter/get-tabs.py --move-to-group BAP \"bug-autopilot/reports/\" && python Q:/src/personal_projects/edge-tab-exporter/get-tabs.py --move-to-group BKiller \"bug-killer/\" && python Q:/src/personal_projects/edge-tab-exporter/get-tabs.py --move-to-group PR \"pr-maintenance-\" && python Q:/src/personal_projects/edge-tab-exporter/get-tabs.py --move-to-group Sprint \"sprint-progress-\" && python Q:/src/personal_projects/edge-tab-exporter/get-tabs.py --close-dupes. Report how many tabs were moved per group and how many duplicates were closed. If nothing was moved and no duplicates found, output 'Edge tab consolidation: no changes.' and exit. Do NOT generate an HTML report for this job.",
+      "maxRuns": 0,
+      "enabled": true,
+      "saveOutput": false,
+      "description": "Moves ungrouped Edge report tabs into AAP/BAP/BKiller/PR/Sprint groups and closes duplicates"
+    },
     "resolve-bugs-cleanup": {
       "prompt": "IMPORTANT: Before generating any report, read and follow ALL rules in Q:/src/personal_projects/virtual-office/config/report-rules.md. Run the resolve-bugs-cleanup job in dry-run mode. Query ADO for all Resolved bugs assigned to qitxu@microsoft.com or under Meeting Join (all sub-areas) / Meeting Notes area paths. Validate each bug: resolved for at least 1 day, linked PRs are merged, no comments in last 3 days, not blocked. Close validated bugs automatically (auto-close mode). Use wit_update_work_item to set System.State to Closed and add a comment: Auto-closed by Virtual Office Auditor agent. You MUST use the fixed template at Q:/src/personal_projects/virtual-office/templates/auditor-resolve-bugs-cleanup.html. Read the template file, then replace all {{PLACEHOLDER}} values with actual data. Replace {{VO_SUBTITLE}} with: Agent: Auditor | Job: resolve-bugs-cleanup | Start: <PST timestamp when job started> | Complete: <PST timestamp when report is generated>. Save report to Q:/src/personal_projects/virtual-office/output/resolve-bugs-cleanup-YYYYMMDD.html. Open in Edge when done.",
       "maxRuns": 0,

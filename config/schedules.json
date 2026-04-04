@@ -97,6 +97,12 @@
       "description": "Bug-AutoPilot daily summary post to Teams at 7:30am"
     },
     {
+      "agent": "auditor",
+      "job": "consolidate-Edge-reports",
+      "cron": "0 8 * * *",
+      "description": "Edge tab consolidation at 8am daily"
+    },
+    {
       "agent": "hang-scout",
       "job": "detect-hang",
       "cron": "45 * * * *",
