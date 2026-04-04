@@ -28,7 +28,7 @@
       "saveOutput": false,
       "description": "Weekly audit of all agent defs and job configs for unauthorized Teams posting instructions"
     },
-    "consolidate-Edge-reports": {
+    "TEMP-consolidate-Edge-reports": {
       "prompt": "Consolidate Edge browser tabs by running: python Q:/src/personal_projects/edge-tab-exporter/get-tabs.py --consolidate. This moves ungrouped report tabs into their corresponding groups (AAP, BAP, PR, BKiller, Sprint) with correct ordering and exclusions, creates groups if missing, and closes duplicates. Report how many tabs were moved per group and how many duplicates were closed. If nothing was moved and no duplicates found, output 'Edge tab consolidation: no changes.' and exit. Do NOT generate an HTML report for this job.",
       "maxRuns": 0,
       "enabled": true,

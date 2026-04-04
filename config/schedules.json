@@ -98,7 +98,7 @@
     },
     {
       "agent": "auditor",
-      "job": "consolidate-Edge-reports",
+      "job": "TEMP-consolidate-Edge-reports",
       "cron": "0 8 * * *",
       "description": "Edge tab consolidation at 8am daily"
     },
