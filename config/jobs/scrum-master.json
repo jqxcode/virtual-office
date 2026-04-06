@@ -1,28 +1,28 @@
 {
   "jobs": {
     "ado-status-update": {
-      "prompt": "Run ADO autopilot LIVE for both meeting-join and meeting-notes areas. Note the current time as the job start time. Steps: (1) cd Q:/src/hackathon/ado-autopilot/ (2) git pull to get latest code (3) Validate configs exist and are valid JSON (4) python src/main.py update-status --config configs/meeting-join.json --auto-approve (5) python src/main.py update-status --config configs/meeting-notes.json --auto-approve. This will generate reports AND write approved updates to ADO. Open both reports in Edge after completion.",
+      "prompt": "Run ADO autopilot LIVE for both meeting-join and meeting-notes areas. Note the current time as the job start time. Steps: (1) cd Q:/src/hackathon/ado-autopilot/ (2) git fetch origin main && git reset --hard origin/main to get latest code (never use git pull -- it creates merge commits on diverged branches) (3) Validate configs exist and are valid JSON (4) python src/main.py update-status --config configs/meeting-join.json --auto-approve (5) python src/main.py update-status --config configs/meeting-notes.json --auto-approve. This will generate reports AND write approved updates to ADO.",
       "maxRuns": 0,
       "enabled": true,
       "saveOutput": false,
       "description": "Runs ADO autopilot status tweet update (live) for Meeting Join and Meeting Notes areas"
     },
     "bug-autopilot-meeting-join": {
-      "prompt": "Run bug-autopilot LIVE for Meeting Join area bugs. Note the current time as the job start time. Steps: (1) cd Q:/src/hackathon/bug-autopilot/ (2) git pull to get latest code (3) Validate configs exist and are valid JSON (4) pip install -r requirements.txt --quiet (5) Run: powershell.exe -File bugautopilot.ps1 -Once (6) Open the report in Edge.",
+      "prompt": "Run bug-autopilot LIVE for Meeting Join area bugs. Note the current time as the job start time. Steps: (1) cd Q:/src/hackathon/bug-autopilot/ (2) git pull to get latest code (3) Validate configs exist and are valid JSON (4) pip install -r requirements.txt --quiet (5) Run: powershell.exe -File bugautopilot.ps1 -Once.",
       "maxRuns": 0,
       "enabled": true,
       "saveOutput": false,
       "description": "Runs bug-autopilot live for Meeting Join bugs"
     },
     "ado-burndown-update": {
-      "prompt": "Run ADO autopilot burndown LIVE for both meeting-join and meeting-notes areas. Note the current time as the job start time. Steps: (1) cd Q:/src/hackathon/ado-autopilot/ (2) git pull to get latest code (3) Validate configs exist and are valid JSON (4) python src/main.py update-burndown --config configs/meeting-join.json --auto-approve (5) python src/main.py update-burndown --config configs/meeting-notes.json --auto-approve. This will generate reports AND write approved burndown updates to ADO. Open both reports in Edge after completion.",
+      "prompt": "Run ADO autopilot burndown LIVE for both meeting-join and meeting-notes areas. Note the current time as the job start time. Steps: (1) cd Q:/src/hackathon/ado-autopilot/ (2) git fetch origin main && git reset --hard origin/main to get latest code (never use git pull -- it creates merge commits on diverged branches) (3) Validate configs exist and are valid JSON (4) python src/main.py update-burndown --config configs/meeting-join.json --auto-approve (5) python src/main.py update-burndown --config configs/meeting-notes.json --auto-approve. This will generate reports AND write approved burndown updates to ADO.",
       "maxRuns": 0,
       "enabled": true,
       "saveOutput": false,
       "description": "Runs ADO autopilot burndown update (live) for Meeting Join and Meeting Notes areas"
     },
     "bug-autopilot-notes": {
-      "prompt": "Run bug-autopilot LIVE for Meeting Notes area bugs. Note the current time as the job start time. Steps: (1) cd Q:/src/hackathon/bug-autopilot/ (2) git pull to get latest code (3) Validate configs exist and are valid JSON (4) pip install -r requirements.txt --quiet (5) Run: powershell.exe -File bugautopilot.ps1 -Config Q:/src/hackathon/bug-autopilot/configs/meeting-notes.json -Once (6) Open the report in Edge.",
+      "prompt": "Run bug-autopilot LIVE for Meeting Notes area bugs. Note the current time as the job start time. Steps: (1) cd Q:/src/hackathon/bug-autopilot/ (2) git pull to get latest code (3) Validate configs exist and are valid JSON (4) pip install -r requirements.txt --quiet (5) Run: powershell.exe -File bugautopilot.ps1 -Config Q:/src/hackathon/bug-autopilot/configs/meeting-notes.json -Once.",
       "maxRuns": 0,
       "enabled": true,
       "saveOutput": false,
