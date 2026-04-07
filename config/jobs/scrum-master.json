@@ -1,7 +1,7 @@
 {
   "jobs": {
     "ado-status-update": {
-      "prompt": "Run ADO autopilot LIVE for both meeting-join and meeting-notes areas. Note the current time as the job start time. Steps: (1) cd Q:/src/hackathon/ado-autopilot/ (2) git fetch origin main && git reset --hard origin/main to get latest code (never use git pull -- it creates merge commits on diverged branches) (3) Validate configs exist and are valid JSON (4) python src/main.py update-status --config configs/meeting-join.json --auto-approve (5) python src/main.py update-status --config configs/meeting-notes.json --auto-approve. This will generate reports AND write approved updates to ADO.",
+      "prompt": "Run ADO autopilot LIVE for both meeting-join and meeting-notes areas. Note the current time as the job start time. Steps: (1) cd Q:/src/hackathon/ado-autopilot/ (2) git fetch origin main && git reset --hard origin/main to get latest code (never use git pull -- it creates merge commits on diverged branches) (3) Validate configs exist and are valid JSON (4) python src/main.py update-status --config configs/meeting-join.json --auto-approve (5) python src/main.py update-status --config configs/meeting-notes.json --auto-approve. This will generate reports, write approved updates to ADO, and upload reports to SharePoint AAP Reports folder automatically. The share URL is saved to reports/latest-share-url.txt for the poster agent to pick up.",
       "maxRuns": 0,
       "enabled": true,
       "saveOutput": false,
