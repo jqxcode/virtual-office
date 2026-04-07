@@ -1798,3 +1798,737 @@ body {
   font-size: 0.75rem;
 }
 
+/* === Agents V2 Filter Bar === */
+.v2-filter-bar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.v2-filter-input {
+  flex: 1;
+  min-width: 120px;
+  padding: 6px 10px;
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  color: #e6edf3;
+  font-size: 12px;
+  outline: none;
+}
+
+.v2-filter-input:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
+}
+
+.v2-filter-select {
+  padding: 6px 10px;
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  color: #e6edf3;
+  font-size: 12px;
+  outline: none;
+  min-width: 120px;
+}
+
+.v2-filter-select:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
+}
+
+/* V2 reports table reuses same styles as #reports-table */
+#v2-reports-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+#v2-reports-table th {
+  text-align: left;
+  padding: 0.5rem 0.6rem;
+  border-bottom: 2px solid #30363d;
+  color: #8b949e;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  user-select: none;
+  position: relative;
+  white-space: nowrap;
+}
+#v2-reports-table th:hover { color: #3b82f6; }
+#v2-reports-table th.sort-asc::after { content: " ^"; font-size: 0.65rem; }
+#v2-reports-table th.sort-desc::after { content: " v"; font-size: 0.65rem; }
+#v2-reports-table td {
+  padding: 0.35rem 0.6rem;
+  border-bottom: 1px solid #30363d;
+  vertical-align: middle;
+}
+#v2-reports-table tr:last-child td { border-bottom: none; }
+#v2-reports-table tr:hover td { background: rgba(255,255,255,0.02); }
+#v2-reports-table .report-agent-pill {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.1rem 0.5rem;
+  border-radius: 9999px;
+  color: #fff;
+  display: inline-block;
+}
+#v2-reports-table .report-file-link {
+  color: #3b82f6;
+  text-decoration: none;
+}
+#v2-reports-table .report-file-link:hover {
+  text-decoration: underline;
+  color: #79c0ff;
+}
+#v2-reports-table td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: #8b949e;
+  font-size: 0.75rem;
+}
+
+/* === V2 Collapsible Sections === */
+.v2-collapsible-header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #8b949e;
+  cursor: pointer;
+  user-select: none;
+  padding: 0.5rem 0;
+  transition: color 0.15s;
+}
+
+.v2-collapsible-header:hover {
+  color: #e6edf3;
+}
+
+.v2-collapse-icon {
+  font-size: 0.65rem;
+  transition: transform 0.2s;
+  flex-shrink: 0;
+}
+
+/* === V2 Show More === */
+.v2-show-more-bar {
+  padding: 0.6rem;
+  text-align: center;
+  border-top: 1px solid #30363d;
+  background: #0d1117;
+  border-radius: 0 0 10px 10px;
+}
+
+.v2-show-more-btn {
+  padding: 0.4rem 1.5rem;
+  background: #21262d;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  color: #8b949e;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.v2-show-more-btn:hover {
+  background: #30363d;
+  color: #e6edf3;
+}
+
+/* === V2 Tab Badge === */
+.top-tab.v2-tab {
+  border-bottom: 2px solid #a855f7;
+}
+
+.top-tab.v2-tab.active {
+  background: #a855f7;
+  color: #0d1117;
+  border-bottom-color: #a855f7;
+}
+
+/* === TEAM Tab === */
+.team-overview {
+  text-align: center;
+  color: #8b949e;
+  font-size: 0.82rem;
+  margin-bottom: 1rem;
+  padding: 0.5rem 0;
+}
+
+.team-agent-list {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+}
+
+.team-agent-card {
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 10px;
+  border-left: 4px solid #30363d;
+  padding: 1rem 1.15rem;
+  transition: box-shadow 0.2s, border-color 0.2s;
+  position: relative;
+}
+
+.team-agent-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.team-agent-card[draggable="true"] {
+  cursor: default;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+.team-agent-card[draggable="true"] * {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+.team-agent-card.dragging {
+  opacity: 0.4;
+}
+
+.team-agent-card.drag-over {
+  border-top: 2px solid #3b82f6;
+  margin-top: -1px;
+}
+
+.team-card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.4rem;
+}
+
+.team-card-name {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #e6edf3;
+}
+
+.team-card-description {
+  font-size: 0.82rem;
+  color: #8b949e;
+  margin-bottom: 0.6rem;
+  line-height: 1.4;
+}
+
+.team-skills-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #8b949e;
+  margin-bottom: 0.3rem;
+}
+
+.team-skills-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+  margin-bottom: 0.5rem;
+}
+
+.team-skills-table th {
+  text-align: left;
+  padding: 0.3rem 0.5rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #8b949e;
+  border-bottom: 1px solid #30363d;
+  background: #0d1117;
+}
+
+.team-skills-table td {
+  padding: 0.3rem 0.5rem;
+  border-bottom: 1px solid #21262d;
+  color: #e6edf3;
+}
+
+.team-skills-table tr:nth-child(even) td {
+  background: #1c2128;
+}
+
+.team-skills-table tr:nth-child(odd) td {
+  background: #161b22;
+}
+
+.team-skill-name {
+  font-family: "Cascadia Code", "Fira Code", "Consolas", monospace;
+  cursor: pointer;
+  position: relative;
+  transition: color 0.15s;
+  white-space: nowrap;
+}
+
+.team-skill-name:hover {
+  color: #3b82f6;
+}
+
+.team-skill-name .copy-icon {
+  font-size: 0.65rem;
+  color: #484f58;
+  margin-left: 0.3rem;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.team-skill-name:hover .copy-icon {
+  opacity: 1;
+}
+
+.team-skill-copied {
+  color: #22c55e !important;
+  animation: team-copy-flash 0.6s ease-out;
+}
+
+@keyframes team-copy-flash {
+  0% { background: rgba(34, 197, 94, 0.2); }
+  100% { background: transparent; }
+}
+
+.team-skill-schedule {
+  font-family: "Cascadia Code", "Fira Code", "Consolas", monospace;
+  font-size: 0.72rem;
+  color: #8b949e;
+  white-space: nowrap;
+}
+
+.team-skill-desc {
+  font-size: 0.72rem;
+  color: #8b949e;
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.team-card-footer {
+  font-size: 0.72rem;
+  color: #484f58;
+  padding-top: 0.4rem;
+  border-top: 1px dashed #30363d;
+  display: flex;
+  gap: 1rem;
+}
+
+/* === OFFICE Tab === */
+.office-header {
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+
+.office-title {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #8b949e;
+  margin-bottom: 0.3rem;
+}
+
+.office-clock {
+  font-family: "Cascadia Code", "Fira Code", "Consolas", monospace;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #e6edf3;
+  font-variant-numeric: tabular-nums;
+}
+
+.office-floor {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.office-group-header {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #8b949e;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding-bottom: 0.3rem;
+  border-bottom: 1px solid #21262d;
+}
+
+.office-group-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.office-desk {
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 10px;
+  border-left: 4px solid #30363d;
+  padding: 0.8rem 1rem;
+  min-height: 180px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.office-robot-container {
+  width: 100px;
+  height: 80px;
+  margin: 0.4rem 0;
+}
+
+.office-robot {
+  width: 100%;
+  height: 100%;
+}
+
+.office-desk.working {
+  background: #1c2128;
+  border-left-width: 4px;
+  animation: office-desk-pulse 3s ease-in-out infinite;
+}
+
+@keyframes office-desk-pulse {
+  0%, 100% { border-left-color: inherit; }
+  50% { border-left-color: #484f58; }
+}
+
+.office-desk.idle {
+  background: #161b22;
+}
+
+.office-desk.sleeping {
+  opacity: 0.5;
+}
+
+.office-desk-status {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.5rem;
+}
+
+.office-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.office-status-dot.working {
+  background: #ef4444;
+  box-shadow: 0 0 6px #ef4444;
+  animation: office-pulse 1.5s ease-in-out infinite;
+}
+
+.office-status-dot.idle {
+  background: #8b949e;
+}
+
+.office-status-dot.sleeping {
+  background: #484f58;
+}
+
+@keyframes office-pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 6px #ef4444; }
+  50% { opacity: 0.4; box-shadow: 0 0 12px #ef4444; }
+}
+
+.office-desk-name {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #e6edf3;
+  margin-bottom: 0.5rem;
+}
+
+.office-desk-job {
+  font-size: 0.75rem;
+  color: #8b949e;
+  margin-bottom: 0.3rem;
+  font-family: "Cascadia Code", "Fira Code", "Consolas", monospace;
+}
+
+.office-desk-elapsed {
+  font-family: "Cascadia Code", "Fira Code", "Consolas", monospace;
+  font-size: 0.82rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: #e6edf3;
+}
+
+.office-desk-result {
+  font-size: 0.72rem;
+  color: #8b949e;
+}
+
+.office-desk-result .success { color: #22c55e; }
+.office-desk-result .failure { color: #ef4444; }
+
+.office-queue {
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 10px;
+  padding: 0.6rem 0.8rem;
+  font-size: 0.82rem;
+  color: #8b949e;
+  min-height: 40px;
+}
+
+.office-queue-item {
+  padding: 0.25rem 0;
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.office-feed {
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 10px;
+  max-height: 200px;
+  overflow-y: auto;
+  font-family: "Cascadia Code", "Fira Code", "Consolas", monospace;
+  font-size: 0.75rem;
+}
+
+.office-feed::-webkit-scrollbar {
+  width: 6px;
+}
+.office-feed::-webkit-scrollbar-track {
+  background: #0d1117;
+  border-radius: 3px;
+}
+.office-feed::-webkit-scrollbar-thumb {
+  background: #30363d;
+  border-radius: 3px;
+}
+
+.office-feed-entry {
+  padding: 0.3rem 0.75rem;
+  border-bottom: 1px solid #21262d;
+  display: flex;
+  gap: 0.6rem;
+}
+
+.office-feed-entry:nth-child(even) {
+  background: #1c2128;
+}
+
+.office-feed-time {
+  color: #484f58;
+  flex-shrink: 0;
+  min-width: 70px;
+}
+
+.office-feed-text {
+  color: #e6edf3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .office-floor {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* === History Tab: Health Cards === */
+.history-health-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 0.5rem;
+}
+
+.health-card {
+  min-width: 120px;
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  padding: 0.6rem 0.8rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.health-card .health-job {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #e6edf3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.health-card .health-pct {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.health-card .health-fraction {
+  font-size: 0.68rem;
+  color: #8b949e;
+}
+
+.health-card.good {
+  border-color: rgba(34, 197, 94, 0.4);
+}
+.health-card.good .health-pct {
+  color: #22c55e;
+}
+
+.health-card.warning {
+  border-color: rgba(217, 119, 6, 0.4);
+}
+.health-card.warning .health-pct {
+  color: #d97706;
+}
+
+.health-card.bad {
+  border-color: rgba(239, 68, 68, 0.4);
+}
+.health-card.bad .health-pct {
+  color: #ef4444;
+}
+
+/* === History Tab: Run History Table === */
+.history-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.history-table thead th {
+  background: #0d1117;
+  color: #8b949e;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.6rem 0.8rem;
+  text-align: left;
+  border-bottom: 1px solid #30363d;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.history-table thead th[data-sort] {
+  cursor: pointer;
+  position: relative;
+}
+
+.history-table thead th[data-sort]:hover {
+  color: #e6edf3;
+}
+
+.history-table thead th[data-sort]::after {
+  content: "";
+  margin-left: 4px;
+  font-size: 0.6rem;
+  opacity: 0.4;
+}
+
+.history-table thead th.sort-asc::after {
+  content: "\25B2";
+  opacity: 1;
+}
+
+.history-table thead th.sort-desc::after {
+  content: "\25BC";
+  opacity: 1;
+}
+
+.history-table tbody tr {
+  border-bottom: 1px solid #21262d;
+  transition: background 0.1s;
+}
+
+.history-table tbody tr:nth-child(even) {
+  background: #1c2128;
+}
+
+.history-table tbody tr:nth-child(odd) {
+  background: #161b22;
+}
+
+.history-table tbody tr:hover {
+  background: #1f2937;
+}
+
+.history-table td {
+  padding: 0.5rem 0.8rem;
+  color: #e6edf3;
+  vertical-align: middle;
+}
+
+#history-table-wrapper {
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+/* Result badges */
+.result-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 0.15rem 0.5rem;
+  border-radius: 9999px;
+  white-space: nowrap;
+  display: inline-block;
+}
+
+.result-badge.success {
+  color: #22c55e;
+  background: rgba(34, 197, 94, 0.15);
+}
+
+.result-badge.failure {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.15);
+}
+
+.result-badge.timeout {
+  color: #f97316;
+  background: rgba(249, 115, 22, 0.15);
+}
+
+/* === Schedule Tab: Next 24h highlight === */
+.schedule-row.next-24h {
+  background: rgba(34, 197, 94, 0.04);
+}
+
+.schedule-table tbody tr.schedule-row.next-24h:nth-child(even) {
+  background: rgba(34, 197, 94, 0.06);
+}
+
+.schedule-table tbody tr.schedule-row.next-24h:nth-child(odd) {
+  background: rgba(34, 197, 94, 0.04);
+}
+

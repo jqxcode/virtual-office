@@ -827,7 +827,7 @@ if ((Test-Path $LiveDashboardFile)) {
         $liveDash = Get-Content -Path $LiveDashboardFile -Raw | ConvertFrom-Json -AsHashtable
     }
     $legacyFound = $false
-    $legacyNames = @("memo-checker")
+    $legacyNames = @("memo-checker", "checker")
     if ($liveDash.ContainsKey("agents")) {
         foreach ($agentName in $liveDash["agents"].Keys) {
             if ($legacyNames -contains $agentName) {
@@ -836,7 +836,7 @@ if ((Test-Path $LiveDashboardFile)) {
             }
         }
     }
-    Assert-True (-not $legacyFound) "No legacy agent names (memo-checker) in dashboard.json"
+    Assert-True (-not $legacyFound) "No legacy agent names (memo-checker, checker) in dashboard.json"
 } else {
     Write-Host "  [SKIP] dashboard.json not found" -ForegroundColor Yellow
 }

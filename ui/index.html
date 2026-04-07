@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Virtual Office</title>
-  <link rel="stylesheet" href="styles.css?v=8">
+  <title>Agent Virtual Office</title>
+  <link rel="stylesheet" href="styles.css?v=13">
 </head>
 <body>
   <header class="header">
     <div class="header-left">
-      <h1 class="header-title">Virtual Office</h1>
+      <h1 class="header-title">Agent Virtual Office</h1>
     </div>
     <div class="header-right">
       <span id="connection-indicator" class="connection-indicator connected">
@@ -22,117 +22,107 @@
 
   <!-- Top-level navigation tabs -->
   <nav class="top-tabs" id="top-tabs">
-    <button class="top-tab active" data-tab="agents">AGENTS</button>
-    <button class="top-tab" data-tab="queue">TASK QUEUE</button>
-    <button class="top-tab" data-tab="events">EVENT LOG</button>
+    <button class="top-tab active" data-tab="team">ABOUT US</button>
+    <button class="top-tab" data-tab="office">OFFICE</button>
+    <button class="top-tab" data-tab="history">HISTORY</button>
+    <button class="top-tab" data-tab="schedule">SCHEDULE</button>
   </nav>
 
   <main class="main-content">
-    <!-- Agents View -->
-    <section id="view-agents" class="view active">
-      <!-- Stats row: 4 tiles -->
-      <div class="stats-row" id="stats-row">
-        <div class="stat-card">
-          <div class="stat-label">JOBS COMPLETED</div>
-          <div class="stat-primary" id="stat-completed-today">--</div>
-          <div class="stat-secondary" id="stat-completed-week">--</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">JOBS FAILED</div>
-          <div class="stat-primary" id="stat-failed-today">--</div>
-          <div class="stat-secondary" id="stat-failed-week">--</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">AGENTS WORKING</div>
-          <div class="stat-primary" id="stat-agents-active">--</div>
-          <div class="stat-secondary" id="stat-agents-total">--</div>
-        </div>
+    <!-- Keep hidden compat elements for tests/JS that reference them -->
+    <div id="agent-grid" class="agent-grid" style="display:none"></div>
+    <div id="activity-feed" style="display:none"></div>
+    <div id="event-log-full" style="display:none"></div>
+
+    <!-- About Us View (formerly TEAM) -->
+    <section id="view-team" class="view active">
+      <div class="team-overview" id="team-overview"></div>
+      <div id="team-agent-list" class="team-agent-list"></div>
+    </section>
+
+    <!-- Office View (V2) -->
+    <section id="view-office" class="view" style="display:none">
+      <div class="office-header" id="office-header">
+        <div class="office-title">VIRTUAL OFFICE</div>
+        <div class="office-clock" id="office-clock">--</div>
       </div>
-
-      <!-- Agent group sub-tabs -->
-      <div class="agent-tabs" id="agent-tabs"></div>
-
-      <!-- Agent list -->
-      <div class="section-header">
-        <span>Active Agents</span>
-        <span class="section-badge" id="active-agents-badge">--</span>
-      </div>
-      <div id="agent-list"></div>
-      <!-- Keep agent-grid ID for backward compat with tests -->
-      <div id="agent-grid" class="agent-grid" style="display:none"></div>
-      <!-- Keep activity-feed element for backward compat but hidden -->
-      <div id="activity-feed" style="display:none"></div>
-
-      <!-- Recent Reports -->
+      <div id="office-floor" class="office-floor"></div>
       <div class="section-header" style="margin-top:1.5rem">
-        <span>Recent Reports</span>
-        <span class="section-badge" id="reports-badge">--</span>
+        <span>Queue</span>
+        <span class="section-badge" id="office-queue-badge">0</span>
       </div>
-      <div id="reports-filter-bar" style="display:flex;gap:8px;margin-bottom:8px;align-items:center;">
-        <input type="text" id="reports-search" placeholder="Filter by name..." style="flex:1;padding:6px 10px;background:var(--card);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;outline:none;">
-        <select id="reports-agent-filter" style="padding:6px 10px;background:var(--card);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;outline:none;">
+      <div id="office-queue" class="office-queue"></div>
+      <div class="section-header" style="margin-top:1.5rem">
+        <span>Live Feed</span>
+      </div>
+      <div id="office-feed" class="office-feed"></div>
+    </section>
+
+    <!-- History View (V2) -->
+    <section id="view-history" class="view" style="display:none">
+      <!-- Job Health Summary Cards -->
+      <div class="section-header">
+        <span>Job Health (7 days)</span>
+      </div>
+      <div id="history-health-cards" class="history-health-cards"></div>
+
+      <!-- Run History Table -->
+      <div class="section-header" style="margin-top:1.5rem">
+        <span>Run History</span>
+        <span class="section-badge" id="history-count">--</span>
+      </div>
+      <div id="history-filter-bar" class="v2-filter-bar">
+        <select id="history-agent-filter" class="v2-filter-select">
+          <option value="">All Agents</option>
+        </select>
+        <select id="history-job-filter" class="v2-filter-select">
+          <option value="">All Jobs</option>
+        </select>
+        <select id="history-result-filter" class="v2-filter-select">
+          <option value="">All Results</option>
+          <option value="success">Success</option>
+          <option value="failure">Failed</option>
+          <option value="timeout">Timeout</option>
+        </select>
+        <select id="history-time-filter" class="v2-filter-select">
+          <option value="" selected>All Time</option>
+          <option value="24h">Last 24 Hours</option>
+          <option value="7d">Last 7 Days</option>
+          <option value="30d">Last 30 Days</option>
+        </select>
+      </div>
+      <div id="history-table-wrapper">
+        <table class="history-table" id="history-table">
+          <thead>
+            <tr>
+              <th data-sort="agent">Agent</th>
+              <th data-sort="job">Job</th>
+              <th data-sort="start">Start</th>
+              <th data-sort="duration">Duration</th>
+              <th data-sort="result">Result</th>
+              <th>Report</th>
+            </tr>
+          </thead>
+          <tbody id="history-tbody"></tbody>
+        </table>
+      </div>
+      <div id="history-show-more" class="v2-show-more-bar" style="display:none">
+        <button class="v2-show-more-btn" id="history-more-btn">Show more</button>
+      </div>
+    </section>
+
+    <!-- Schedule View (V2) -->
+    <section id="view-schedule" class="view" style="display:none">
+      <div class="section-header">
+        <span>Upcoming Schedule</span>
+        <span class="section-badge" id="schedule-v2-count">--</span>
+      </div>
+      <div id="schedule-v2-filter-bar" class="v2-filter-bar">
+        <select id="schedule-v2-agent-filter" class="v2-filter-select">
           <option value="">All Agents</option>
         </select>
       </div>
-      <div id="reports-tree"></div>
-    </section>
-
-    <!-- Event Log View -->
-    <section id="view-events" class="view" style="display:none">
-      <div class="event-filters">
-        <div class="filter-group">
-          <label class="filter-label">Agent</label>
-          <select id="filter-agent" class="filter-select">
-            <option value="">All Agents</option>
-          </select>
-        </div>
-        <div class="filter-group">
-          <label class="filter-label">Event Type</label>
-          <select id="filter-event-type" class="filter-select">
-            <option value="">All Events</option>
-            <option value="started">Started</option>
-            <option value="completed">Completed</option>
-            <option value="failed">Failed</option>
-            <option value="queued">Queued</option>
-            <option value="stale_lock_cleared">Stale Lock Cleared</option>
-            <option value="schedule_registered">Schedule Registered</option>
-            <option value="schedule_removed">Schedule Removed</option>
-          </select>
-        </div>
-        <div class="filter-group">
-          <label class="filter-label">Time Range</label>
-          <select id="filter-time" class="filter-select">
-            <option value="">All Time</option>
-            <option value="1h">Last Hour</option>
-            <option value="6h">Last 6 Hours</option>
-            <option value="24h">Last 24 Hours</option>
-            <option value="7d">Last 7 Days</option>
-          </select>
-        </div>
-        <div class="filter-group">
-          <span id="event-count" class="event-count">--</span>
-        </div>
-      </div>
-      <div id="event-log-full" class="event-log-full">
-        <div class="placeholder-message">Loading events...</div>
-      </div>
-    </section>
-
-    <!-- Task Queue View -->
-    <section id="view-queue" class="view" style="display:none">
-      <!-- Per-agent queue cards -->
-      <div class="section-header">
-        <span>Agents</span>
-        <span class="section-badge" id="queue-total-badge">--</span>
-      </div>
-      <div id="queue-cards" class="queue-cards-grid"></div>
-
-      <!-- Upcoming schedule table -->
-      <div class="section-header" style="margin-top:1.5rem">
-        <span>Upcoming Schedule</span>
-        <span class="section-badge" id="schedule-count">--</span>
-      </div>
-      <div class="schedule-table-wrapper" id="schedule-table-wrapper">
+      <div class="schedule-table-wrapper">
         <table class="schedule-table">
           <thead>
             <tr>
@@ -140,17 +130,18 @@
               <th>Agent</th>
               <th>Job</th>
               <th>Schedule</th>
-              <th>Status</th>
-              <th>Action</th>
+              <th>Last Result</th>
             </tr>
           </thead>
-          <tbody id="schedule-tbody"></tbody>
+          <tbody id="schedule-v2-tbody"></tbody>
         </table>
-        <div id="schedule-overflow" class="schedule-overflow" style="display:none"></div>
+      </div>
+      <div id="schedule-v2-show-more" class="v2-show-more-bar" style="display:none">
+        <button class="v2-show-more-btn" id="schedule-v2-more-btn">Show more</button>
       </div>
     </section>
   </main>
 
-  <script src="app.js?v=8"></script>
+  <script src="app.js?v=13"></script>
 </body>
 </html>

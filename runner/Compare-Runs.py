@@ -680,7 +680,7 @@ def generate_summary(ado_reports, bug_reports, issues, state, new_issues_created
 </head>
 <body>
   <h1>Scrum-Master Run Comparison</h1>
-  <p style="color:#888; font-size:13px; margin-top:-10px;">Agent: Checker | Job: TODO-compare-runs | Generated: {now.strftime('%Y-%m-%dT%H:%M:%S')}</p>
+  <p style="color:#888; font-size:13px; margin-top:-10px;">Agent: Auditor | Job: TODO-compare-runs | Generated: {now.strftime('%Y-%m-%dT%H:%M:%S')}</p>
   <div class="meta">Generated {now.strftime('%Y-%m-%d %H:%M')} &bull; {len(ado_reports)} ADO reports, {len(bug_reports)} bug reports</div>
 """
 

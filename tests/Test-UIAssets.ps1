@@ -63,7 +63,7 @@ if (Test-Path $HtmlFile) {
 # ========================================
 # TC2: app.js has no reference to hardcoded "memo-checker"
 # ========================================
-Write-Host "`nTC2: app.js has no reference to hardcoded 'memo-checker' (should be 'checker')" -ForegroundColor Cyan
+Write-Host "`nTC2: app.js has no reference to hardcoded 'memo-checker' (should be 'auditor')" -ForegroundColor Cyan
 
 Assert-True (Test-Path $AppJsFile) "app.js exists"
 

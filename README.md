@@ -10,7 +10,7 @@ Virtual Office is an agent orchestration framework that schedules, runs, and mon
 | **Bug Killer** | Scans repos for issues, creates fix PRs | scan-and-fix, open-pr-maintenance, daily-summary |
 | **Poster** | Posts daily summaries to Teams | Bug-Autopilot-Adoption-daily-summary |
 | **Emailer** | Gmail inbox management | scan-all-mailboxes |
-| **Checker** | Memory consolidation, sprint progress, run comparison | consolidate-agent-memories, TODO-sprint-progress, TODO-compare-runs |
+| **Auditor** | Memory consolidation, sprint progress, run comparison | consolidate-agent-memories, TODO-sprint-progress, TODO-compare-runs |
 | **Hang Scout** | Hung job detection and diagnostics | detect-hang, daily-report |
 
 ## Quick Start

@@ -37,9 +37,12 @@
     .result-bar.skipped { border-left-color: #7d6608; }
     ul { margin: 8px 0; padding-left: 20px; line-height: 1.8; }
     .section-title { color: #a0c4ff; font-size: 0.9rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin: 16px 0 8px 0; }
+    .section-title:first-child { margin-top: 0; }
+
+    /* Summary table */
     table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+    th { text-align: left; padding: 8px 12px; border-bottom: 2px solid #0f3460; color: #a0c4ff; font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.04em; }
     td { padding: 6px 12px; border-bottom: 1px solid #0f3460; }
-    td:first-child { color: #aaa; width: 120px; }
   </style>
 </head>
 <body>
@@ -53,55 +56,31 @@
   <div class="card">
     <h2>Summary</h2>
     <table>
-      <tr><td>Repo</td><td><strong>{{REPO_NAME}}</strong></td></tr>
-      <tr><td>Issue</td><td><a href="{{ISSUE_URL}}">#{{ISSUE_NUMBER}}</a> — {{ISSUE_TITLE}} {{LABELS}}</td></tr>
-      <tr><td>Result</td><td><span class="badge {{RESULT_CLASS}}">{{RESULT}}</span></td></tr>
-      <!-- Include PR row only if a PR was created -->
-      <tr><td>PR</td><td><a href="{{PR_URL}}">{{PR_DISPLAY}}</a></td></tr>
-      <tr><td>Branch</td><td><code>{{BRANCH}}</code></td></tr>
+      <thead>
+        <tr>
+          <th>Repo</th>
+          <th>Issue</th>
+          <th>Labels</th>
+          <th>Result</th>
+          <th>PR</th>
+          <th>Branch</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{SUMMARY_TABLE_ROWS}}
+      </tbody>
     </table>
   </div>
 
-  <!-- ===== SECTION 2: Root Cause ===== -->
-  <div class="card">
-    <h2>Root Cause</h2>
-    <!-- Plain text or HTML explanation of what caused the bug -->
-    <p>{{ROOT_CAUSE}}</p>
-  </div>
+  <!-- ===== SECTION 2: Issue Details ===== -->
+  <!-- Repeat per issue -->
+  {{ISSUE_DETAILS}}
 
-  <!-- ===== SECTION 3: Fix ===== -->
-  <div class="card">
-    <h2>Fix</h2>
-    <!-- Description of what was changed -->
-    <p>{{FIX_DESCRIPTION}}</p>
-    <!-- Code diff or key changes -->
-    <div class="code">{{CODE_DIFF}}</div>
-  </div>
-
-  <!-- ===== SECTION 4: Validation ===== -->
-  <div class="card">
-    <h2>Validation</h2>
-    <ul>
-      <!-- One <li> per test or check performed -->
-      {{VALIDATION_ITEMS}}
-    </ul>
-  </div>
-
-  <!-- ===== SECTION 5: Notes (optional) ===== -->
+  <!-- ===== SECTION 3: Notes (optional) ===== -->
   <!-- Only include this section if there are additional notes -->
   <div class="card">
     <h2>Notes</h2>
     <p>{{NOTES}}</p>
-  </div>
-
-  <!-- ===== SECTION 6: Teams Notification (optional) ===== -->
-  <!-- Only include if the report was posted to a Teams channel -->
-  <div class="card">
-    <h2>Teams Notification</h2>
-    <table>
-      <tr><td>Channel</td><td><strong>{{TEAMS_CHANNEL}}</strong></td></tr>
-      <tr><td>Message</td><td><a href="{{TEAMS_MESSAGE_URL}}">View in Teams</a></td></tr>
-    </table>
   </div>
 
 </div>

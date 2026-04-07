@@ -46,16 +46,17 @@ if (Test-Path $templateFile) {
 }
 
 # ========================================
-# TC86: Dashboard uses "checker" not "memo-checker"
+# TC86: Dashboard uses "auditor" not "checker" or "memo-checker"
 # ========================================
-Write-Host "`nTC86: Dashboard uses 'checker' not 'memo-checker'" -ForegroundColor Cyan
+Write-Host "`nTC86: Dashboard uses 'auditor' not 'checker' or 'memo-checker'" -ForegroundColor Cyan
 
 $dashFile = Join-Path $ProjectRoot "state" "dashboard.json"
 Assert-True (Test-Path $dashFile) "Dashboard state file exists"
 
 if (Test-Path $dashFile) {
     $dash = Get-Content -Path $dashFile -Raw | ConvertFrom-Json -AsHashtable
-    Assert-True ($dash["agents"].ContainsKey("checker")) "Dashboard has 'checker' agent entry"
+    Assert-True ($dash["agents"].ContainsKey("auditor")) "Dashboard has 'auditor' agent entry"
+    Assert-True (-not $dash["agents"].ContainsKey("checker")) "Dashboard does NOT have 'checker' (old name)"
     Assert-True (-not $dash["agents"].ContainsKey("memo-checker")) "Dashboard does NOT have 'memo-checker' (old name)"
 }
 
@@ -73,24 +74,24 @@ if (Test-Path $smJobsFile) {
 
     Assert-True ($smJobs.ContainsKey("bug-autopilot-meeting-join")) "scrum-master has 'bug-autopilot-meeting-join' job"
     Assert-True (-not $smJobs.ContainsKey("bug-autopilot")) "scrum-master does NOT have bare 'bug-autopilot' job"
-    Assert-True (-not $smJobs.ContainsKey("TODO-sprint-progress")) "scrum-master does NOT have 'TODO-sprint-progress' (moved to checker)"
-    Assert-True (-not $smJobs.ContainsKey("TODO-compare-runs")) "scrum-master does NOT have 'TODO-compare-runs' (moved to checker)"
+    Assert-True (-not $smJobs.ContainsKey("TODO-sprint-progress")) "scrum-master does NOT have 'TODO-sprint-progress' (moved to auditor)"
+    Assert-True (-not $smJobs.ContainsKey("TODO-compare-runs")) "scrum-master does NOT have 'TODO-compare-runs' (moved to auditor)"
 }
 
 # ========================================
-# TC88: checker.json HAS the TODO-sprint-progress and TODO-compare-runs jobs
+# TC88: auditor.json HAS the TODO-sprint-progress and TODO-compare-runs jobs
 # ========================================
-Write-Host "`nTC88: checker.json has the moved jobs" -ForegroundColor Cyan
+Write-Host "`nTC88: auditor.json has the moved jobs" -ForegroundColor Cyan
 
-$checkerJobsFile = Join-Path $ProjectRoot "config" "jobs" "checker.json"
-Assert-True (Test-Path $checkerJobsFile) "checker.json exists"
+$auditorJobsFile = Join-Path $ProjectRoot "config" "jobs" "auditor.json"
+Assert-True (Test-Path $auditorJobsFile) "auditor.json exists"
 
-if (Test-Path $checkerJobsFile) {
-    $checkerJobsRaw = Get-Content -Path $checkerJobsFile -Raw | ConvertFrom-Json -AsHashtable
-    $checkerJobs = if ($checkerJobsRaw.ContainsKey("jobs")) { $checkerJobsRaw["jobs"] } else { $checkerJobsRaw }
+if (Test-Path $auditorJobsFile) {
+    $auditorJobsRaw = Get-Content -Path $auditorJobsFile -Raw | ConvertFrom-Json -AsHashtable
+    $auditorJobs = if ($auditorJobsRaw.ContainsKey("jobs")) { $auditorJobsRaw["jobs"] } else { $auditorJobsRaw }
 
-    Assert-True ($checkerJobs.ContainsKey("TODO-sprint-progress")) "checker has 'TODO-sprint-progress' job"
-    Assert-True ($checkerJobs.ContainsKey("TODO-compare-runs")) "checker has 'TODO-compare-runs' job"
+    Assert-True ($auditorJobs.ContainsKey("TODO-sprint-progress")) "auditor has 'TODO-sprint-progress' job"
+    Assert-True ($auditorJobs.ContainsKey("TODO-compare-runs")) "auditor has 'TODO-compare-runs' job"
 }
 
 # ========================================

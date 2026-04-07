@@ -76,12 +76,12 @@ which requires administrator privileges. See design-decisions.md for rationale.
 | bug-killer | Bug Killer | Work Agents | Scans repos for open issues, creates fix PRs, maintains open PRs | 180 |
 | poster | Poster | Work Agents | Posts daily Bug-AutoPilot summary to Teams channel | 30 |
 | emailer | Emailer | Other Agents | Manages Gmail inboxes -- scan, classify, digest (portal: localhost:8402) | 60 |
-| auditor | Checker | Other Agents | Memory consolidation, sprint progress, compare-runs, OOF summary, report audit | 120 |
+| auditor | Auditor | Other Agents | Memory consolidation, sprint progress, compare-runs, OOF summary, report audit | 120 |
 | hang-scout | Hang Scout | Other Agents | Hung job detection, py-spy diagnosis, daily 5W incident report | 15 |
 
 ### Agent Rename History
 
-- `memo-checker` was renamed to `checker` (displayName: "Checker"). The agent now consolidates memory management, sprint progress reporting, run comparison, and report template auditing.
+- `memo-checker` was renamed to `checker`, then to `auditor` (displayName: "Auditor"). The agent now consolidates memory management, sprint progress reporting, run comparison, and report template auditing.
 
 ---
 
@@ -110,7 +110,7 @@ which requires administrator privileges. See design-decisions.md for rationale.
 |-----|----------|-------------|
 | scan-all-mailboxes | 7am daily | Scan all Gmail mailboxes, classify, generate digest |
 
-### checker
+### auditor
 
 | Job | Schedule | Description |
 |-----|----------|-------------|
@@ -185,7 +185,7 @@ The daily-report job (midnight) generates a 5W incident report including:
 
 ### Top Navigation
 
-Centered pill-shaped tabs: AGENTS | EVENT LOG | TASK QUEUE (extensible for future: CHAT, MEMORY).
+Centered pill-shaped tabs: AGENTS | TASK QUEUE | EVENT LOG | AGENTS V2 | JOB SCHEDULES V2.
 Active tab is filled/highlighted. Selection persisted to URL `?view=`.
 
 ### Summary Stats Row (4 tiles)
@@ -260,6 +260,38 @@ One card per registered agent, colored by agent. Each card shows:
 - Per-job list with queue depth badge and Cancel button when depth > 0
 - Next scheduled fire time (earliest across all enabled schedules for that agent)
 
+### Agents V2 Tab
+
+Consolidated view combining agent queue cards with an enhanced reports table. Two sections:
+
+**Per-Agent Queue Cards**
+
+Same queue cards as the Task Queue tab, showing all registered agents with status, lock state, running job info, job list with queue depth, and next scheduled fire time. Rendered without drag-and-drop reordering.
+
+**Recent Reports (Enhanced)**
+
+Full reports table showing ALL agents (not filtered by group). Enhanced over the Agents tab's reports with four filters:
+- Text search (name, job, agent)
+- Agent dropdown
+- Job dropdown
+- Date picker
+
+Table columns: Agent (color pill), Job, Date, Report (link), Size. All columns sortable. Data from `/api/reports`.
+
+### Job Schedules V2 Tab
+
+Unified schedule view combining upcoming and past schedule data into collapsible sections with pagination.
+
+**Upcoming Schedule (collapsible)**
+
+Same schedule data as Task Queue's upcoming schedule table (cron expansion, status cross-referencing, action buttons). Paginated at 20 rows per page with a "Show more" button that loads 20 more each click. Columns: Next Run, Agent, Job, Schedule, Status, Action.
+
+**Past Schedule (collapsible)**
+
+Event log data rendered with inline filters (Agent dropdown, Event Type dropdown, Time Range dropdown). Same rendering as the Event Log tab but embedded inline. Paginated at 20 rows with "Show more". Completed events show a "Report" link that cross-references the merged dashboard state to find the job's `lastOutput` path.
+
+Both sections are collapsible via clickable headers (down arrow = expanded, right arrow = collapsed).
+
 ### API Endpoints
 
 | Endpoint | Method | Description |
@@ -313,6 +345,10 @@ config/schedules.json + state/agents/{agent}/{job}/queue + state/agents/{agent}/
         |
         v
   /api/schedules -----> Task Queue tab (schedule table + queue cards)
+
+  /api/reports -------> Agents V2 tab (enhanced reports table) + Agents tab (reports tree)
+
+  /api/schedules + /api/events --> Job Schedules V2 tab (upcoming + past combined)
 ```
 
 ### Theme
@@ -335,7 +371,7 @@ immediately below the main title:
 ```
 
 This provides consistent provenance tracking across all agent outputs.
-The checker's consolidate-agent-memories job includes a report template audit
+The auditor's consolidate-agent-memories job includes a report template audit
 that verifies all agent files and job configs enforce this standard.
 
 ---

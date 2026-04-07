@@ -22,6 +22,13 @@ Virtual Office is an agent orchestration framework for Windows that turns Claude
 | D9 | dashboard.json as UI contract | Single file is the API between runner and UI. UI polls this file only. Simple, no server-side logic needed. | WebSocket/real-time -- rejected: overkill for local use |
 | D10 | PS1 with ASCII only | PowerShell on Windows misreads non-BOM UTF-8. All scripts use ASCII characters only. | UTF-8 without BOM -- rejected: causes phantom parse errors |
 | D11 | All jobs go through Task Scheduler, including one-offs | Every job must flow through Invoke-AgentJob.ps1 so it appears on the dashboard, writes audit/events, and tracks errors. One-off jobs use a single-fire Task Scheduler trigger instead of session-only cron. | Session cron -- rejected: bypasses dashboard, no state tracking, no error capture |
+| D12 | V2 tabs coexist with V1 for A/B comparison | Side-by-side comparison lets user evaluate UX improvement before retiring V1. V1 removal is a separate, future decision. | Immediate V1 replacement -- rejected: no fallback if V2 has issues |
+| D13 | 4 V2 tabs map to 4 fundamental questions | TEAM (who are we), OFFICE (what's now), HISTORY (what happened), SCHEDULE (what's next). Each tab has exactly one purpose -- no mixing. | Single omnibus V2 tab -- rejected: same problem as V1 overloaded tabs |
+| D14 | TEAM tab shows agent identity + skills + schedules | Consolidates data from agents.json, jobs/*.json, and schedules.json into a single "team directory" view. Skills (job names) are click-to-copy. | Separate identity/skills pages -- rejected: forces navigation for basic lookup |
+| D15 | OFFICE tab is spatial, not a list | Grid of "desks" with live status, not a vertical list. Working agents pulse with elapsed timer. Gives ambient awareness like walking into an office. | Vertical status list -- rejected: no spatial metaphor, less glanceable |
+| D16 | HISTORY tab computes job health from events | Success rate per job derived from started/completed/failed event pairs matched by run_id. No new state files needed -- events.jsonl is the source of truth. | Separate health tracking file -- rejected: duplicates event data |
+| D17 | Agent cards draggable in TEAM tab | Same drag-and-drop pattern as V1 agent list. Separate localStorage key (vo-team-order). | Fixed order only -- rejected: users want to prioritize visible agents |
+| D18 | V2 replaces V1 filter model with per-tab filters | V1 had one Event Log with agent/type/time filters. V2 splits this: HISTORY has agent/job/result/time, SCHEDULE has agent filter. More specific filters per context. | Global filter bar -- rejected: one-size-fits-all filters are noisy |
 
 ## Audit Log Schema
 
@@ -42,6 +49,8 @@ Each line in the audit log is a JSON object with these fields:
 Log files are stored at `output/audit/YYYY-MM.jsonl` (one file per month, append-only).
 
 ## State File Contracts
+
+**V2 Note**: The V2 tabs (TEAM, OFFICE, HISTORY, SCHEDULE) do not introduce any new state files. They read from existing files: dashboard.json (agent status), events.jsonl (job history), config/agents.json (identity), config/jobs/*.json (skills/job definitions), and config/schedules.json (timing). All V2 data needs are served by existing API endpoints (/api/config, /api/dashboard, /api/events, /api/reports, /api/schedules).
 
 ### dashboard.json
 

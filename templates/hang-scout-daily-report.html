@@ -42,8 +42,18 @@
   .kv .k { color: var(--muted); }
   .kv .v { font-weight: 600; }
   .rec { padding: 8px 12px; background: rgba(88,166,255,0.08); border-left: 3px solid var(--accent); border-radius: 0 6px 6px 0; margin-bottom: 8px; font-size: 12px; }
-  .ba-bar { display: flex; height: 22px; border-radius: 4px; overflow: hidden; margin: 2px 0; }
-  .ba-bar div { display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 600; color: #fff; min-width: 0; }
+  .rec-critical { background: rgba(239,83,80,0.12); border-left-color: #ef5350; }
+  .rec-warn { background: rgba(255,167,38,0.12); border-left-color: #ffa726; }
+  .rec-ok { background: rgba(102,187,106,0.12); border-left-color: #66bb6a; }
+  .tooltip-wrap { position: relative; cursor: help; }
+  .tooltip-wrap .tooltip-text { visibility: hidden; background: #21262d; color: var(--text); font-size: 11px; padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border); position: absolute; z-index: 10; bottom: 110%; left: 50%; transform: translateX(-50%); width: 260px; line-height: 1.5; box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
+  .tooltip-wrap:hover .tooltip-text { visibility: visible; }
+  .tooltip-wrap .tooltip-text::after { content: ''; position: absolute; top: 100%; left: 50%; margin-left: -6px; border-width: 6px; border-style: solid; border-color: #21262d transparent transparent transparent; }
+  .incident-5w { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 8px 0; }
+  .incident-5w .w-label { font-weight: 700; color: var(--accent); white-space: nowrap; }
+  .incident-5w .w-value { color: var(--text); }
+  .bap-bar { display: flex; height: 22px; border-radius: 4px; overflow: hidden; margin: 2px 0; }
+  .bap-bar div { display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 600; color: #fff; min-width: 0; }
   table.sortable th { cursor: pointer; user-select: none; position: relative; padding-right: 18px; }
   table.sortable th:hover { color: var(--accent); }
   table.sortable th::after { content: ''; position: absolute; right: 4px; top: 50%; transform: translateY(-50%); font-size: 10px; color: var(--muted); }
@@ -58,29 +68,30 @@
 
 <!-- KPI Cards -->
 <div class="cards">
-  <div class="card">
+  <div class="card tooltip-wrap">
     <div class="num" style="color:{{HEALTH_COLOR}}">{{SYSTEM_HEALTH}}</div>
     <div class="lbl">System Health</div>
+    <span class="tooltip-text"><b>OK</b> (green): No hangs in 24h, all jobs healthy<br><b>WARN</b> (yellow): 1+ hangs in 24h or trend anomaly<br><b>CRITICAL</b> (red): Active unresolved hang or repeated failures</span>
   </div>
   <div class="card">
-    <div class="num">{{TOTAL_RUNS_7D}}</div>
-    <div class="lbl">Total Runs (7d)</div>
+    <div class="num">{{TOTAL_RUNS_30D}}</div>
+    <div class="lbl">Total Runs (30d)</div>
   </div>
   <div class="card">
     <div class="num">{{RUNS_24H}}</div>
     <div class="lbl">Runs (24h)</div>
   </div>
   <div class="card">
-    <div class="num" style="color:#ef5350">{{FAILURES_7D}}</div>
-    <div class="lbl">Failures (7d)</div>
+    <div class="num" style="color:#ef5350">{{FAILURES_30D}}</div>
+    <div class="lbl tooltip-wrap">Failures (30d)<span class="tooltip-text">Count of jobs with non-zero exit, hangs killed, or stale locks cleared in the past 30 days</span></div>
   </div>
   <div class="card">
     <div class="num">{{ACTIVE_AGENTS}}</div>
     <div class="lbl">Active Agents</div>
   </div>
   <div class="card">
-    <div class="num" style="color:{{HANGS_COLOR}}">{{HANGS_7D}}</div>
-    <div class="lbl">Hangs (7d)</div>
+    <div class="num" style="color:{{HANGS_COLOR}}">{{HANGS_30D}}</div>
+    <div class="lbl">Hangs (30d)</div>
   </div>
   <div class="card">
     <div class="num" style="color:{{HANGS_24H_COLOR}}">{{HANGS_24H}}</div>
@@ -91,21 +102,38 @@
 <!-- Executive Summary -->
 <div class="section">
   <h2>Executive Summary</h2>
+  <p style="color:var(--muted);font-size:12px;margin-bottom:14px;">Since last report (<b>{{REPORT_PERIOD_START}}</b>) to now (<b>{{REPORT_PERIOD_END}}</b>)</p>
   <div class="exec-grid">
     <div>
-      <div class="kv"><span class="k">Who</span><span class="v">{{WHO}}</span></div>
-      <div class="kv"><span class="k">What</span><span class="v">{{WHAT}}</span></div>
-      <div class="kv"><span class="k">When</span><span class="v">{{WHEN}}</span></div>
-      <div class="kv"><span class="k">Where</span><span class="v">{{WHERE}}</span></div>
-      <div class="kv"><span class="k">Why</span><span class="v">{{WHY}}</span></div>
+      <div class="kv"><span class="k">Failure Rate</span><span class="v" style="color:{{FAILURE_RATE_COLOR}}">{{FAILURE_RATE}}</span></div>
+      <div class="kv"><span class="k">Hangs (30d)</span><span class="v" style="color:{{HANGS_DETAIL_COLOR}}">{{HANGS_DETAIL}}</span></div>
+      <div class="kv"><span class="k">Known Patterns</span><span class="v">{{KNOWN_PATTERNS}}</span></div>
+      <div class="kv"><span class="k">Top Risk</span><span class="v" style="color:#ffa726">{{TOP_RISK}} {{TOP_RISK_ISSUE_LINK}}</span></div>
     </div>
     <div>
-      <div class="kv"><span class="k">Failure Rate</span><span class="v" style="color:{{FAILURE_RATE_COLOR}}">{{FAILURE_RATE}}</span></div>
-      <div class="kv"><span class="k">Hangs (7d)</span><span class="v" style="color:{{HANGS_DETAIL_COLOR}}">{{HANGS_DETAIL}}</span></div>
-      <div class="kv"><span class="k">Known Patterns</span><span class="v">{{KNOWN_PATTERNS}}</span></div>
-      <div class="kv"><span class="k">Top Risk</span><span class="v" style="color:#ffa726">{{TOP_RISK}}</span></div>
+      <div class="kv"><span class="k">Total Incidents (24h)</span><span class="v">{{INCIDENTS_24H}}</span></div>
+      <div class="kv"><span class="k">Kills Executed</span><span class="v">{{KILLS_EXECUTED}}</span></div>
+      <div class="kv"><span class="k">New Patterns</span><span class="v">{{NEW_PATTERNS}}</span></div>
+      <div class="kv"><span class="k">Stale Locks Cleared</span><span class="v">{{STALE_LOCKS_CLEARED}}</span></div>
     </div>
   </div>
+</div>
+
+<!-- Per-Incident 5W Details -->
+<div class="section">
+  <h2>Incident 5W Breakdown</h2>
+  {{INCIDENT_5W_BLOCKS}}
+  <!-- Each block should use this structure:
+    <h3 style="font-size:14px;margin:16px 0 8px;">Incident #N - <agent>/<job></h3>
+    <div class="incident-5w">
+      <span class="w-label">Who</span><span class="w-value">Agent: X, Job: Y, Process: Z</span>
+      <span class="w-label">What</span><span class="w-value">classification - description</span>
+      <span class="w-label">When</span><span class="w-value">Detected: timestamp, Runtime: N min, Lock age: N min</span>
+      <span class="w-label">Where</span><span class="w-value">Process tree: PID chain, Code: file:line</span>
+      <span class="w-label">Why</span><span class="w-value">Root cause analysis</span>
+    </div>
+    <p style="font-size:11px;color:var(--muted);">Action: killed|skipped | Recovery: outcome | Issue: <a href="URL">link</a> or N/A</p>
+  -->
 </div>
 
 <!-- 5W Incident Details -->
@@ -136,7 +164,7 @@
 
 <!-- Runtime Trends Chart -->
 <div class="section">
-  <h2>Runtime Trends (7-day, avg minutes per agent)</h2>
+  <h2>Runtime Trends (30-day, avg minutes per agent)</h2>
   <div class="chart-container">
     <canvas id="runtimeChart"></canvas>
   </div>
@@ -144,10 +172,10 @@
 
 <!-- Runtime Summary Table -->
 <div class="section">
-  <h2>Runtime Summary by Job (7-day)</h2>
+  <h2>Runtime Summary by Job (30-day)</h2>
   <table class="sortable" id="runtimeTable">
     <thead>
-      <tr><th>Agent</th><th>Job</th><th>Runs (7d)</th><th>Runs (24h)</th><th>Status</th><th>Avg</th><th>Min</th><th>Max</th><th>Avg (24h)</th><th>Trend</th></tr>
+      <tr><th>Agent</th><th>Job</th><th>Runs (30d)</th><th>Runs (24h)</th><th>Status</th><th>Avg</th><th>Min</th><th>Max</th><th>Avg (24h)</th><th>Trend</th><th>Analysis</th></tr>
     </thead>
     <tbody>
       {{RUNTIME_TABLE_ROWS}}
@@ -157,30 +185,41 @@
 
 <!-- Bug Autopilot Performance -->
 <div class="section">
-  <h2>Bug Autopilot Performance Analysis</h2>
+  <h2>Bug Autopilot (BAP) Performance Analysis</h2>
   <div class="exec-grid">
-    {{BA_PERF_SUMMARY}}
+    {{BAP_PERF_SUMMARY}}
   </div>
-  {{BA_PERF_NOTE}}
+  <p style="font-size:11px;color:var(--muted);margin-top:8px;">
+    <span class="tooltip-wrap">Error Rate: <b>{{BAP_ERROR_RATE}}</b>
+      <span class="tooltip-text">Percentage of bugs where the BAP agent encountered an error during analysis (API failures, timeout, parse errors, etc.)</span>
+    </span>
+  </p>
+  {{BAP_PERF_NOTE}}
 
-  <h3 style="font-size:13px;margin:16px 0 10px;">Run Duration Breakdown (7d)</h3>
+  <h3 style="font-size:13px;margin:16px 0 10px;">Run Duration Breakdown (30d)</h3>
   <table>
     <thead><tr><th>Job</th><th>Runs</th><th>Avg</th><th>Max</th><th>Notes</th></tr></thead>
     <tbody>
-      {{BA_DURATION_TABLE_ROWS}}
+      {{BAP_DURATION_TABLE_ROWS}}
     </tbody>
   </table>
 </div>
 
 <!-- Grouped Bar Chart: Job Duration Comparison -->
 <div class="section">
-  <h2>Job Duration Comparison (7d avg vs 24h avg)</h2>
+  <h2>Job Duration Comparison (30d avg vs 24h avg)</h2>
   <div class="chart-container">
     <canvas id="barChart"></canvas>
   </div>
 </div>
 
 <!-- Recommendations -->
+<!-- Each recommendation div should use severity class:
+     rec rec-critical  = CRITICAL items (red border/bg)
+     rec rec-warn      = TREND ALERT / RUNTIME LIMIT EXCEEDED (yellow border/bg)
+     rec rec-ok        = Resolved patterns / DATA GAP (green border/bg)
+     rec              = default (blue border/bg) for informational items
+-->
 <div class="section">
   <h2>Recommendations</h2>
   {{RECOMMENDATIONS}}
@@ -218,7 +257,7 @@ new Chart(ctx2, {
   data: {
     labels: {{BAR_LABELS}},
     datasets: [
-      { label: '7d Avg (min)', data: {{BAR_AVG_7D}}, backgroundColor: '#4fc3f766', borderColor: '#4fc3f7', borderWidth: 1 },
+      { label: '30d Avg (min)', data: {{BAR_AVG_30D}}, backgroundColor: '#4fc3f766', borderColor: '#4fc3f7', borderWidth: 1 },
       { label: '24h Avg (min)', data: {{BAR_AVG_24H}}, backgroundColor: '#ffa72666', borderColor: '#ffa726', borderWidth: 1 }
     ]
   },

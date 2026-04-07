@@ -125,6 +125,12 @@
       "job": "BAP-Perf-Analysis-posting",
       "cron": "0 21 * * *",
       "description": "Bug Autopilot Performance Analysis post to Teams at 9pm daily"
+    },
+    {
+      "agent": "auditor",
+      "job": "FFv2-daily-summary",
+      "cron": "0 12 * * 1-5",
+      "description": "Feature Flight V2 daily report for direct reports flights, weekdays at noon"
     }
   ]
 }

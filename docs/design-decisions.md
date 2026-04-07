@@ -33,9 +33,9 @@
 
 ## Agent Rename: memo-checker -> checker -> auditor
 
-**Decision**: Renamed `memo-checker` to `checker` with displayName "Checker".
+**Decision**: Renamed `memo-checker` to `checker`, then to `auditor` with displayName "Auditor".
 
-**Why**: The agent's scope expanded beyond memory/memo checking to include sprint progress reporting, cross-run comparison, report template auditing, and logical conflict detection in memory dedup. The name "memo-checker" was misleadingly narrow. "Checker" reflects the agent's role as a general-purpose validation and reporting agent.
+**Why**: The agent's scope expanded beyond memory/memo checking to include sprint progress reporting, cross-run comparison, report template auditing, and logical conflict detection in memory dedup. The name "memo-checker" was misleadingly narrow. "Auditor" reflects the agent's role as a general-purpose validation, auditing, and reporting agent.
 
 ## Hang Detection: Per-Agent Thresholds
 
@@ -93,15 +93,15 @@ hang-scout:    excluded (cannot detect its own hangs)
 
 **Decision**: All HTML reports include a standard subtitle with Agent, Job, Start, and Complete timestamps.
 
-**Why**: With multiple agents generating reports on overlapping schedules, provenance tracking is essential. The subtitle answers "which agent produced this, for which job, and when" at a glance. The checker's consolidate-agent-memories job includes a report template audit that verifies all agent files and job configs enforce this standard.
+**Why**: With multiple agents generating reports on overlapping schedules, provenance tracking is essential. The subtitle answers "which agent produced this, for which job, and when" at a glance. The auditor's consolidate-agent-memories job includes a report template audit that verifies all agent files and job configs enforce this standard.
 
-## Checker: Report Template Audit
+## Auditor: Report Template Audit
 
 **Decision**: The consolidate-agent-memories job scans all agent .md files and job configs to verify HTML reports have VO subtitle, dark theme, Segoe UI, and are self-contained.
 
 **Why**: Report styling drift was a recurring issue -- agents would generate reports with inconsistent themes or missing subtitles. Automated auditing during the nightly consolidation catches deviations early.
 
-## Checker: Logical Conflict Detection in Memory Dedup
+## Auditor: Logical Conflict Detection in Memory Dedup
 
 **Decision**: Memory deduplication now detects logical conflicts (contradictory information across memory files) rather than just textual duplicates.
 
@@ -155,3 +155,46 @@ hang-scout:    excluded (cannot detect its own hangs)
 ### Queue cancel writes events
 **Decision**: Queue cancellation writes both an event and an audit entry.
 **Why**: Consistency with all other state mutations in the system. The `queue_cancelled` event shows up in the activity feed and event log, maintaining full auditability.
+
+---
+
+## v0.5.0 - V2 Tab Redesign (TEAM, OFFICE, HISTORY, SCHEDULE)
+
+### D12: V2 tabs coexist with V1 for A/B comparison
+**Decision**: V2 tabs (TEAM, OFFICE, HISTORY, SCHEDULE) are added alongside the existing V1 tabs (Agents, Queue, Events). Total navigation: 7 tabs.
+**Why**: Side-by-side comparison lets the user evaluate UX improvement before retiring V1. V1 removal is a separate, future decision. If V2 has issues, V1 remains fully functional as a fallback.
+**Trade-off**: 7 tabs is a lot. Once V2 is validated, V1 tabs should be removed to simplify navigation.
+
+### D13: 4 V2 tabs map to 4 fundamental questions
+**Decision**: Each V2 tab answers exactly one question: TEAM (who are we?), OFFICE (what is happening now?), HISTORY (what happened?), SCHEDULE (what is next?). No mixing of concerns.
+**Why**: V1 tabs evolved organically and mixed concerns -- the Agents tab showed status, jobs, and queue data all in one view. The V2 tabs are purpose-built: each tab has a single responsibility and its own filter model.
+**Trade-off**: Users may need to switch tabs more often. The benefit is that each tab is focused and uncluttered.
+
+### D14: TEAM tab shows agent identity + skills + schedules
+**Decision**: The TEAM tab consolidates agent identity (from agents.json), skills/jobs (from jobs/*.json), and schedules (from schedules.json) into a single "team directory" view. Job names are click-to-copy for use in CLI commands.
+**Why**: Previously, understanding "what does this agent do?" required looking at multiple config files. The TEAM tab is the single place to see an agent's full profile.
+**Trade-off**: Requires merging three data sources on the client side. The /api/config endpoint already merges agents + jobs; schedules are fetched separately from /api/schedules.
+
+### D15: OFFICE tab is spatial, not a list
+**Decision**: The OFFICE tab renders a grid of "desks" -- one per agent -- with live status indicators. Working agents pulse with an elapsed timer. Idle agents show last activity. This is a spatial layout, not a vertical list.
+**Why**: The spatial metaphor gives ambient awareness -- like walking into a physical office and seeing who is at their desk working. A pulsing desk immediately draws attention to active work. A vertical list (as in V1) requires reading each row sequentially.
+**Trade-off**: Grid layout uses more vertical space with fewer agents visible per row. For the current 8 agents, a 4x2 grid fits well.
+
+### D16: HISTORY tab computes job health from events
+**Decision**: The HISTORY tab derives job health metrics (success rate per job, color-coded cards) from event pairs in events.jsonl. Started/completed/failed events are matched by run_id to compute outcomes. No new state files are introduced.
+**Why**: events.jsonl already contains all the data needed. Adding a separate health-tracking file would duplicate information and create consistency risks. Computing health on the client side means the metrics are always up-to-date with the latest events.
+**Trade-off**: Client-side computation may be slow with thousands of events. Mitigated by the /api/events endpoint's limit parameter and by computing health incrementally during rendering.
+
+### D17: Agent cards draggable in TEAM tab
+**Decision**: Agent cards in the TEAM tab support drag-and-drop reordering, persisted to localStorage under the key `vo-team-order`. This uses the same drag-and-drop pattern as the V1 agent list but with a separate storage key.
+**Why**: Users want to arrange agents by importance or frequency of use. A separate localStorage key prevents V1 and V2 ordering from interfering with each other.
+**Trade-off**: Drag-and-drop adds JS complexity. The implementation reuses the existing V1 drag logic, so the incremental cost is low.
+
+### D18: V2 replaces V1 filter model with per-tab filters
+**Decision**: V1 had a single Event Log tab with agent/type/time filters applied to all events. V2 splits filtering into context-specific controls: HISTORY has agent/job/result/time filters, SCHEDULE has an agent filter. Each filter set is tuned to its tab's data.
+**Why**: A single global filter bar forces users to mentally map generic filters to specific contexts. Per-tab filters use domain-specific vocabulary (e.g., "result" in HISTORY means success/failure, which does not apply to SCHEDULE).
+**Trade-off**: Filter state is not shared across tabs. This is intentional -- filtering HISTORY by "bug-killer" should not affect SCHEDULE view.
+
+### No new state files for V2
+**Decision**: V2 tabs read exclusively from existing data sources: dashboard.json (live status), events.jsonl (history), config/agents.json (identity), config/jobs/*.json (job definitions), config/schedules.json (timing). No new state files are introduced.
+**Why**: The existing data model is sufficient. Adding new files would increase the surface area for corruption, require atomic-write handling, and complicate the runner. V2 is a UI-only change -- it presents existing data in a better way.

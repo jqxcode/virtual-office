@@ -44,3 +44,7 @@ Before ANY Teams Graph API call (POST message, create channel, DELETE message), 
 ```
 
 For channel creation use `"action":"teams_channel_create"`. For message deletion use `"action":"teams_message_delete"`. Log AFTER the API call completes so `http_status` reflects the actual result. If the API call fails, still log it with the error status code.
+
+## 10. Open in Edge
+
+After saving any HTML report, open it in Edge using `python Q:/src/personal_projects/virtual-office/runner/open-in-edge.py <filepath>` (which deduplicates tabs). This behavior is controlled by the `openReportsInEdge` flag in `Q:/src/personal_projects/virtual-office/config/report-settings.json`. If the flag is `false` or the file does not exist, skip opening.

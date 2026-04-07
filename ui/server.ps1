@@ -209,12 +209,18 @@ try {
                         $auditLines = [System.IO.File]::ReadAllLines($af.FullName, [System.Text.Encoding]::UTF8)
                         foreach ($line in $auditLines) {
                             $trimmed = $line.Trim()
-                            if ($trimmed.Length -gt 0 -and $trimmed.StartsWith('{') -and $trimmed.EndsWith('}')) {
-                                # Normalize audit "action" field to "event" for consistency
-                                if ($trimmed -match '"action"' -and $trimmed -notmatch '"event"') {
-                                    $trimmed = $trimmed -replace '"action"\s*:', '"event":'
+                            if ($trimmed.Length -eq 0) { continue }
+                            # Split concatenated JSON objects
+                            $parts = [regex]::Split($trimmed, '(?<=\})(?=\{)')
+                            foreach ($part in $parts) {
+                                $p = $part.Trim()
+                                if ($p.Length -gt 0 -and $p.StartsWith('{') -and $p.EndsWith('}')) {
+                                    # Normalize audit "action" field to "event" for consistency
+                                    if ($p -match '"action"' -and $p -notmatch '"event"') {
+                                        $p = $p -replace '"action"\s*:', '"event":'
+                                    }
+                                    $nonEmpty += $p
                                 }
-                                $nonEmpty += $trimmed
                             }
                         }
                     }

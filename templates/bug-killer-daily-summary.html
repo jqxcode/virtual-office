@@ -10,11 +10,15 @@
   h2 { color: #00d4ff; border-bottom: 1px solid #333; padding-bottom: 6px; margin-top: 24px; margin-bottom: 12px; }
   .card { background: #16213e; border: 1px solid #0f3460; border-radius: 10px; padding: 20px; margin-bottom: 20px; }
   .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 24px; }
-  .stat-card { background: #16213e; border: 1px solid #0f3460; border-radius: 10px; padding: 16px; text-align: center; }
+  .stat-card { background: #16213e; border: 1px solid #0f3460; border-radius: 10px; padding: 16px; text-align: center; cursor: pointer; transition: border-color 0.2s, background 0.2s, transform 0.15s; }
+  .stat-card:hover { border-color: #00d4ff; background: #1e2d55; transform: translateY(-2px); }
+  .stat-card.active { border-color: #00d4ff; box-shadow: 0 0 8px rgba(0,212,255,0.3); }
   .stat-card .num { font-size: 32px; font-weight: 700; line-height: 1.1; }
   .stat-card .lbl { font-size: 10px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; }
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th { background: #0f3460; color: #00d4ff; padding: 10px 12px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+  th { background: #0f3460; color: #00d4ff; padding: 10px 12px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; user-select: none; white-space: nowrap; }
+  th .sort-arrow { display: inline-block; width: 12px; text-align: center; margin-left: 4px; font-size: 10px; color: #555; }
+  th:hover .sort-arrow { color: #00d4ff; }
   td { padding: 9px 12px; border-bottom: 1px solid #0f3460; }
   tr:last-child td { border-bottom: none; }
   tr:hover td { background: #1e2d55; }
@@ -25,6 +29,12 @@
   .badge-failed { background: #5c1a1a; color: #f44336; }
   .badge-skipped { background: #3a3a1a; color: #ffb300; }
   .no-activity { color: #888; font-style: italic; padding: 24px; text-align: center; }
+  .timeline-chart { width: 100%; overflow-x: auto; }
+  .timeline-chart svg { display: block; }
+  .timeline-fallback { font-size: 13px; color: #aaa; }
+  .timeline-bar:hover { opacity: 0.85; }
+  .filter-notice { margin-top: 8px; padding: 6px 12px; background: #0d1b2a; border-radius: 6px; font-size: 12px; color: #00d4ff; display: none; }
+  .filter-notice a { cursor: pointer; margin-left: 8px; }
 </style>
 </head>
 <body>
@@ -34,23 +44,23 @@
 
 <!-- KPI Cards -->
 <div class="cards">
-  <div class="stat-card">
+  <div class="stat-card" data-filter="scan-and-fix" onclick="filterByCard(this)">
     <div class="num" style="color:#4caf50">{{ISSUES_FIXED}}</div>
     <div class="lbl">Issues Fixed</div>
   </div>
-  <div class="stat-card">
+  <div class="stat-card" data-filter="open-pr-maintenance" onclick="filterByCard(this)">
     <div class="num" style="color:#00d4ff">{{PRS_CREATED}}</div>
     <div class="lbl">PRs Created</div>
   </div>
-  <div class="stat-card">
+  <div class="stat-card" data-filter="pr-comment" onclick="filterByCard(this)">
     <div class="num" style="color:#ab47bc">{{COMMENTS_ADDRESSED}}</div>
     <div class="lbl">PR Comments Addressed</div>
   </div>
-  <div class="stat-card">
+  <div class="stat-card" data-filter="merge-conflict" onclick="filterByCard(this)">
     <div class="num" style="color:#ffa726">{{CONFLICTS_RESOLVED}}</div>
     <div class="lbl">Merge Conflicts Resolved</div>
   </div>
-  <div class="stat-card">
+  <div class="stat-card" data-filter="skipped" onclick="filterByCard(this)">
     <div class="num" style="color:#888">{{SKIPPED_NOOP}}</div>
     <div class="lbl">Skipped / No-op</div>
   </div>
@@ -59,33 +69,264 @@
 <!-- Activity Table -->
 <div class="card">
   <h2>Activity (Past 24h)</h2>
+  <div class="filter-notice" id="filterNotice">
+    Showing: <span id="filterLabel"></span>
+    <a onclick="clearFilter()">Clear filter</a>
+  </div>
   <!-- If no activity, replace the table with: <p class="no-activity">No activity in the past 24 hours.</p> -->
-  <table>
+  <table id="activityTable">
     <thead>
       <tr>
-        <th>Time</th>
-        <th>Job Type</th>
-        <th>Repo</th>
-        <th>Issue/PR</th>
-        <th>Title</th>
-        <th>Outcome</th>
-        <th>Report</th>
+        <th onclick="sortTable(0)">Time <span class="sort-arrow">v</span></th>
+        <th onclick="sortTable(1)">Job Type <span class="sort-arrow">v</span></th>
+        <th onclick="sortTable(2)">Repo <span class="sort-arrow">v</span></th>
+        <th onclick="sortTable(3)">Issue/PR <span class="sort-arrow">v</span></th>
+        <th onclick="sortTable(4)">Title <span class="sort-arrow">v</span></th>
+        <th onclick="sortTable(5)">Report <span class="sort-arrow">v</span></th>
       </tr>
     </thead>
     <tbody>
       {{ACTIVITY_TABLE_ROWS}}
     </tbody>
   </table>
+
+  <!-- If any runs were skipped/no-op, show a brief summary -->
+  <div style="margin-top:12px; padding:10px; background:#0d1b2a; border-radius:6px; font-size:12px; color:#aaa;">
+    {{SKIPPED_SUMMARY}}
+  </div>
 </div>
 
 <!-- Agent Job Run Durations (from Get-JobDurations.py output) -->
 <div class="card">
-  <h2>Agent Job Run Durations</h2>
-  {{JOB_DURATIONS_CONTENT}}
+  <h2>Agent Job Run Durations (Past 30 Days)</h2>
+  <div class="timeline-chart" id="timelineChart">
+    <!-- Timeline chart rendered by JS from JOB_DURATIONS_DATA if available -->
+  </div>
+  <div class="timeline-fallback" id="timelineFallback">
+    {{JOB_DURATIONS_CONTENT}}
+  </div>
+  <!--
+    To enable the visual timeline chart, populate the script block below with JSON data.
+    Format: [ { "job": "scan-and-fix", "start": "2026-04-04T08:00:00", "end": "2026-04-04T08:12:30" }, ... ]
+    The template engine should set JOB_DURATIONS_DATA to a JSON array, or leave it empty for text fallback.
+  -->
+  <script id="jobDurationsData" type="application/json">{{JOB_DURATIONS_DATA}}</script>
 </div>
 
 <p style="text-align:center; color:#555; font-size:11px; margin-top:24px;">
   Generated by Virtual Office Bug Killer | {{DATE}}
 </p>
+
+<script>
+/* ---- Sortable Table ---- */
+var sortState = {};
+
+function sortTable(colIdx) {
+  var table = document.getElementById('activityTable');
+  if (!table) return;
+  var tbody = table.tBodies[0];
+  var rows = Array.prototype.slice.call(tbody.rows);
+  var dir = sortState[colIdx] === 'asc' ? 'desc' : 'asc';
+  sortState[colIdx] = dir;
+
+  rows.sort(function(a, b) {
+    var aText = (a.cells[colIdx] ? a.cells[colIdx].textContent : '').trim().toLowerCase();
+    var bText = (b.cells[colIdx] ? b.cells[colIdx].textContent : '').trim().toLowerCase();
+    if (aText < bText) return dir === 'asc' ? -1 : 1;
+    if (aText > bText) return dir === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  for (var i = 0; i < rows.length; i++) {
+    tbody.appendChild(rows[i]);
+  }
+
+  /* Update sort arrows */
+  var ths = table.querySelectorAll('th .sort-arrow');
+  for (var j = 0; j < ths.length; j++) {
+    ths[j].textContent = 'v';
+  }
+  var arrow = table.querySelectorAll('th')[colIdx].querySelector('.sort-arrow');
+  if (arrow) {
+    arrow.textContent = dir === 'asc' ? '^' : 'v';
+  }
+}
+
+/* ---- Stat Card Filtering ---- */
+var activeFilter = null;
+
+function filterByCard(el) {
+  var filter = el.getAttribute('data-filter');
+  var table = document.getElementById('activityTable');
+  if (!table) return;
+  var tbody = table.tBodies[0];
+  var rows = tbody.rows;
+  var notice = document.getElementById('filterNotice');
+  var label = document.getElementById('filterLabel');
+
+  /* Toggle off if same card clicked again */
+  if (activeFilter === filter) {
+    clearFilter();
+    return;
+  }
+
+  activeFilter = filter;
+
+  /* Remove active from all cards */
+  var cards = document.querySelectorAll('.stat-card');
+  for (var c = 0; c < cards.length; c++) {
+    cards[c].classList.remove('active');
+  }
+  el.classList.add('active');
+
+  for (var i = 0; i < rows.length; i++) {
+    var jobCell = rows[i].cells[1];
+    if (!jobCell) continue;
+    var jobText = jobCell.textContent.trim().toLowerCase();
+    if (jobText.indexOf(filter) !== -1) {
+      rows[i].style.display = '';
+    } else {
+      rows[i].style.display = 'none';
+    }
+  }
+
+  if (notice && label) {
+    label.textContent = el.querySelector('.lbl').textContent;
+    notice.style.display = 'block';
+  }
+}
+
+function clearFilter() {
+  activeFilter = null;
+  var table = document.getElementById('activityTable');
+  if (!table) return;
+  var tbody = table.tBodies[0];
+  var rows = tbody.rows;
+  for (var i = 0; i < rows.length; i++) {
+    rows[i].style.display = '';
+  }
+  var cards = document.querySelectorAll('.stat-card');
+  for (var c = 0; c < cards.length; c++) {
+    cards[c].classList.remove('active');
+  }
+  var notice = document.getElementById('filterNotice');
+  if (notice) notice.style.display = 'none';
+}
+
+/* ---- Timeline Chart ---- */
+(function() {
+  var dataEl = document.getElementById('jobDurationsData');
+  var chartEl = document.getElementById('timelineChart');
+  var fallbackEl = document.getElementById('timelineFallback');
+  if (!dataEl || !chartEl) return;
+
+  var raw = dataEl.textContent.trim();
+  var data;
+  try {
+    data = JSON.parse(raw);
+  } catch(e) {
+    /* No valid JSON -- show text fallback */
+    chartEl.style.display = 'none';
+    return;
+  }
+
+  if (!Array.isArray(data) || data.length === 0) {
+    chartEl.style.display = 'none';
+    return;
+  }
+
+  /* Hide text fallback, show chart */
+  if (fallbackEl) fallbackEl.style.display = 'none';
+
+  /* Collect unique job names and compute time range */
+  var jobNames = [];
+  var jobMap = {};
+  var minT = Infinity, maxT = -Infinity;
+
+  for (var i = 0; i < data.length; i++) {
+    var d = data[i];
+    var s = new Date(d.start).getTime();
+    var e = new Date(d.end).getTime();
+    if (s < minT) minT = s;
+    if (e > maxT) maxT = e;
+    if (!jobMap[d.job]) {
+      jobMap[d.job] = jobNames.length;
+      jobNames.push(d.job);
+    }
+  }
+
+  var colors = {
+    'scan-and-fix': '#4caf50',
+    'open-pr-maintenance': '#00d4ff',
+    'daily-summary': '#ffa726',
+    'pr-comment': '#ab47bc',
+    'merge-conflict': '#f44336'
+  };
+  var defaultColor = '#888';
+
+  var rowH = 32;
+  var padTop = 30;
+  var padBottom = 40;
+  var padLeft = 180;
+  var padRight = 20;
+  var chartW = 900;
+  var chartH = padTop + jobNames.length * rowH + padBottom;
+  var plotW = chartW - padLeft - padRight;
+  var range = maxT - minT || 1;
+
+  function timeX(t) {
+    return padLeft + ((t - minT) / range) * plotW;
+  }
+
+  var svgParts = [];
+  svgParts.push('<svg xmlns="http://www.w3.org/2000/svg" width="' + chartW + '" height="' + chartH + '" style="font-family:Segoe UI,sans-serif;">');
+
+  /* Y-axis labels */
+  for (var j = 0; j < jobNames.length; j++) {
+    var y = padTop + j * rowH + rowH / 2;
+    svgParts.push('<text x="' + (padLeft - 8) + '" y="' + (y + 4) + '" text-anchor="end" fill="#aaa" font-size="11">' + jobNames[j] + '</text>');
+    svgParts.push('<line x1="' + padLeft + '" y1="' + y + '" x2="' + (chartW - padRight) + '" y2="' + y + '" stroke="#0f3460" stroke-width="1"/>');
+  }
+
+  /* X-axis ticks -- up to 6 evenly spaced */
+  var ticks = 6;
+  for (var t = 0; t <= ticks; t++) {
+    var tv = minT + (range * t / ticks);
+    var tx = timeX(tv);
+    var dt = new Date(tv);
+    var lbl = ('0' + dt.getHours()).slice(-2) + ':' + ('0' + dt.getMinutes()).slice(-2);
+    svgParts.push('<line x1="' + tx + '" y1="' + padTop + '" x2="' + tx + '" y2="' + (chartH - padBottom) + '" stroke="#0f3460" stroke-width="1" stroke-dasharray="3,3"/>');
+    svgParts.push('<text x="' + tx + '" y="' + (chartH - padBottom + 16) + '" text-anchor="middle" fill="#666" font-size="10">' + lbl + '</text>');
+  }
+
+  /* Bars */
+  var barH = 18;
+  for (var k = 0; k < data.length; k++) {
+    var item = data[k];
+    var st = new Date(item.start).getTime();
+    var en = new Date(item.end).getTime();
+    var x1 = timeX(st);
+    var x2 = timeX(en);
+    var w = Math.max(x2 - x1, 3);
+    var row = jobMap[item.job];
+    var by = padTop + row * rowH + (rowH - barH) / 2;
+    var c = colors[item.job] || defaultColor;
+    var durSec = Math.round((en - st) / 1000);
+    var durM = Math.floor(durSec / 60);
+    var durS = durSec % 60;
+    var sDate = new Date(st);
+    var eDate = new Date(en);
+    var tip = item.job + ' | ' +
+      ('0'+sDate.getHours()).slice(-2)+':'+('0'+sDate.getMinutes()).slice(-2)+':'+('0'+sDate.getSeconds()).slice(-2) +
+      ' - ' +
+      ('0'+eDate.getHours()).slice(-2)+':'+('0'+eDate.getMinutes()).slice(-2)+':'+('0'+eDate.getSeconds()).slice(-2) +
+      ' (' + durM + 'm ' + durS + 's)';
+    svgParts.push('<rect class="timeline-bar" x="' + x1 + '" y="' + by + '" width="' + w + '" height="' + barH + '" rx="4" fill="' + c + '" opacity="0.8"><title>' + tip + '</title></rect>');
+  }
+
+  svgParts.push('</svg>');
+  chartEl.innerHTML = svgParts.join('');
+})();
+</script>
 </body>
 </html>

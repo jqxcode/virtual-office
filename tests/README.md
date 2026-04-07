@@ -26,6 +26,7 @@ Get-ChildItem tests/Test-*.ps1 | ForEach-Object { pwsh -File $_ }
 | Test-AtomicWrites.ps1 | Atomic file writes (.tmp rename), crash safety |
 | Test-UIRendering.ps1 | CSS/HTML structural validation: tooltip clipping, card sizing, required classes |
 | Test-ErrorTracking.ps1 | Error entries, schema validation, dashboard errorCount, resolved filtering, append-only, lastOutput |
+| Test-V2Tabs.ps1 | V2 tab HTML structure, CSS classes, JS functions, collapsible sections, pagination, report links |
 
 ## Conventions
 

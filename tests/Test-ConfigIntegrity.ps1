@@ -149,9 +149,9 @@ foreach ($agentName in ($agents.Keys | Sort-Object)) {
 # ========================================
 # TC8: No legacy agent names in schedules
 # ========================================
-Write-Host "`nTC8: No legacy agent names in schedules (memo-checker should be checker)" -ForegroundColor Cyan
+Write-Host "`nTC8: No legacy agent names in schedules (memo-checker/checker should be auditor)" -ForegroundColor Cyan
 
-$legacyNames = @("memo-checker")
+$legacyNames = @("memo-checker", "checker")
 $hasLegacy = $false
 foreach ($entry in $schedules) {
     $agent = $entry["agent"]
@@ -160,7 +160,7 @@ foreach ($entry in $schedules) {
         Write-Host "    Legacy agent name found in schedule: '$agent'" -ForegroundColor Yellow
     }
 }
-Assert-True (-not $hasLegacy) "No legacy agent names (memo-checker) found in schedules.json"
+Assert-True (-not $hasLegacy) "No legacy agent names (memo-checker, checker) found in schedules.json"
 
 # Also check agents.json
 $hasLegacyAgent = $false
@@ -170,7 +170,7 @@ foreach ($agentName in $agents.Keys) {
         Write-Host "    Legacy agent name found in agents.json: '$agentName'" -ForegroundColor Yellow
     }
 }
-Assert-True (-not $hasLegacyAgent) "No legacy agent names (memo-checker) found in agents.json"
+Assert-True (-not $hasLegacyAgent) "No legacy agent names (memo-checker, checker) found in agents.json"
 
 # --- Summary ---
 Write-Host "`n========================================" -ForegroundColor White
