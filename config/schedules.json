@@ -137,6 +137,12 @@
       "job": "FFv2-daily-summary",
       "cron": "0 12 * * 1-5",
       "description": "Feature Flight V2 daily report for direct reports flights, weekdays at noon"
+    },
+    {
+      "agent": "scrum-master",
+      "job": "shiproom-hygiene-check",
+      "cron": "0 5 * * *",
+      "description": "Shiproom hygiene checks (Task-to-Task parent links) at 5am daily"
     }
   ]
 }
