@@ -1,7 +1,7 @@
 {
   "jobs": {
     "approve-FFv2": {
-      "prompt": "Run the FFv2 approval script with the following parameters: python Q:/src/local_skills/data_tools/ffv2-approve.py {{EXTRA_ARGS}}. This approves pending Feature Flight V2 rollout approvals and flight requests via headless Edge CDP and the FFv2 API. Report the results summary printed by the script.",
+      "prompt": "Run the FFv2 approval script. The user's extra arguments are: {{EXTRA_ARGS}}. Execute: python Q:/src/local_skills/data_tools/ffv2-approve.py {{EXTRA_ARGS}}. The script auto-detects argument type: a number is a flight ID, a URL containing featureFlight/ extracts the ID, anything else is a person name. Report the results summary printed by the script.",
       "maxRuns": 0,
       "enabled": true,
       "saveOutput": false,
