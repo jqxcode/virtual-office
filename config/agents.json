@@ -64,6 +64,14 @@
       "description": "Deep research agent - combines log analysis, code tracing, Kusto telemetry, Edge CDP scraping, Graph API lookups, ADO operations, and Agency Teams messaging to investigate complex issues end-to-end",
       "staleLockTimeoutMinutes": 180,
       "group": "Work Agents"
+    },
+    "approver": {
+      "displayName": "Approver",
+      "icon": "",
+      "agentFile": "~/.claude/agents/approver.md",
+      "description": "Manual approval agent for web-based approval workflows (FFv2 flights, etc.)",
+      "staleLockTimeoutMinutes": 30,
+      "group": "Work Agents"
     }
   }
 }
