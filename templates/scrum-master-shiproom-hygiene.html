@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shiproom Hygiene Check - {{DATE}}</title>
+<style>
+  :root { --bg: #0d1117; --card: #161b22; --border: #30363d; --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff; --green: #66bb6a; --amber: #ffa726; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', -apple-system, sans-serif; background: var(--bg); color: var(--text); padding: 24px; max-width: 1200px; margin: 0 auto; font-size: 13px; }
+  h1 { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+  .subtitle { color: var(--muted); font-size: 12px; margin-bottom: 20px; }
+  .section { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-bottom: 20px; }
+  .section h2 { font-size: 16px; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+  .section h2 .count { font-size: 12px; background: #1a2a3a; color: var(--accent); padding: 2px 8px; border-radius: 12px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th { text-align: left; padding: 8px 10px; border-bottom: 2px solid var(--border); color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+  td { padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: 600; }
+  .badge-fixed { background: #1a3a1a; color: #66bb6a; }
+  .badge-flagged { background: #3a3a1a; color: #ffa726; }
+  .badge-moved { background: #1a2a3a; color: #58a6ff; }
+  .badge-closed { background: #1a3a1a; color: #66bb6a; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 24px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 16px; text-align: center; }
+  .card .num { font-size: 32px; font-weight: 700; line-height: 1.1; }
+  .card .lbl { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .all-clear { text-align: center; padding: 40px 20px; color: var(--green); font-size: 16px; font-weight: 600; }
+  .footer { margin-top: 32px; text-align: center; font-size: 10px; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<h1>Shiproom Hygiene Check - {{DATE}}</h1>
+<p style="color:#888; font-size:13px; margin-top:-10px;">{{VO_SUBTITLE}}</p>
+<div class="subtitle">Areas: Meeting Join (Fundamentals) + Meeting Notes | Sprint: {{CURRENT_SPRINT}}</div>
+
+<!-- KPI Cards -->
+<div class="cards">
+  <div class="card">
+    <div class="num">{{TOTAL_CHECKS}}</div>
+    <div class="lbl">Checks Run</div>
+  </div>
+  <div class="card">
+    <div class="num" style="color:#66bb6a;">{{CHECKS_PASSED}}</div>
+    <div class="lbl">Passed</div>
+  </div>
+  <div class="card">
+    <div class="num" style="color:#ffa726;">{{CHECKS_WITH_ISSUES}}</div>
+    <div class="lbl">Had Issues</div>
+  </div>
+  <div class="card">
+    <div class="num" style="color:#58a6ff;">{{TOTAL_ACTIONS}}</div>
+    <div class="lbl">Actions Taken</div>
+  </div>
+</div>
+
+<!-- ALL CLEAR: shown only when every check passed with zero issues -->
+{{ALL_CLEAR_SECTION}}
+<!-- Replace {{ALL_CLEAR_SECTION}} with:
+  <div class="section all-clear">All checks passed - no hygiene issues found.</div>
+  when CHECKS_WITH_ISSUES is 0; otherwise replace with empty string. -->
+
+<!-- Check 1: Task-to-Task Parent Links -->
+<!-- ONLY include this section if Check 1 found issues. Omit entirely if no issues. -->
+{{CHECK1_SECTION}}
+<!-- Replace {{CHECK1_SECTION}} with the block below ONLY if issues were found:
+<div class="section">
+  <h2>Check 1: Task-to-Task Parent Links <span class="count">N fixed</span></h2>
+  <p style="color:var(--muted); font-size:12px; margin-bottom:12px;">Tasks should not be parented under another Task. Parent link changed to Related, owner notified.</p>
+  <table>
+    <thead>
+      <tr><th>Task ID</th><th>Task Title</th><th>Former Parent ID</th><th>Former Parent Title</th><th>Owner</th><th>Action</th></tr>
+    </thead>
+    <tbody>
+      {{CHECK1_TABLE_ROWS}}
+      (one <tr> per item: <td><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/{id}">{id}</a></td><td>{title}</td><td><a href="...">{parent_id}</a></td><td>{parent_title}</td><td>{owner}</td><td><span class="badge badge-fixed">Fixed</span></td>)
+    </tbody>
+  </table>
+</div>
+If no issues, replace {{CHECK1_SECTION}} with empty string. -->
+
+<!-- Check 2: Close Resolved Work Items -->
+<!-- ONLY include this section if Check 2 found issues. Omit entirely if no issues. -->
+{{CHECK2_SECTION}}
+<!-- Replace {{CHECK2_SECTION}} with the block below ONLY if issues were found:
+<div class="section">
+  <h2>Check 2: Resolved Items Closed <span class="count">N closed</span></h2>
+  <p style="color:var(--muted); font-size:12px; margin-bottom:12px;">Resolved items should be Closed. State changed to Closed with comment.</p>
+  <table>
+    <thead>
+      <tr><th>ID</th><th>Type</th><th>Title</th><th>Owner</th><th>Action</th></tr>
+    </thead>
+    <tbody>
+      {{CHECK2_TABLE_ROWS}}
+      (one <tr> per item: <td><a href="...">{id}</a></td><td>{type}</td><td>{title}</td><td>{owner}</td><td><span class="badge badge-closed">Closed</span></td>)
+    </tbody>
+  </table>
+</div>
+If no issues, replace {{CHECK2_SECTION}} with empty string. -->
+
+<!-- Check 3: Move Non-Closed Items from Previous Sprint -->
+<!-- ONLY include this section if Check 3 found issues. Omit entirely if no issues. -->
+{{CHECK3_SECTION}}
+<!-- Replace {{CHECK3_SECTION}} with the block below ONLY if issues were found:
+<div class="section">
+  <h2>Check 3: Previous Sprint Leftovers <span class="count">N moved</span></h2>
+  <p style="color:var(--muted); font-size:12px; margin-bottom:12px;">Non-closed items from {{PREVIOUS_SPRINT}} moved to {{CURRENT_SPRINT}}.</p>
+  <table>
+    <thead>
+      <tr><th>ID</th><th>Type</th><th>Title</th><th>State</th><th>Owner</th><th>Action</th></tr>
+    </thead>
+    <tbody>
+      {{CHECK3_TABLE_ROWS}}
+      (one <tr> per item: <td><a href="...">{id}</a></td><td>{type}</td><td>{title}</td><td>{state}</td><td>{owner}</td><td><span class="badge badge-moved">Moved</span></td>)
+    </tbody>
+  </table>
+</div>
+If no issues, replace {{CHECK3_SECTION}} with empty string. -->
+
+<!-- Check 4: Current Sprint Tasks - Estimates and Parent -->
+<!-- ONLY include this section if Check 4 found issues. Omit entirely if no issues. -->
+{{CHECK4_SECTION}}
+<!-- Replace {{CHECK4_SECTION}} with the block below ONLY if issues were found:
+<div class="section">
+  <h2>Check 4: Tasks Missing Estimates or Parent <span class="count">N flagged</span></h2>
+  <p style="color:var(--muted); font-size:12px; margin-bottom:12px;">Current sprint tasks must have Original Estimate, Remaining Work, and a parent work item. Owners notified.</p>
+  <table>
+    <thead>
+      <tr><th>Task ID</th><th>Title</th><th>State</th><th>Owner</th><th>Issue</th><th>Action</th></tr>
+    </thead>
+    <tbody>
+      {{CHECK4_TABLE_ROWS}}
+      (one <tr> per item: <td><a href="...">{id}</a></td><td>{title}</td><td>{state}</td><td>{owner}</td><td>{issue description, e.g. "Missing Original Estimate, Remaining Work" or "No parent"}</td><td><span class="badge badge-flagged">Notified</span></td>)
+    </tbody>
+  </table>
+</div>
+If no issues, replace {{CHECK4_SECTION}} with empty string. -->
+
+<!-- Check 5: Non-Closed Bugs Not in Current Sprint -->
+<!-- ONLY include this section if Check 5 found issues. Omit entirely if no issues. -->
+{{CHECK5_SECTION}}
+<!-- Replace {{CHECK5_SECTION}} with the block below ONLY if issues were found:
+<div class="section">
+  <h2>Check 5: Stale Bugs Moved to Current Sprint <span class="count">N moved</span></h2>
+  <p style="color:var(--muted); font-size:12px; margin-bottom:12px;">Non-closed bugs must be in the current sprint. Moved from their previous iteration.</p>
+  <table>
+    <thead>
+      <tr><th>Bug ID</th><th>Title</th><th>State</th><th>Previous Sprint</th><th>Owner</th><th>Action</th></tr>
+    </thead>
+    <tbody>
+      {{CHECK5_TABLE_ROWS}}
+      (one <tr> per item: <td><a href="...">{id}</a></td><td>{title}</td><td>{state}</td><td>{old iteration name}</td><td>{owner}</td><td><span class="badge badge-moved">Moved</span></td>)
+    </tbody>
+  </table>
+</div>
+If no issues, replace {{CHECK5_SECTION}} with empty string. -->
+
+<!-- Future checks: follow the same pattern.
+  1. Add a {{CHECKn_SECTION}} placeholder here.
+  2. Include it ONLY if the check found issues; omit entirely if clean.
+  3. Use the same table structure with appropriate columns.
+  4. Use badge-fixed for auto-corrected items, badge-flagged for notified-only, badge-moved for relocated items, badge-closed for state changes. -->
+
+<div class="footer">Generated by Virtual Office - Scrum Master agent</div>
+</body>
+</html>
