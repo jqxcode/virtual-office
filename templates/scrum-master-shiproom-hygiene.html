@@ -162,6 +162,25 @@ If no issues, replace {{CHECK4_SECTION}} with empty string. -->
 </div>
 If no issues, replace {{CHECK5_SECTION}} with empty string. -->
 
+<!-- Check 6: Stale Tasks from Past Sprints -->
+<!-- ONLY include this section if Check 6 found issues. Omit entirely if no issues. -->
+{{CHECK6_SECTION}}
+<!-- Replace {{CHECK6_SECTION}} with the block below ONLY if issues were found:
+<div class="section">
+  <h2>Check 6: Stale Tasks Moved for Review <span class="count">N moved</span></h2>
+  <p style="color:var(--muted); font-size:12px; margin-bottom:12px;">Non-closed tasks from past sprints with an assignee moved to {{FUTURE_SPRINT}} for owner review.</p>
+  {{CHECK6_QUERY_LINK}}
+  <table>
+    <thead>
+      <tr><th>Task ID</th><th>Title</th><th>State</th><th>Previous Sprint</th><th>Owner</th><th>Action</th></tr>
+    </thead>
+    <tbody>
+      {{CHECK6_TABLE_ROWS}}
+    </tbody>
+  </table>
+</div>
+If no issues, replace {{CHECK6_SECTION}} with empty string. -->
+
 <!-- Future checks: follow the same pattern.
   1. Add a {{CHECKn_SECTION}} placeholder here.
   2. Include it ONLY if the check found issues; omit entirely if clean.
