@@ -29,6 +29,8 @@
   .card .lbl { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; }
   a { color: var(--accent); text-decoration: none; }
   a:hover { text-decoration: underline; }
+  .query-link { display: inline-block; margin-bottom: 12px; padding: 4px 12px; border: 1px solid var(--accent); border-radius: 6px; font-size: 11px; color: var(--accent); }
+  .query-link:hover { background: rgba(88,166,255,0.1); text-decoration: none; }
   .all-clear { text-align: center; padding: 40px 20px; color: var(--green); font-size: 16px; font-weight: 600; }
   .footer { margin-top: 32px; text-align: center; font-size: 10px; color: var(--muted); }
 </style>
@@ -72,13 +74,13 @@
 <div class="section">
   <h2>Check 1: Task-to-Task Parent Links <span class="count">N fixed</span></h2>
   <p style="color:var(--muted); font-size:12px; margin-bottom:12px;">Tasks should not be parented under another Task. Parent link changed to Related, owner notified.</p>
+  {{CHECK1_QUERY_LINK}}
   <table>
     <thead>
       <tr><th>Task ID</th><th>Task Title</th><th>Former Parent ID</th><th>Former Parent Title</th><th>Owner</th><th>Action</th></tr>
     </thead>
     <tbody>
       {{CHECK1_TABLE_ROWS}}
-      (one <tr> per item: <td><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/{id}">{id}</a></td><td>{title}</td><td><a href="...">{parent_id}</a></td><td>{parent_title}</td><td>{owner}</td><td><span class="badge badge-fixed">Fixed</span></td>)
     </tbody>
   </table>
 </div>
@@ -91,13 +93,13 @@ If no issues, replace {{CHECK1_SECTION}} with empty string. -->
 <div class="section">
   <h2>Check 2: Resolved Items Closed <span class="count">N closed</span></h2>
   <p style="color:var(--muted); font-size:12px; margin-bottom:12px;">Resolved items should be Closed. State changed to Closed with comment.</p>
+  {{CHECK2_QUERY_LINK}}
   <table>
     <thead>
       <tr><th>ID</th><th>Type</th><th>Title</th><th>Owner</th><th>Action</th></tr>
     </thead>
     <tbody>
       {{CHECK2_TABLE_ROWS}}
-      (one <tr> per item: <td><a href="...">{id}</a></td><td>{type}</td><td>{title}</td><td>{owner}</td><td><span class="badge badge-closed">Closed</span></td>)
     </tbody>
   </table>
 </div>
@@ -110,13 +112,13 @@ If no issues, replace {{CHECK2_SECTION}} with empty string. -->
 <div class="section">
   <h2>Check 3: Previous Sprint Leftovers <span class="count">N moved</span></h2>
   <p style="color:var(--muted); font-size:12px; margin-bottom:12px;">Non-closed items from {{PREVIOUS_SPRINT}} moved to {{CURRENT_SPRINT}}.</p>
+  {{CHECK3_QUERY_LINK}}
   <table>
     <thead>
       <tr><th>ID</th><th>Type</th><th>Title</th><th>State</th><th>Owner</th><th>Action</th></tr>
     </thead>
     <tbody>
       {{CHECK3_TABLE_ROWS}}
-      (one <tr> per item: <td><a href="...">{id}</a></td><td>{type}</td><td>{title}</td><td>{state}</td><td>{owner}</td><td><span class="badge badge-moved">Moved</span></td>)
     </tbody>
   </table>
 </div>
@@ -129,13 +131,13 @@ If no issues, replace {{CHECK3_SECTION}} with empty string. -->
 <div class="section">
   <h2>Check 4: Tasks Missing Estimates or Parent <span class="count">N flagged</span></h2>
   <p style="color:var(--muted); font-size:12px; margin-bottom:12px;">Current sprint tasks must have Original Estimate, Remaining Work, and a parent work item. Owners notified.</p>
+  {{CHECK4_QUERY_LINK}}
   <table>
     <thead>
       <tr><th>Task ID</th><th>Title</th><th>State</th><th>Owner</th><th>Issue</th><th>Action</th></tr>
     </thead>
     <tbody>
       {{CHECK4_TABLE_ROWS}}
-      (one <tr> per item: <td><a href="...">{id}</a></td><td>{title}</td><td>{state}</td><td>{owner}</td><td>{issue description, e.g. "Missing Original Estimate, Remaining Work" or "No parent"}</td><td><span class="badge badge-flagged">Notified</span></td>)
     </tbody>
   </table>
 </div>
@@ -148,13 +150,13 @@ If no issues, replace {{CHECK4_SECTION}} with empty string. -->
 <div class="section">
   <h2>Check 5: Stale Bugs Moved to Current Sprint <span class="count">N moved</span></h2>
   <p style="color:var(--muted); font-size:12px; margin-bottom:12px;">Non-closed bugs must be in the current sprint. Moved from their previous iteration.</p>
+  {{CHECK5_QUERY_LINK}}
   <table>
     <thead>
       <tr><th>Bug ID</th><th>Title</th><th>State</th><th>Previous Sprint</th><th>Owner</th><th>Action</th></tr>
     </thead>
     <tbody>
       {{CHECK5_TABLE_ROWS}}
-      (one <tr> per item: <td><a href="...">{id}</a></td><td>{title}</td><td>{state}</td><td>{old iteration name}</td><td>{owner}</td><td><span class="badge badge-moved">Moved</span></td>)
     </tbody>
   </table>
 </div>
@@ -164,7 +166,11 @@ If no issues, replace {{CHECK5_SECTION}} with empty string. -->
   1. Add a {{CHECKn_SECTION}} placeholder here.
   2. Include it ONLY if the check found issues; omit entirely if clean.
   3. Use the same table structure with appropriate columns.
-  4. Use badge-fixed for auto-corrected items, badge-flagged for notified-only, badge-moved for relocated items, badge-closed for state changes. -->
+  4. Use badge-fixed for auto-corrected items, badge-flagged for notified-only, badge-moved for relocated items, badge-closed for state changes.
+  5. Include a {{CHECKn_QUERY_LINK}} placeholder before the table. Replace with:
+     <a class="query-link" href="https://domoreexp.visualstudio.com/MSTeams/_workitems?_a=query&wiql={URL-encoded WIQL}">Open all N items in ADO query</a>
+     Build the WIQL as: SELECT [System.Id],[System.Title],[System.State],[System.AssignedTo],[System.WorkItemType] FROM workitems WHERE [System.Id] IN (id1,id2,...) ORDER BY [System.Id]
+     URL-encode the WIQL. For large result sets (>100 items), use a date+area filter instead of ID list to keep URLs short. -->
 
 <div class="footer">Generated by Virtual Office - Scrum Master agent</div>
 </body>
