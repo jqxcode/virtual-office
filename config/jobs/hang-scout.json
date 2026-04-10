@@ -1,7 +1,7 @@
 {
   "jobs": {
     "detect-hang": {
-      "prompt": "Run hang detection scan now. Read the 'hangDetection' config from this job definition for per-agent thresholds. Scan all VO agent lock files under Q:/src/personal_projects/virtual-office/state/agents/*/lock. For each lock, check if the age exceeds that agent's hangThresholdMinutes (default 60). For hung jobs: walk the process tree, capture py-spy stack traces for Python processes, classify the hang, decide whether to kill (only if age > killThresholdMinutes), log the incident, and file GitHub issues for new patterns. Skip any agents listed in 'exclude'. Output a scan summary at the end. IMPORTANT: Your output MUST use ASCII-only characters. Use -- instead of em dashes, -> instead of arrows (right arrow), <- instead of left arrows, ... instead of ellipsis, and straight quotes instead of curly quotes.",
+      "prompt": "Run hang detection scan now. Read the 'hangDetection' config from this job definition for per-agent thresholds. Scan all VO agent lock files under Q:/src/personal_projects/virtual-office/state/agents/*/lock. For each lock, check if the age exceeds that agent's hangThresholdMinutes (default 60). For hung jobs: walk the process tree, capture py-spy stack traces for Python processes, classify the hang, decide whether to kill (only if age > killThresholdMinutes), log the incident, and file GitHub issues for new patterns. IMPORTANT: After classifying a hang, check the 'perClassification' section for a classification-specific killThresholdMinutes override. If the hang classification matches a key in perClassification, use that killThresholdMinutes instead of the agent-level one. This allows fast-kill for hang types that are unrecoverable (e.g. stale_task_poll). Skip any agents listed in 'exclude'. Output a scan summary at the end. IMPORTANT: Your output MUST use ASCII-only characters. Use -- instead of em dashes, -> instead of arrows (right arrow), <- instead of left arrows, ... instead of ellipsis, and straight quotes instead of curly quotes.",
       "maxRuns": 0,
       "enabled": true,
       "saveOutput": true,
@@ -10,6 +10,12 @@
         "defaultHangThresholdMinutes": 60,
         "defaultKillThresholdMinutes": 120,
         "exclude": ["hang-scout"],
+        "perClassification": {
+          "stale_task_poll": {
+            "killThresholdMinutes": 75,
+            "reason": "Parent agent is polling a completed subagent task and will not recover on its own. Kill after 75 min (hangThreshold + 15 min grace) rather than waiting for the full agent kill threshold."
+          }
+        },
         "perAgent": {
           "scrum-master": {
             "hangThresholdMinutes": 60,
@@ -35,7 +41,7 @@
       }
     },
     "detect-scrum-master": {
-      "prompt": "Run hang detection scan targeting ONLY the scrum-master agent. Use hangThresholdMinutes=30 and killThresholdMinutes=60 for this scan (override the config defaults). Scan ONLY the lock file at Q:/src/personal_projects/virtual-office/state/agents/scrum-master/lock. If age >= 30 minutes: walk the process tree, capture py-spy stack traces for Python processes, classify the hang, decide whether to kill (only if age > 60 min), log the incident, and file GitHub issues for new patterns. Output scan summary. IMPORTANT: Your output MUST use ASCII-only characters. Use -- instead of em dashes, -> instead of arrows (right arrow), <- instead of left arrows, ... instead of ellipsis, and straight quotes instead of curly quotes.",
+      "prompt": "Run hang detection scan targeting ONLY the scrum-master agent. Use hangThresholdMinutes=30 and killThresholdMinutes=60 for this scan (override the config defaults). Scan ONLY the lock file at Q:/src/personal_projects/virtual-office/state/agents/scrum-master/lock. If age >= 30 minutes: walk the process tree, capture py-spy stack traces for Python processes, classify the hang, decide whether to kill (only if age > 60 min), log the incident, and file GitHub issues for new patterns. IMPORTANT: After classifying the hang, check the 'perClassification' section in the detect-hang job config for a classification-specific killThresholdMinutes override. If the classification matches (e.g. stale_task_poll -> 75 min), use that threshold instead. Output scan summary. IMPORTANT: Your output MUST use ASCII-only characters. Use -- instead of em dashes, -> instead of arrows (right arrow), <- instead of left arrows, ... instead of ellipsis, and straight quotes instead of curly quotes.",
       "maxRuns": 0,
       "enabled": true,
       "saveOutput": true,
