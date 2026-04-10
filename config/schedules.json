@@ -133,6 +133,12 @@
       "description": "Bug Autopilot Performance Analysis post to Teams at 9pm daily"
     },
     {
+      "agent": "approver",
+      "job": "approve-CoreIdentity",
+      "cron": "0 8 * * *",
+      "description": "CoreIdentity entitlement approvals at 8am daily"
+    },
+    {
       "agent": "auditor",
       "job": "FFv2-daily-summary",
       "cron": "0 12 * * 1-5",

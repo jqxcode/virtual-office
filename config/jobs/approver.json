@@ -1,5 +1,13 @@
 {
   "jobs": {
+    "approve-CoreIdentity": {
+      "prompt": "Run the CoreIdentity approval script to check and approve all pending entitlement approvals. Execute: python Q:/src/local_skills/data_tools/coreidentity-approve.py. Report the results summary printed by the script. If the script reports errors connecting to CDP, note that headless Edge may need to be relaunched.",
+      "cron": "0 8 * * *",
+      "maxRuns": 0,
+      "enabled": true,
+      "saveOutput": false,
+      "description": "Check and approve pending CoreIdentity entitlement approvals daily"
+    },
     "approve-FFv2": {
       "prompt": "Run the FFv2 approval script. The user's extra arguments are: {{EXTRA_ARGS}}. Execute: python Q:/src/local_skills/data_tools/ffv2-approve.py {{EXTRA_ARGS}}. The script auto-detects argument type: a number is a flight ID, a URL containing featureFlight/ extracts the ID, anything else is a person name. Report the results summary printed by the script.",
       "maxRuns": 0,
