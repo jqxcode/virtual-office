@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<!-- vo-theme-0.2.0 -->
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Harness Performance Report - {{DATE}}</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
+  :root {
+    --vo-bg-deep: #0d1117; --vo-bg-panel: #010409; --vo-bg-surface: #161b22;
+    --vo-bg-hover: #1c2128; --vo-bg-recessed: #0a0c10;
+    --vo-text-primary: #e6edf3; --vo-text-secondary: #d0d6e0;
+    --vo-text-tertiary: #8b949e; --vo-text-quaternary: #484f58;
+    --vo-accent: #22c55e; --vo-accent-secondary: #10b981; --vo-accent-hover: #16a34a;
+    --vo-border-subtle: rgba(255,255,255,0.05); --vo-border-standard: rgba(255,255,255,0.08);
+    --vo-border-solid: #30363d; --vo-border-solid-light: #21262d;
+    --vo-status-success: #22c55e; --vo-status-error: #ef4444;
+    --vo-status-warning: #f59e0b; --vo-status-info: #3b82f6;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    font-feature-settings: "cv01", "ss03";
+    background: var(--vo-bg-deep); color: var(--vo-text-secondary); line-height: 1.6;
+    max-width: 1000px; margin: 0 auto; padding: 32px;
+  }
+  h1 { color: var(--vo-text-primary); font-size: 32px; font-weight: 500; letter-spacing: -0.704px; margin-bottom: 4px; }
+  .subtitle { color: var(--vo-text-tertiary); font-size: 13px; margin-bottom: 24px; }
+  .card { background: var(--vo-bg-surface); border: 1px solid var(--vo-border-standard); border-radius: 8px; padding: 24px; margin-bottom: 20px; }
+  .card h2 { color: var(--vo-text-primary); font-size: 18px; font-weight: 500; margin-bottom: 16px; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 24px; }
+  .stat-card { background: var(--vo-bg-surface); border: 1px solid var(--vo-border-standard); border-radius: 8px; padding: 20px; text-align: center; }
+  .stat-card .number { font-size: 36px; font-weight: 500; letter-spacing: -1px; color: var(--vo-text-primary); font-feature-settings: "cv01", "ss03", "tnum"; }
+  .stat-card .label { font-size: 13px; color: var(--vo-text-tertiary); margin-top: 4px; }
+  .stat-card .delta { font-size: 13px; font-weight: 500; margin-top: 4px; }
+  .delta-good { color: var(--vo-status-success); }
+  .delta-bad { color: var(--vo-status-error); }
+  .delta-neutral { color: var(--vo-text-tertiary); }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; margin: 16px 0; }
+  th { background: var(--vo-bg-panel); text-align: left; padding: 10px 14px; font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; color: var(--vo-text-tertiary); border-bottom: 1px solid var(--vo-border-standard); }
+  td { padding: 10px 14px; border-bottom: 1px solid var(--vo-border-subtle); color: var(--vo-text-secondary); }
+  tr:hover td { background: var(--vo-bg-hover); }
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 9999px; font-size: 12px; font-weight: 500; }
+  .badge-success { background: rgba(34,197,94,0.15); color: var(--vo-status-success); }
+  .badge-warning { background: rgba(245,158,11,0.15); color: var(--vo-status-warning); }
+  .badge-error { background: rgba(239,68,68,0.15); color: var(--vo-status-error); }
+  .badge-neutral { background: rgba(139,148,158,0.15); color: var(--vo-text-tertiary); }
+  .bar-container { display: flex; align-items: center; gap: 8px; }
+  .bar { height: 20px; border-radius: 4px; min-width: 2px; transition: width 0.3s; }
+  .bar-success { background: var(--vo-status-success); }
+  .bar-error { background: var(--vo-status-error); }
+  .bar-duration { background: var(--vo-status-info); opacity: 0.6; }
+  .mono { font-family: 'Cascadia Code', ui-monospace, monospace; font-size: 13px; }
+  .section-note { font-size: 13px; color: var(--vo-text-tertiary); margin-top: 12px; font-style: italic; }
+  a { color: var(--vo-accent); text-decoration: none; }
+  a:hover { color: var(--vo-accent-hover); text-decoration: underline; }
+  .footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid var(--vo-border-subtle); color: var(--vo-text-quaternary); font-size: 12px; }
+</style>
+</head>
+<body>
+
+<h1>Harness Performance Report</h1>
+<p class="subtitle">{{VO_SUBTITLE}}</p>
+
+<!-- Section 1: Summary Stats -->
+<div class="stats">
+  {{STAT_CARDS}}
+</div>
+
+<!-- Section 2: Weekly Comparison -->
+<div class="card">
+  <h2>Week-over-Week Comparison</h2>
+  <p style="font-size:13px; color:var(--vo-text-tertiary); margin-bottom:12px;">
+    Current: {{CURRENT_WEEK_RANGE}} | Previous: {{PREVIOUS_WEEK_RANGE}}
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th>Metric</th>
+        <th>Previous Week</th>
+        <th>Current Week</th>
+        <th>Delta</th>
+        <th>Trend</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{COMPARISON_ROWS}}
+    </tbody>
+  </table>
+</div>
+
+<!-- Section 3: Agent-Level Breakdown -->
+<div class="card">
+  <h2>Agent Performance</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Agent</th>
+        <th>Runs</th>
+        <th>Success Rate</th>
+        <th>Avg Duration</th>
+        <th>Errors</th>
+        <th>Hangs</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{AGENT_ROWS}}
+    </tbody>
+  </table>
+</div>
+
+<!-- Section 4: Duration Trend -->
+<div class="card">
+  <h2>Daily Run Duration (all agents combined)</h2>
+  <p style="font-size:13px; color:var(--vo-text-tertiary); margin-bottom:12px;">
+    Average duration per job run, by day. Shorter = less retry/loop overhead.
+  </p>
+  {{DURATION_CHART}}
+</div>
+
+<!-- Section 5: Error Log -->
+<div class="card">
+  <h2>Errors This Week</h2>
+  {{ERROR_TABLE}}
+</div>
+
+<!-- Section 6: Loop Detections -->
+<div class="card">
+  <h2>Loop Detections</h2>
+  {{LOOP_SECTION}}
+</div>
+
+<!-- Section 7: Harness Changes Applied -->
+<div class="card">
+  <h2>Harness Changes Since Baseline</h2>
+  <ul style="padding-left: 20px; font-size: 14px;">
+    {{HARNESS_CHANGES}}
+  </ul>
+  <p class="section-note">Baseline date: {{BASELINE_DATE}}</p>
+</div>
+
+</body>
+</html>
