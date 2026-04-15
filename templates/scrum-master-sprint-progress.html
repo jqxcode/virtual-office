@@ -1,55 +1,76 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sprint Progress - {{SPRINT_NAME}}</title>
-  <style>
-    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #1a1a2e; color: #e0e0e0; margin: 0; padding: 24px; }
-    .container { max-width: 1100px; margin: 0 auto; }
-    h1 { color: #00d4ff; font-size: 1.8rem; margin-bottom: 8px; }
-    .subtitle { color: #888; font-size: 0.9rem; margin-bottom: 24px; }
-    .card { background: #16213e; border: 1px solid #0f3460; border-radius: 10px; padding: 20px; margin-bottom: 20px; }
-    .card h2 { color: #00d4ff; font-size: 1.1rem; margin: 0 0 12px 0; border-bottom: 1px solid #0f3460; padding-bottom: 8px; }
-    .card h3 { color: #00d4ff; font-size: 0.95rem; margin: 16px 0 8px 0; }
-    a { color: #00d4ff; text-decoration: none; }
-    a:hover { text-decoration: underline; }
+<!-- vo-theme-0.2.0 -->
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sprint Progress - {{SPRINT_NAME}}</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
+  :root {
+    --vo-bg-deep: #0d1117; --vo-bg-panel: #010409; --vo-bg-surface: #161b22;
+    --vo-bg-hover: #1c2128; --vo-bg-recessed: #0a0c10;
+    --vo-text-primary: #e6edf3; --vo-text-secondary: #d0d6e0;
+    --vo-text-tertiary: #8b949e; --vo-text-quaternary: #484f58;
+    --vo-accent: #22c55e; --vo-accent-secondary: #10b981; --vo-accent-hover: #16a34a;
+    --vo-border-subtle: rgba(255,255,255,0.05); --vo-border-standard: rgba(255,255,255,0.08);
+    --vo-border-solid: #30363d; --vo-border-solid-light: #21262d;
+    --vo-status-success: #22c55e; --vo-status-error: #ef4444;
+    --vo-status-warning: #f59e0b; --vo-status-info: #3b82f6;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    font-feature-settings: "cv01", "ss03";
+    background: var(--vo-bg-deep); color: var(--vo-text-secondary); line-height: 1.5;
+    max-width: 1100px; margin: 0 auto; padding: 24px;
+  }
+  h1 { color: var(--vo-text-primary); font-size: 32px; font-weight: 500; letter-spacing: -0.704px; margin-bottom: 8px; }
+  h2 { color: var(--vo-text-primary); font-size: 24px; font-weight: 500; letter-spacing: -0.288px; margin: 24px 0 12px; }
+  h3 { color: var(--vo-text-primary); font-size: 20px; font-weight: 600; letter-spacing: -0.24px; margin: 16px 0 8px; }
+  .subtitle { color: var(--vo-text-tertiary); font-size: 15px; font-weight: 400; margin-bottom: 24px; }
+  .card { background: var(--vo-bg-surface); border: 1px solid var(--vo-border-standard); border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+  .card h2 { color: var(--vo-text-primary); font-size: 18px; font-weight: 500; margin: 0 0 12px 0; border-bottom: 1px solid var(--vo-border-subtle); padding-bottom: 8px; }
+  .card h3 { color: var(--vo-text-primary); font-size: 16px; font-weight: 600; margin: 16px 0 8px 0; }
+  a { color: var(--vo-accent); text-decoration: none; }
+  a:hover { color: var(--vo-accent-hover); text-decoration: underline; }
 
-    /* Summary tiles */
-    .tiles { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 8px; }
-    .tile { background: #0d1b2a; border: 1px solid #0f3460; border-radius: 8px; padding: 14px 20px; min-width: 120px; text-align: center; }
-    .tile .num { font-size: 2rem; font-weight: 700; }
-    .tile .num a { color: inherit; }
-    .tile .lbl { font-size: 0.78rem; color: #888; margin-top: 2px; }
-    .tile-green .num { color: #2ecc71; }
-    .tile-blue .num { color: #00d4ff; }
-    .tile-amber .num { color: #f39c12; }
-    .tile-grey .num { color: #aaa; }
+  /* Summary tiles */
+  .tiles { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 8px; }
+  .tile { background: var(--vo-bg-recessed); border: 1px solid var(--vo-border-standard); border-radius: 8px; padding: 14px 20px; min-width: 120px; text-align: center; }
+  .tile .num { font-size: 32px; font-weight: 500; }
+  .tile .num a { color: inherit; }
+  .tile .lbl { font-size: 13px; font-weight: 500; color: var(--vo-text-tertiary); margin-top: 2px; }
+  .tile-green .num { color: var(--vo-status-success); }
+  .tile-blue .num { color: var(--vo-status-info); }
+  .tile-amber .num { color: var(--vo-status-warning); }
+  .tile-grey .num { color: var(--vo-text-tertiary); }
 
-    /* Tables */
-    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-top: 8px; }
-    th { text-align: left; padding: 8px 12px; color: #888; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid #0f3460; }
-    td { padding: 8px 12px; border-bottom: 1px solid #0f3460; }
-    tr:hover { background: #0d1b2a; }
+  /* Tables */
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+  th { background: var(--vo-bg-panel); color: var(--vo-text-tertiary); font-size: 13px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--vo-border-standard); }
+  td { padding: 10px 14px; font-size: 14px; border-bottom: 1px solid var(--vo-border-subtle); color: var(--vo-text-secondary); }
+  tr:hover td { background: var(--vo-bg-hover); }
 
-    /* Status badges */
-    .badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }
-    .badge-done { background: #1e8449; color: #fff; }
-    .badge-active { background: #2980b9; color: #fff; }
-    .badge-new { background: #555; color: #ccc; }
-    .badge-blocked { background: #922b21; color: #fff; }
+  /* Status badges */
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 9999px; font-size: 12px; font-weight: 500; }
+  .badge-done { background: rgba(34,197,94,0.15); color: var(--vo-status-success); }
+  .badge-active { background: rgba(59,130,246,0.15); color: var(--vo-status-info); }
+  .badge-new { background: rgba(139,148,158,0.15); color: var(--vo-text-tertiary); }
+  .badge-blocked { background: rgba(239,68,68,0.15); color: var(--vo-status-error); }
 
-    /* Comparison table */
-    .compare-table td.delta-pos { color: #2ecc71; }
-    .compare-table td.delta-neg { color: #e74c3c; }
-    .compare-table td.delta-zero { color: #888; }
-  </style>
+  /* Comparison table */
+  .compare-table td.delta-pos { color: var(--vo-status-success); }
+  .compare-table td.delta-neg { color: var(--vo-status-error); }
+  .compare-table td.delta-zero { color: var(--vo-text-tertiary); }
+
+  .footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid var(--vo-border-subtle); color: var(--vo-text-quaternary); font-size: 12px; }
+</style>
 </head>
 <body>
-<div class="container">
 
   <h1>Sprint Progress - {{SPRINT_NAME}}</h1>
-  <p style="color:#888; font-size:13px; margin-top:0;">{{VO_SUBTITLE}}</p>
+  <p style="color:var(--vo-text-tertiary); font-size:13px; margin-top:0;">{{VO_SUBTITLE}}</p>
   <div class="subtitle">{{SPRINT_DATES}} | Generated {{TIMESTAMP}}</div>
 
   <!-- ===== SECTION 1: Sprint Summary ===== -->
@@ -62,13 +83,13 @@
       <div class="tile tile-grey"><div class="num"><a href="{{NOT_STARTED_URL}}">{{NOT_STARTED}}</a></div><div class="lbl">Not Started</div></div>
       <div class="tile tile-amber"><div class="num"><a href="{{BLOCKED_URL}}">{{BLOCKED}}</a></div><div class="lbl">Blocked</div></div>
     </div>
-    <p style="font-size:0.85rem;color:#aaa;margin-top:12px">Day {{SPRINT_DAY}} of {{SPRINT_LENGTH}} | {{DAYS_REMAINING}} days remaining</p>
+    <p style="font-size:14px;color:var(--vo-text-tertiary);margin-top:12px">Day {{SPRINT_DAY}} of {{SPRINT_LENGTH}} | {{DAYS_REMAINING}} days remaining</p>
   </div>
 
   <!-- ===== SECTION 2: Sprint Comparison ===== -->
   <div class="card">
     <h2>Sprint Comparison (Previous vs Current)</h2>
-    <p style="font-size:0.82rem;color:#888;margin-bottom:12px">Comparing {{PREV_SPRINT_NAME}} with {{SPRINT_NAME}}</p>
+    <p style="font-size:13px;color:var(--vo-text-tertiary);margin-bottom:12px">Comparing {{PREV_SPRINT_NAME}} with {{SPRINT_NAME}}</p>
     <table class="compare-table">
       <thead>
         <tr><th>Metric</th><th>Previous</th><th>Current</th><th>Delta</th></tr>
@@ -132,7 +153,7 @@
   <!-- ===== SECTION 5: Meeting Join Highlights ===== -->
   <div class="card">
     <h2>Meeting Join Highlights</h2>
-    <ul>
+    <ul style="padding-left:20px; line-height:1.8;">
       {{MJ_HIGHLIGHTS}}
     </ul>
   </div>
@@ -140,7 +161,7 @@
   <!-- ===== SECTION 6: Meeting Notes Highlights ===== -->
   <div class="card">
     <h2>Meeting Notes Highlights</h2>
-    <ul>
+    <ul style="padding-left:20px; line-height:1.8;">
       {{MEETING_HIGHLIGHTS}}
     </ul>
   </div>
@@ -148,11 +169,10 @@
   <!-- ===== SECTION 7: Blockers and Risks ===== -->
   <div class="card">
     <h2>Blockers and Risks</h2>
-    <ul>
+    <ul style="padding-left:20px; line-height:1.8;">
       {{BLOCKERS}}
     </ul>
   </div>
 
-</div>
 </body>
 </html>

@@ -23,11 +23,14 @@ sys.stdout.reconfigure(encoding="utf-8")
 PROJECT_ROOT = Path(__file__).parent.parent
 AUDIT_DIR = PROJECT_ROOT / "output" / "audit"
 
+# VDS vo-theme-0.2.0 aligned colors
 AGENT_COLORS = {
-    "scrum-master": "#3498db",
-    "bug-killer": "#e74c3c",
-    "emailer": "#2ecc71",
-    "auditor": "#9b59b6",
+    "scrum-master": "#3b82f6",   # --vo-status-info
+    "bug-killer": "#ef4444",     # --vo-status-error
+    "emailer": "#22c55e",        # --vo-status-success
+    "auditor": "#a855f7",        # purple (consistent with app.js)
+    "poster": "#f59e0b",         # --vo-status-warning
+    "hang-scout": "#06b6d4",     # cyan
 }
 
 def parse_duration(s):

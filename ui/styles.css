@@ -1,4 +1,21 @@
 /* === Reset & Base === */
+/* vo-theme-0.2.0 */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
+
+:root {
+  --vo-bg-deep: #0d1117; --vo-bg-panel: #010409; --vo-bg-surface: #161b22;
+  --vo-bg-hover: #1c2128; --vo-bg-recessed: #0a0c10;
+  --vo-text-primary: #e6edf3; --vo-text-secondary: #d0d6e0;
+  --vo-text-tertiary: #8b949e; --vo-text-quaternary: #484f58;
+  --vo-accent: #22c55e; --vo-accent-secondary: #10b981; --vo-accent-hover: #16a34a;
+  --vo-accent-glow: rgba(34,197,94,0.15);
+  --vo-border-subtle: rgba(255,255,255,0.05); --vo-border-standard: rgba(255,255,255,0.08);
+  --vo-border-solid: #30363d; --vo-border-solid-light: #21262d;
+  --vo-status-success: #22c55e; --vo-status-error: #ef4444;
+  --vo-status-warning: #f59e0b; --vo-status-info: #3b82f6;
+  --vo-status-idle: #8b949e;
+}
+
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
@@ -6,9 +23,10 @@
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  background: #0d1117;
-  color: #e6edf3;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  font-feature-settings: "cv01", "ss03";
+  background: var(--vo-bg-deep);
+  color: var(--vo-text-primary);
   min-height: 100vh;
 }
 
@@ -29,7 +47,7 @@ body {
 
 .header-title {
   font-size: 1.25rem;
-  font-weight: 700;
+  font-weight: 500;
   letter-spacing: -0.01em;
   color: #e6edf3;
 }
@@ -325,7 +343,7 @@ body {
 /* Job status labels */
 .job-status-label {
   font-size: 0.65rem;
-  font-weight: 700;
+  font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   padding: 0.1rem 0.4rem;
@@ -434,7 +452,7 @@ body {
 
 .tooltip-title {
   font-size: 0.7rem;
-  font-weight: 700;
+  font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: #8b949e;
@@ -523,7 +541,7 @@ body {
 
 .modal-title {
   font-size: 1rem;
-  font-weight: 700;
+  font-weight: 500;
   color: #e6edf3;
 }
 
@@ -576,7 +594,7 @@ body {
 
 .error-level {
   font-size: 0.65rem;
-  font-weight: 700;
+  font-weight: 500;
   padding: 0.15rem 0.45rem;
   border-radius: 4px;
   text-transform: uppercase;
@@ -755,7 +773,7 @@ body {
 
 .running-section-title {
   font-size: 0.7rem;
-  font-weight: 700;
+  font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: #8b949e;
@@ -786,7 +804,7 @@ body {
 .running-duration {
   font-family: "Cascadia Code", "Fira Code", "Consolas", monospace;
   font-size: 1.1rem;
-  font-weight: 700;
+  font-weight: 500;
   color: #3b82f6;
   text-align: center;
   padding: 0.4rem 0;
@@ -847,7 +865,7 @@ body {
 
 .stat-label {
   font-size: 0.65rem;
-  font-weight: 700;
+  font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: #8b949e;
@@ -856,7 +874,7 @@ body {
 
 .stat-primary {
   font-size: 1.5rem;
-  font-weight: 700;
+  font-weight: 500;
   color: #e6edf3;
   line-height: 1.2;
 }
@@ -896,7 +914,7 @@ body {
   gap: 0.6rem;
   margin-bottom: 0.75rem;
   font-size: 0.72rem;
-  font-weight: 700;
+  font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: #8b949e;
@@ -1042,7 +1060,7 @@ body {
 
 .activity-type-badge {
   font-size: 0.6rem;
-  font-weight: 700;
+  font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   padding: 0.12rem 0.45rem;
@@ -1245,7 +1263,7 @@ body {
   background: #0d1117;
   color: #8b949e;
   font-size: 0.7rem;
-  font-weight: 700;
+  font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   padding: 0.6rem 0.8rem;
@@ -1314,7 +1332,7 @@ body {
 
 .schedule-status-badge {
   font-size: 0.65rem;
-  font-weight: 700;
+  font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   padding: 0.15rem 0.5rem;
@@ -1454,7 +1472,7 @@ body {
 
 .queue-card-status {
   font-size: 0.65rem;
-  font-weight: 700;
+  font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   padding: 0.15rem 0.55rem;
@@ -1511,7 +1529,7 @@ body {
 
 .queue-card-section-title {
   font-size: 0.68rem;
-  font-weight: 700;
+  font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: #8b949e;
@@ -1727,7 +1745,7 @@ body {
   background: #22c55e;
   color: #0d1117;
   font-size: 0.6rem;
-  font-weight: 700;
+  font-weight: 500;
   padding: 0.15rem 0.4rem;
   border-radius: 4px;
   white-space: nowrap;
@@ -1899,7 +1917,7 @@ body {
   gap: 0.6rem;
   margin-bottom: 0.75rem;
   font-size: 0.72rem;
-  font-weight: 700;
+  font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: #8b949e;
@@ -2018,7 +2036,7 @@ body {
 
 .team-card-name {
   font-size: 1rem;
-  font-weight: 700;
+  font-weight: 500;
   color: #e6edf3;
 }
 
@@ -2031,7 +2049,7 @@ body {
 
 .team-skills-label {
   font-size: 0.68rem;
-  font-weight: 700;
+  font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: #8b949e;
@@ -2049,7 +2067,7 @@ body {
   text-align: left;
   padding: 0.3rem 0.5rem;
   font-size: 0.65rem;
-  font-weight: 700;
+  font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: #8b949e;
@@ -2140,7 +2158,7 @@ body {
 
 .team-hooks-type {
   font-size: 0.75rem;
-  font-weight: 700;
+  font-weight: 500;
   color: #8b949e;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -2155,7 +2173,7 @@ body {
 
 .office-title {
   font-size: 0.7rem;
-  font-weight: 700;
+  font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.12em;
   color: #8b949e;
@@ -2178,7 +2196,7 @@ body {
 
 .office-group-header {
   font-size: 0.85rem;
-  font-weight: 700;
+  font-weight: 500;
   color: #8b949e;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -2242,7 +2260,7 @@ body {
   align-items: center;
   gap: 0.35rem;
   font-size: 0.68rem;
-  font-weight: 700;
+  font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   margin-bottom: 0.5rem;
@@ -2277,7 +2295,7 @@ body {
 
 .office-desk-name {
   font-size: 0.95rem;
-  font-weight: 700;
+  font-weight: 500;
   color: #e6edf3;
   margin-bottom: 0.5rem;
 }
@@ -2404,7 +2422,7 @@ body {
 
 .health-card .health-pct {
   font-size: 1.1rem;
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .health-card .health-fraction {
@@ -2444,7 +2462,7 @@ body {
   background: #0d1117;
   color: #8b949e;
   font-size: 0.7rem;
-  font-weight: 700;
+  font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   padding: 0.6rem 0.8rem;
@@ -2514,7 +2532,7 @@ body {
 /* Result badges */
 .result-badge {
   font-size: 0.68rem;
-  font-weight: 700;
+  font-weight: 500;
   padding: 0.15rem 0.5rem;
   border-radius: 9999px;
   white-space: nowrap;
