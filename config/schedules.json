@@ -131,6 +131,12 @@
       "job": "shiproom-hygiene-check",
       "cron": "0 5 * * *",
       "description": "Shiproom hygiene checks (Task-to-Task parent links) at 5am daily"
+    },
+    {
+      "agent": "approver",
+      "job": "approve-FFv2",
+      "cron": "33 21 * * *",
+      "description": "Approve all pending FFv2 flights from directs daily at 9:33pm"
     }
   ]
 }
