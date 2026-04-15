@@ -19,18 +19,6 @@
       "description": "ADO status tweet update (live) at 9pm daily"
     },
     {
-      "agent": "scrum-master",
-      "job": "bug-autopilot-meeting-join",
-      "cron": "0 8 * * *",
-      "description": "Bug autopilot (live) at 8am daily"
-    },
-    {
-      "agent": "scrum-master",
-      "job": "bug-autopilot-meeting-join",
-      "cron": "0 20 * * *",
-      "description": "Bug autopilot (live) at 8pm daily"
-    },
-    {
       "agent": "bug-killer",
       "job": "scan-and-fix",
       "cron": "0 10 * * *",
@@ -101,12 +89,6 @@
       "job": "AAP-report-posting",
       "cron": "0 20 * * *",
       "description": "ADO Autopilot report link to Teams Test Autopilot channel at 8pm daily"
-    },
-    {
-      "agent": "auditor",
-      "job": "TEMP-consolidate-Edge-reports",
-      "cron": "15 * * * *",
-      "description": "Edge tab consolidation hourly at :15"
     },
     {
       "agent": "hang-scout",

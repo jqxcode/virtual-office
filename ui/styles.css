@@ -2130,6 +2130,23 @@ body {
   gap: 1rem;
 }
 
+.team-hooks-card {
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  border-left: 4px solid #f0883e;
+  padding: 0.8rem 1rem;
+}
+
+.team-hooks-type {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #8b949e;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0.5rem 0 0.3rem;
+}
+
 /* === OFFICE Tab === */
 .office-header {
   text-align: center;

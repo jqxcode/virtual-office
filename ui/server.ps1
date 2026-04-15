@@ -179,6 +179,13 @@ try {
                             $agentsObj.agents.$agentName | Add-Member -NotePropertyName "jobs" -NotePropertyValue $jobObj.jobs -Force
                         }
                     }
+                    # Merge hooks config if exists
+                    $hooksFile = Join-Path $ConfigDir "hooks.json"
+                    if (Test-Path $hooksFile) {
+                        $hooksJson = [System.IO.File]::ReadAllText($hooksFile, [System.Text.Encoding]::UTF8)
+                        $hooksObj = $hooksJson | ConvertFrom-Json
+                        $agentsObj | Add-Member -NotePropertyName "hooks" -NotePropertyValue $hooksObj -Force
+                    }
                     $merged = $agentsObj | ConvertTo-Json -Depth 10
                     Send-TextResponse $context 200 "application/json" $merged
                 } else {
