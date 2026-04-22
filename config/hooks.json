@@ -1,0 +1,11 @@
+{
+  "post-run": [
+    {
+      "name": "consolidate-Edge-reports",
+      "description": "Organize Edge browser report tabs into groups (AAP, BAP, PR, BKiller, Sprint) and close duplicates",
+      "command": "python Q:/src/personal_projects/edge-tab-exporter/get-tabs.py --consolidate",
+      "trigger": "after every job completes",
+      "excludeJobs": ["TEMP-consolidate-Edge-reports"]
+    }
+  ]
+}

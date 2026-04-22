@@ -1,64 +1,84 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<!-- vo-theme-0.2.0 -->
 <meta charset="UTF-8">
 <title>Virtual Office Daily 5W Report - {{DATE}}</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <style>
-  :root { --bg: #0d1117; --card: #161b22; --border: #30363d; --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff; }
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Segoe UI', -apple-system, sans-serif; background: var(--bg); color: var(--text); padding: 24px; max-width: 1440px; margin: 0 auto; font-size: 13px; }
-  h1 { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
-  .subtitle { color: var(--muted); font-size: 12px; margin-bottom: 20px; }
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
+  :root {
+    --vo-bg-deep: #0d1117; --vo-bg-panel: #010409; --vo-bg-surface: #161b22;
+    --vo-bg-hover: #1c2128; --vo-bg-recessed: #0a0c10;
+    --vo-text-primary: #e6edf3; --vo-text-secondary: #d0d6e0;
+    --vo-text-tertiary: #8b949e; --vo-text-quaternary: #484f58;
+    --vo-accent: #22c55e; --vo-accent-secondary: #10b981; --vo-accent-hover: #16a34a;
+    --vo-border-subtle: rgba(255,255,255,0.05); --vo-border-standard: rgba(255,255,255,0.08);
+    --vo-border-solid: #30363d; --vo-border-solid-light: #21262d;
+    --vo-status-success: #22c55e; --vo-status-error: #ef4444;
+    --vo-status-warning: #f59e0b; --vo-status-info: #3b82f6;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    font-feature-settings: "cv01", "ss03";
+    background: var(--vo-bg-deep); color: var(--vo-text-secondary); line-height: 1.5;
+    max-width: 1440px; margin: 0 auto; padding: 24px; font-size: 13px;
+  }
+  h1 { color: var(--vo-text-primary); font-size: 32px; font-weight: 500; letter-spacing: -0.704px; margin-bottom: 4px; }
+  h2 { color: var(--vo-text-primary); font-size: 24px; font-weight: 500; letter-spacing: -0.288px; margin: 24px 0 12px; }
+  h3 { color: var(--vo-text-primary); font-size: 20px; font-weight: 600; letter-spacing: -0.24px; margin: 16px 0 8px; }
+  .subtitle { color: var(--vo-text-tertiary); font-size: 12px; margin-bottom: 20px; }
   .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 24px; }
-  .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 16px; text-align: center; }
-  .card .num { font-size: 32px; font-weight: 700; line-height: 1.1; }
-  .card .lbl { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; }
-  .section { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-bottom: 20px; }
-  .section h2 { font-size: 16px; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+  .card { background: var(--vo-bg-surface); border: 1px solid var(--vo-border-standard); border-radius: 8px; padding: 16px; text-align: center; }
+  .card .num { font-size: 32px; font-weight: 500; line-height: 1.1; }
+  .card .lbl { font-size: 10px; color: var(--vo-text-tertiary); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; }
+  .section { background: var(--vo-bg-surface); border: 1px solid var(--vo-border-standard); border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+  .section h2 { font-size: 18px; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
   .section h2 .icon { font-size: 18px; }
-  table { width: 100%; border-collapse: collapse; font-size: 12px; }
-  th { text-align: left; padding: 8px 10px; border-bottom: 2px solid var(--border); color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
-  td { padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; margin: 16px 0; }
+  th { background: var(--vo-bg-panel); text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--vo-border-standard); color: var(--vo-text-tertiary); font-size: 10px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
+  td { padding: 10px 14px; border-bottom: 1px solid var(--vo-border-subtle); vertical-align: top; color: var(--vo-text-secondary); }
   tr:last-child td { border-bottom: none; }
-  tr:hover td { background: rgba(255,255,255,0.02); }
+  tr:hover td { background: var(--vo-bg-hover); }
   td.num { text-align: right; font-variant-numeric: tabular-nums; }
-  td.notes-cell { max-width: 400px; font-size: 11px; color: var(--muted); line-height: 1.4; }
-  .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: 600; }
-  .badge-green { background: #1a3a1a; color: #66bb6a; }
-  .badge-red { background: #3a1a1a; color: #ef5350; }
-  .badge-yellow { background: #3a3a1a; color: #ffa726; }
-  .badge-blue { background: #1a2a3a; color: #4fc3f7; }
-  .badge-gray { background: #2a2a2a; color: #8b949e; }
-  .agent-pill { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; background: color-mix(in srgb, var(--ac) 20%, transparent); color: var(--ac); }
+  td.notes-cell { max-width: 400px; font-size: 11px; color: var(--vo-text-tertiary); line-height: 1.4; }
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 9999px; font-size: 12px; font-weight: 500; }
+  .badge-green { background: rgba(34,197,94,0.15); color: var(--vo-status-success); }
+  .badge-red { background: rgba(239,68,68,0.15); color: var(--vo-status-error); }
+  .badge-yellow { background: rgba(245,158,11,0.15); color: var(--vo-status-warning); }
+  .badge-blue { background: rgba(59,130,246,0.15); color: var(--vo-status-info); }
+  .badge-gray { background: rgba(139,148,158,0.15); color: var(--vo-text-tertiary); }
+  .agent-pill { display: inline-block; padding: 2px 10px; border-radius: 9999px; font-size: 11px; font-weight: 500; background: color-mix(in srgb, var(--ac) 20%, transparent); color: var(--ac); }
   .health-indicator { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 6px; }
   .chart-container { height: 300px; position: relative; }
-  a { color: var(--accent); text-decoration: none; }
-  a:hover { text-decoration: underline; }
+  a { color: var(--vo-accent); text-decoration: none; }
+  a:hover { color: var(--vo-accent-hover); text-decoration: underline; }
   .exec-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
   @media (max-width: 800px) { .exec-grid { grid-template-columns: 1fr; } }
-  .kv { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid var(--border); }
+  .kv { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid var(--vo-border-subtle); }
   .kv:last-child { border-bottom: none; }
-  .kv .k { color: var(--muted); }
-  .kv .v { font-weight: 600; }
-  .rec { padding: 8px 12px; background: rgba(88,166,255,0.08); border-left: 3px solid var(--accent); border-radius: 0 6px 6px 0; margin-bottom: 8px; font-size: 12px; }
-  .rec-critical { background: rgba(239,83,80,0.12); border-left-color: #ef5350; }
-  .rec-warn { background: rgba(255,167,38,0.12); border-left-color: #ffa726; }
-  .rec-ok { background: rgba(102,187,106,0.12); border-left-color: #66bb6a; }
+  .kv .k { color: var(--vo-text-tertiary); }
+  .kv .v { font-weight: 500; }
+  .rec { padding: 8px 12px; background: rgba(34,197,94,0.08); border-left: 3px solid var(--vo-accent); border-radius: 0 6px 6px 0; margin-bottom: 8px; font-size: 12px; }
+  .rec-critical { background: rgba(239,68,68,0.12); border-left-color: var(--vo-status-error); }
+  .rec-warn { background: rgba(245,158,11,0.12); border-left-color: var(--vo-status-warning); }
+  .rec-ok { background: rgba(34,197,94,0.12); border-left-color: var(--vo-status-success); }
   .tooltip-wrap { position: relative; cursor: help; }
-  .tooltip-wrap .tooltip-text { visibility: hidden; background: #21262d; color: var(--text); font-size: 11px; padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border); position: absolute; z-index: 10; bottom: 110%; left: 50%; transform: translateX(-50%); width: 260px; line-height: 1.5; box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
+  .tooltip-wrap .tooltip-text { visibility: hidden; background: var(--vo-bg-hover); color: var(--vo-text-primary); font-size: 11px; padding: 10px 14px; border-radius: 8px; border: 1px solid var(--vo-border-solid); position: absolute; z-index: 10; bottom: 110%; left: 50%; transform: translateX(-50%); width: 260px; line-height: 1.5; box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
   .tooltip-wrap:hover .tooltip-text { visibility: visible; }
-  .tooltip-wrap .tooltip-text::after { content: ''; position: absolute; top: 100%; left: 50%; margin-left: -6px; border-width: 6px; border-style: solid; border-color: #21262d transparent transparent transparent; }
+  .tooltip-wrap .tooltip-text::after { content: ''; position: absolute; top: 100%; left: 50%; margin-left: -6px; border-width: 6px; border-style: solid; border-color: var(--vo-bg-hover) transparent transparent transparent; }
   .incident-5w { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 8px 0; }
-  .incident-5w .w-label { font-weight: 700; color: var(--accent); white-space: nowrap; }
-  .incident-5w .w-value { color: var(--text); }
+  .incident-5w .w-label { font-weight: 500; color: var(--vo-accent); white-space: nowrap; }
+  .incident-5w .w-value { color: var(--vo-text-primary); }
   .bap-bar { display: flex; height: 22px; border-radius: 4px; overflow: hidden; margin: 2px 0; }
-  .bap-bar div { display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 600; color: #fff; min-width: 0; }
+  .bap-bar div { display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 500; color: #fff; min-width: 0; }
   table.sortable th { cursor: pointer; user-select: none; position: relative; padding-right: 18px; }
-  table.sortable th:hover { color: var(--accent); }
-  table.sortable th::after { content: ''; position: absolute; right: 4px; top: 50%; transform: translateY(-50%); font-size: 10px; color: var(--muted); }
+  table.sortable th:hover { color: var(--vo-accent); }
+  table.sortable th::after { content: ''; position: absolute; right: 4px; top: 50%; transform: translateY(-50%); font-size: 10px; color: var(--vo-text-tertiary); }
   table.sortable th.sort-asc::after { content: ' ^'; }
   table.sortable th.sort-desc::after { content: ' v'; }
+  .footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid var(--vo-border-subtle); color: var(--vo-text-quaternary); font-size: 12px; text-align: center; }
 </style>
 </head>
 <body>
@@ -82,7 +102,7 @@
     <div class="lbl">Runs (24h)</div>
   </div>
   <div class="card">
-    <div class="num" style="color:#ef5350">{{FAILURES_30D}}</div>
+    <div class="num" style="color:var(--vo-status-error)">{{FAILURES_30D}}</div>
     <div class="lbl tooltip-wrap">Failures (30d)<span class="tooltip-text">Count of jobs with non-zero exit, hangs killed, or stale locks cleared in the past 30 days</span></div>
   </div>
   <div class="card">
@@ -102,13 +122,13 @@
 <!-- Executive Summary -->
 <div class="section">
   <h2>Executive Summary</h2>
-  <p style="color:var(--muted);font-size:12px;margin-bottom:14px;">Since last report (<b>{{REPORT_PERIOD_START}}</b>) to now (<b>{{REPORT_PERIOD_END}}</b>)</p>
+  <p style="color:var(--vo-text-tertiary);font-size:12px;margin-bottom:14px;">Since last report (<b>{{REPORT_PERIOD_START}}</b>) to now (<b>{{REPORT_PERIOD_END}}</b>)</p>
   <div class="exec-grid">
     <div>
       <div class="kv"><span class="k">Failure Rate</span><span class="v" style="color:{{FAILURE_RATE_COLOR}}">{{FAILURE_RATE}}</span></div>
       <div class="kv"><span class="k">Hangs (30d)</span><span class="v" style="color:{{HANGS_DETAIL_COLOR}}">{{HANGS_DETAIL}}</span></div>
       <div class="kv"><span class="k">Known Patterns</span><span class="v">{{KNOWN_PATTERNS}}</span></div>
-      <div class="kv"><span class="k">Top Risk</span><span class="v" style="color:#ffa726">{{TOP_RISK}} {{TOP_RISK_ISSUE_LINK}}</span></div>
+      <div class="kv"><span class="k">Top Risk</span><span class="v" style="color:var(--vo-status-warning)">{{TOP_RISK}} {{TOP_RISK_ISSUE_LINK}}</span></div>
     </div>
     <div>
       <div class="kv"><span class="k">Total Incidents (24h)</span><span class="v">{{INCIDENTS_24H}}</span></div>
@@ -132,7 +152,7 @@
       <span class="w-label">Where</span><span class="w-value">Process tree: PID chain, Code: file:line</span>
       <span class="w-label">Why</span><span class="w-value">Root cause analysis</span>
     </div>
-    <p style="font-size:11px;color:var(--muted);">Action: killed|skipped | Recovery: outcome | Issue: <a href="URL">link</a> or N/A</p>
+    <p style="font-size:11px;color:var(--vo-text-tertiary);">Action: killed|skipped | Recovery: outcome | Issue: <a href="URL">link</a> or N/A</p>
   -->
 </div>
 
@@ -189,7 +209,7 @@
   <div class="exec-grid">
     {{BAP_PERF_SUMMARY}}
   </div>
-  <p style="font-size:11px;color:var(--muted);margin-top:8px;">
+  <p style="font-size:11px;color:var(--vo-text-tertiary);margin-top:8px;">
     <span class="tooltip-wrap">Error Rate: <b>{{BAP_ERROR_RATE}}</b>
       <span class="tooltip-text">Percentage of bugs where the BAP agent encountered an error during analysis (API failures, timeout, parse errors, etc.)</span>
     </span>
@@ -214,12 +234,6 @@
 </div>
 
 <!-- Recommendations -->
-<!-- Each recommendation div should use severity class:
-     rec rec-critical  = CRITICAL items (red border/bg)
-     rec rec-warn      = TREND ALERT / RUNTIME LIMIT EXCEEDED (yellow border/bg)
-     rec rec-ok        = Resolved patterns / DATA GAP (green border/bg)
-     rec              = default (blue border/bg) for informational items
--->
 <div class="section">
   <h2>Recommendations</h2>
   {{RECOMMENDATIONS}}
@@ -238,36 +252,34 @@ new Chart(ctx1, {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
-      legend: { labels: { color: '#8b949e', font: { size: 11 } } },
+      legend: { labels: { color: '#8b949e', font: { size: 11, family: 'Inter' } } },
       tooltip: { callbacks: { label: (c) => c.dataset.label + ': ' + c.parsed.y + ' min' } }
     },
     scales: {
-      x: { ticks: { color: '#8b949e' }, grid: { color: '#30363d' } },
-      y: { title: { display: true, text: 'Avg Duration (min)', color: '#8b949e' }, ticks: { color: '#8b949e' }, grid: { color: '#30363d' } }
+      x: { ticks: { color: '#8b949e' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+      y: { title: { display: true, text: 'Avg Duration (min)', color: '#8b949e' }, ticks: { color: '#8b949e' }, grid: { color: 'rgba(255,255,255,0.05)' } }
     }
   }
 });
 
 // Grouped bar chart
-// BAR_LABELS must use FULL agent and job names -- no abbreviations.
-// Use arrays for 2-line labels, e.g. ["bug-killer", "open-pr-maintenance"] instead of "bk/open-pr-maint".
 const ctx2 = document.getElementById('barChart').getContext('2d');
 new Chart(ctx2, {
   type: 'bar',
   data: {
     labels: {{BAR_LABELS}},
     datasets: [
-      { label: '30d Avg (min)', data: {{BAR_AVG_30D}}, backgroundColor: '#4fc3f766', borderColor: '#4fc3f7', borderWidth: 1 },
-      { label: '24h Avg (min)', data: {{BAR_AVG_24H}}, backgroundColor: '#ffa72666', borderColor: '#ffa726', borderWidth: 1 }
+      { label: '30d Avg (min)', data: {{BAR_AVG_30D}}, backgroundColor: 'rgba(59,130,246,0.4)', borderColor: '#3b82f6', borderWidth: 1 },
+      { label: '24h Avg (min)', data: {{BAR_AVG_24H}}, backgroundColor: 'rgba(245,158,11,0.4)', borderColor: '#f59e0b', borderWidth: 1 }
     ]
   },
   options: {
     responsive: true,
     maintainAspectRatio: false,
-    plugins: { legend: { labels: { color: '#8b949e' } } },
+    plugins: { legend: { labels: { color: '#8b949e', font: { family: 'Inter' } } } },
     scales: {
-      x: { ticks: { color: '#8b949e', maxRotation: 45, autoSkip: false }, grid: { color: '#30363d' } },
-      y: { title: { display: true, text: 'Duration (min)', color: '#8b949e' }, ticks: { color: '#8b949e' }, grid: { color: '#30363d' } }
+      x: { ticks: { color: '#8b949e', maxRotation: 45, autoSkip: false }, grid: { color: 'rgba(255,255,255,0.05)' } },
+      y: { title: { display: true, text: 'Duration (min)', color: '#8b949e' }, ticks: { color: '#8b949e' }, grid: { color: 'rgba(255,255,255,0.05)' } }
     }
   }
 });
@@ -301,8 +313,8 @@ document.querySelectorAll('table.sortable').forEach(table => {
 });
 </script>
 
-<p style="text-align:center;color:var(--muted);font-size:10px;margin-top:24px;">
+<div class="footer">
   Generated by Virtual Office Hang Scout | {{DATE}}
-</p>
+</div>
 </body>
 </html>

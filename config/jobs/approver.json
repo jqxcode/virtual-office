@@ -1,19 +1,19 @@
 {
   "jobs": {
     "approve-CoreIdentity": {
-      "prompt": "Run the CoreIdentity approval script to check and approve all pending entitlement approvals. Execute: python Q:/src/local_skills/data_tools/coreidentity-approve.py. Report the results summary printed by the script. If the script reports errors connecting to CDP, note that headless Edge may need to be relaunched.",
+      "prompt": "Run the CoreIdentity approval and renewal script. Execute: python Q:/src/local_skills/data_tools/coreidentity-approve.py. This handles both: (1) approving pending entitlement requests from team members, and (2) renewing your own expiring memberships. Report the results summary printed by the script. If the script reports errors connecting to CDP, note that headless Edge may need to be relaunched.",
       "cron": "0 8 * * *",
       "maxRuns": 0,
       "enabled": true,
       "saveOutput": false,
-      "description": "Check and approve pending CoreIdentity entitlement approvals daily"
+      "description": "Approve pending entitlement requests and renew own expiring memberships daily"
     },
     "approve-FFv2": {
-      "prompt": "Run the FFv2 approval script. The user's extra arguments are: {{EXTRA_ARGS}}. Execute: python Q:/src/local_skills/data_tools/ffv2-approve.py {{EXTRA_ARGS}}. The script auto-detects argument type: a number is a flight ID, a URL containing featureFlight/ extracts the ID, anything else is a person name. Report the results summary printed by the script.",
+      "prompt": "Run the FFv2 approval script. The user's extra arguments are: {{EXTRA_ARGS}}. Execute: python Q:/src/local_skills/data_tools/ffv2-approve.py {{EXTRA_ARGS}}. The script auto-detects argument type: no args = approve all directs' pending flights, a number = flight ID, a URL containing featureFlight/ = extract ID, anything else = person name. Report the results summary printed by the script.",
       "maxRuns": 0,
       "enabled": true,
       "saveOutput": false,
-      "description": "Approve pending FFv2 flight rollout approvals and flight requests"
+      "description": "Approve all pending FFv2 flights from directs (daily 9:33pm), or targeted by person/ID/URL"
     }
   }
 }

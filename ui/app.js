@@ -3298,7 +3298,11 @@ function renderTeamTab() {
     scheduleLookup[s.agent][s.job].push({ cron: s.cron, description: s.description || "" });
   });
   var overviewEl = document.getElementById("team-overview");
-  if (overviewEl) overviewEl.textContent = agentNames.length + " agents \u2022 " + schedules.length + " scheduled jobs";
+  var hooksCount = 0;
+  if (config.hooks) { Object.keys(config.hooks).forEach(function(k) { if (Array.isArray(config.hooks[k])) hooksCount += config.hooks[k].length; }); }
+  var overviewText = agentNames.length + " agents \u2022 " + schedules.length + " scheduled jobs";
+  if (hooksCount > 0) overviewText += " \u2022 " + hooksCount + " hook" + (hooksCount > 1 ? "s" : "");
+  if (overviewEl) overviewEl.textContent = overviewText;
   var listEl = document.getElementById("team-agent-list");
   if (!listEl || isDragging) return;
   initTeamDragDrop();
@@ -3376,6 +3380,44 @@ function renderTeamTab() {
     ft.textContent = "Stale timeout: " + (agentCfg.staleLockTimeoutMinutes || "N/A") + " min  \u2022  Group: " + (agentCfg.group || "Agents");
     card.appendChild(ft); listEl.appendChild(card);
   });
+
+  // Render hooks section below agent cards
+  var hooks = config.hooks;
+  if (hooks) {
+    var hookTypes = Object.keys(hooks);
+    if (hookTypes.length > 0) {
+      var hooksCard = document.createElement("div"); hooksCard.className = "team-hooks-card";
+      hooksCard.style.gridColumn = "1 / -1"; // span full width
+      var hooksHdr = document.createElement("div"); hooksHdr.className = "team-card-header";
+      var hookIcon = document.createElement("span"); hookIcon.textContent = "\u26A1"; hookIcon.style.marginRight = "0.5rem";
+      hooksHdr.appendChild(hookIcon);
+      var hookTitle = document.createElement("span"); hookTitle.className = "team-card-name";
+      hookTitle.textContent = "Hooks"; hookTitle.style.color = "#f0883e";
+      hooksHdr.appendChild(hookTitle); hooksCard.appendChild(hooksHdr);
+      hookTypes.forEach(function(hookType) {
+        var hookList = hooks[hookType];
+        if (!Array.isArray(hookList) || hookList.length === 0) return;
+        var typeLabel = document.createElement("div"); typeLabel.className = "team-hooks-type";
+        typeLabel.textContent = hookType; hooksCard.appendChild(typeLabel);
+        var tbl = document.createElement("table"); tbl.className = "team-skills-table";
+        var thd = document.createElement("thead"); var thr = document.createElement("tr");
+        ["Hook", "Trigger", "Description"].forEach(function(h) { var th = document.createElement("th"); th.textContent = h; thr.appendChild(th); });
+        thd.appendChild(thr); tbl.appendChild(thd);
+        var tbd = document.createElement("tbody");
+        hookList.forEach(function(hook) {
+          var tr = document.createElement("tr");
+          var tdName = document.createElement("td");
+          var nameSpan = document.createElement("span"); nameSpan.className = "team-skill-name"; nameSpan.textContent = hook.name;
+          tdName.appendChild(nameSpan); tr.appendChild(tdName);
+          var tdTrigger = document.createElement("td"); tdTrigger.className = "team-skill-schedule"; tdTrigger.textContent = hook.trigger || ""; tr.appendChild(tdTrigger);
+          var tdDesc = document.createElement("td"); tdDesc.className = "team-skill-desc"; tdDesc.textContent = hook.description || ""; tdDesc.title = hook.description || ""; tr.appendChild(tdDesc);
+          tbd.appendChild(tr);
+        });
+        tbl.appendChild(tbd); hooksCard.appendChild(tbl);
+      });
+      listEl.appendChild(hooksCard);
+    }
+  }
 }
 
 // --- OFFICE Tab ---
@@ -3744,6 +3786,7 @@ async function poll() {
   // Refresh team tab
   if (activeTopTab === "team") {
     try {
+      agentConfig = await fetchConfig();
       scheduleData = await fetchSchedules();
       scheduleData.dashboard = lastDashboard;
       scheduleData.config = agentConfig;
@@ -3757,6 +3800,7 @@ async function poll() {
   // Refresh office tab
   if (activeTopTab === "office") {
     try {
+      agentConfig = await fetchConfig();
       scheduleData = await fetchSchedules();
       scheduleData.dashboard = lastDashboard;
       scheduleData.config = agentConfig;

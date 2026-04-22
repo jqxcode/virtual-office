@@ -67,7 +67,17 @@ function Write-AuditEntry {
         system_version = $SYSTEM_VERSION
         details        = $Details
     } | ConvertTo-Json -Compress
-    Add-Content -Path $monthFile -Value $entry -Encoding UTF8
+    # Use FileStream with exclusive lock to prevent concurrent write corruption
+    $line = $entry + [Environment]::NewLine
+    $bytes = [System.Text.Encoding]::UTF8.GetBytes($line)
+    $fs = $null
+    try {
+        $fs = [System.IO.FileStream]::new($monthFile, [System.IO.FileMode]::Append, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
+        $fs.Write($bytes, 0, $bytes.Length)
+        $fs.Flush()
+    } finally {
+        if ($fs) { $fs.Close() }
+    }
 }
 
 function Write-Event {
@@ -88,7 +98,17 @@ function Write-Event {
         event     = $Event
         details   = $Details
     } | ConvertTo-Json -Compress
-    Add-Content -Path $EVENTS_FILE -Value $entry -Encoding UTF8
+    # Use FileStream with exclusive lock to prevent concurrent write corruption
+    $line = $entry + [Environment]::NewLine
+    $bytes = [System.Text.Encoding]::UTF8.GetBytes($line)
+    $fs = $null
+    try {
+        $fs = [System.IO.FileStream]::new($EVENTS_FILE, [System.IO.FileMode]::Append, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
+        $fs.Write($bytes, 0, $bytes.Length)
+        $fs.Flush()
+    } finally {
+        if ($fs) { $fs.Close() }
+    }
 }
 
 function Update-Dashboard {
@@ -557,6 +577,20 @@ while ($keepRunning) {
     Write-Event -AgentName $Agent -JobName $Job -Event $completedAction -Details @{ run_id = $runId; exit_code = $exitCode; duration = $runDuration }
 
     Write-Host "Job '$Job' for agent '$Agent' $completedAction (run: $runId, output: $auditOutputFile, duration: $runDuration)"
+
+    # Post-run hook: consolidate Edge report tabs (non-blocking)
+    if ($Job -ne "TEMP-consolidate-Edge-reports") {
+        try {
+            $consolidateScript = "Q:\src\personal_projects\edge-tab-exporter\get-tabs.py"
+            if (Test-Path $consolidateScript) {
+                Write-Host "Post-run hook: consolidating Edge report tabs..."
+                $hookResult = & python $consolidateScript --consolidate 2>&1
+                Write-Host "Edge consolidation: $hookResult"
+            }
+        } catch {
+            Write-Host "Edge consolidation hook failed (non-fatal): $_"
+        }
+    }
 
     # Step 11: Check queues across ALL jobs for this agent before releasing lock
     # (Hold the lock until we know there's nothing left to run, preventing race conditions

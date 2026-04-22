@@ -1,67 +1,88 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<!-- vo-theme-0.2.0 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Bug Killer Daily Summary - {{DATE}}</title>
 <style>
-  body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #1a1a2e; color: #e0e0e0; margin: 0; padding: 24px; max-width: 1200px; margin: 0 auto; }
-  h1 { color: #00d4ff; font-size: 1.8rem; margin-bottom: 4px; }
-  h2 { color: #00d4ff; border-bottom: 1px solid #333; padding-bottom: 6px; margin-top: 24px; margin-bottom: 12px; }
-  .card { background: #16213e; border: 1px solid #0f3460; border-radius: 10px; padding: 20px; margin-bottom: 20px; }
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
+  :root {
+    --vo-bg-deep: #0d1117; --vo-bg-panel: #010409; --vo-bg-surface: #161b22;
+    --vo-bg-hover: #1c2128; --vo-bg-recessed: #0a0c10;
+    --vo-text-primary: #e6edf3; --vo-text-secondary: #d0d6e0;
+    --vo-text-tertiary: #8b949e; --vo-text-quaternary: #484f58;
+    --vo-accent: #22c55e; --vo-accent-secondary: #10b981; --vo-accent-hover: #16a34a;
+    --vo-border-subtle: rgba(255,255,255,0.05); --vo-border-standard: rgba(255,255,255,0.08);
+    --vo-border-solid: #30363d; --vo-border-solid-light: #21262d;
+    --vo-status-success: #22c55e; --vo-status-error: #ef4444;
+    --vo-status-warning: #f59e0b; --vo-status-info: #3b82f6;
+    --vo-status-idle: #8b949e;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    font-feature-settings: "cv01", "ss03";
+    background: var(--vo-bg-deep); color: var(--vo-text-secondary); line-height: 1.5;
+    max-width: 1200px; margin: 0 auto; padding: 24px;
+  }
+  h1 { color: var(--vo-text-primary); font-size: 32px; font-weight: 500; letter-spacing: -0.704px; margin-bottom: 4px; }
+  h2 { color: var(--vo-text-primary); font-size: 24px; font-weight: 500; letter-spacing: -0.288px; margin: 24px 0 12px; border-bottom: 1px solid var(--vo-border-subtle); padding-bottom: 6px; }
+  .card { background: var(--vo-bg-surface); border: 1px solid var(--vo-border-standard); border-radius: 8px; padding: 20px; margin-bottom: 20px; }
   .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 24px; }
-  .stat-card { background: #16213e; border: 1px solid #0f3460; border-radius: 10px; padding: 16px; text-align: center; cursor: pointer; transition: border-color 0.2s, background 0.2s, transform 0.15s; }
-  .stat-card:hover { border-color: #00d4ff; background: #1e2d55; transform: translateY(-2px); }
-  .stat-card.active { border-color: #00d4ff; box-shadow: 0 0 8px rgba(0,212,255,0.3); }
-  .stat-card .num { font-size: 32px; font-weight: 700; line-height: 1.1; }
-  .stat-card .lbl { font-size: 10px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th { background: #0f3460; color: #00d4ff; padding: 10px 12px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; user-select: none; white-space: nowrap; }
-  th .sort-arrow { display: inline-block; width: 12px; text-align: center; margin-left: 4px; font-size: 10px; color: #555; }
-  th:hover .sort-arrow { color: #00d4ff; }
-  td { padding: 9px 12px; border-bottom: 1px solid #0f3460; }
+  .stat-card { background: var(--vo-bg-surface); border: 1px solid var(--vo-border-standard); border-radius: 8px; padding: 16px; text-align: center; cursor: pointer; transition: border-color 0.2s, background 0.2s, transform 0.15s; }
+  .stat-card:hover { border-color: var(--vo-accent); background: var(--vo-bg-hover); transform: translateY(-2px); }
+  .stat-card.active { border-color: var(--vo-accent); box-shadow: 0 0 8px rgba(34,197,94,0.3); }
+  .stat-card .num { font-size: 32px; font-weight: 500; line-height: 1.1; }
+  .stat-card .lbl { font-size: 10px; color: var(--vo-text-tertiary); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 16px 0; }
+  th { background: var(--vo-bg-panel); color: var(--vo-text-tertiary); padding: 10px 14px; text-align: left; font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; user-select: none; white-space: nowrap; border-bottom: 1px solid var(--vo-border-standard); }
+  th .sort-arrow { display: inline-block; width: 12px; text-align: center; margin-left: 4px; font-size: 10px; color: var(--vo-text-quaternary); }
+  th:hover .sort-arrow { color: var(--vo-accent); }
+  td { padding: 10px 14px; border-bottom: 1px solid var(--vo-border-subtle); color: var(--vo-text-secondary); }
   tr:last-child td { border-bottom: none; }
-  tr:hover td { background: #1e2d55; }
-  a { color: #00d4ff; text-decoration: none; }
-  a:hover { text-decoration: underline; }
-  .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
-  .badge-success { background: #1a5c2a; color: #4caf50; }
-  .badge-failed { background: #5c1a1a; color: #f44336; }
-  .badge-skipped { background: #3a3a1a; color: #ffb300; }
-  .no-activity { color: #888; font-style: italic; padding: 24px; text-align: center; }
+  tr:hover td { background: var(--vo-bg-hover); }
+  a { color: var(--vo-accent); text-decoration: none; }
+  a:hover { color: var(--vo-accent-hover); text-decoration: underline; }
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 9999px; font-size: 12px; font-weight: 500; }
+  .badge-success { background: rgba(34,197,94,0.15); color: var(--vo-status-success); }
+  .badge-failed { background: rgba(239,68,68,0.15); color: var(--vo-status-error); }
+  .badge-skipped { background: rgba(245,158,11,0.15); color: var(--vo-status-warning); }
+  .no-activity { color: var(--vo-text-tertiary); font-style: italic; padding: 24px; text-align: center; }
   .timeline-chart { width: 100%; overflow-x: auto; }
   .timeline-chart svg { display: block; }
-  .timeline-fallback { font-size: 13px; color: #aaa; }
+  .timeline-fallback { font-size: 13px; color: var(--vo-text-tertiary); }
   .timeline-bar:hover { opacity: 0.85; }
-  .filter-notice { margin-top: 8px; padding: 6px 12px; background: #0d1b2a; border-radius: 6px; font-size: 12px; color: #00d4ff; display: none; }
+  .filter-notice { margin-top: 8px; padding: 6px 12px; background: var(--vo-bg-recessed); border-radius: 6px; font-size: 12px; color: var(--vo-accent); display: none; }
   .filter-notice a { cursor: pointer; margin-left: 8px; }
+  .footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid var(--vo-border-subtle); text-align: center; color: var(--vo-text-quaternary); font-size: 12px; }
 </style>
 </head>
 <body>
 
 <h1>Bug Killer Daily Summary</h1>
-<p style="color:#888; font-size:13px; margin-top:-10px;">{{VO_SUBTITLE}}</p>
+<p style="color:var(--vo-text-tertiary); font-size:13px; margin-top:-10px;">{{VO_SUBTITLE}}</p>
 
 <!-- KPI Cards -->
 <div class="cards">
   <div class="stat-card" data-filter="scan-and-fix" onclick="filterByCard(this)">
-    <div class="num" style="color:#4caf50">{{ISSUES_FIXED}}</div>
+    <div class="num" style="color:var(--vo-status-success)">{{ISSUES_FIXED}}</div>
     <div class="lbl">Issues Fixed</div>
   </div>
   <div class="stat-card" data-filter="open-pr-maintenance" onclick="filterByCard(this)">
-    <div class="num" style="color:#00d4ff">{{PRS_CREATED}}</div>
+    <div class="num" style="color:var(--vo-accent)">{{PRS_CREATED}}</div>
     <div class="lbl">PRs Created</div>
   </div>
   <div class="stat-card" data-filter="pr-comment" onclick="filterByCard(this)">
-    <div class="num" style="color:#ab47bc">{{COMMENTS_ADDRESSED}}</div>
+    <div class="num" style="color:var(--vo-status-info)">{{COMMENTS_ADDRESSED}}</div>
     <div class="lbl">PR Comments Addressed</div>
   </div>
   <div class="stat-card" data-filter="merge-conflict" onclick="filterByCard(this)">
-    <div class="num" style="color:#ffa726">{{CONFLICTS_RESOLVED}}</div>
+    <div class="num" style="color:var(--vo-status-warning)">{{CONFLICTS_RESOLVED}}</div>
     <div class="lbl">Merge Conflicts Resolved</div>
   </div>
   <div class="stat-card" data-filter="skipped" onclick="filterByCard(this)">
-    <div class="num" style="color:#888">{{SKIPPED_NOOP}}</div>
+    <div class="num" style="color:var(--vo-text-tertiary)">{{SKIPPED_NOOP}}</div>
     <div class="lbl">Skipped / No-op</div>
   </div>
 </div>
@@ -91,7 +112,7 @@
   </table>
 
   <!-- If any runs were skipped/no-op, show a brief summary -->
-  <div style="margin-top:12px; padding:10px; background:#0d1b2a; border-radius:6px; font-size:12px; color:#aaa;">
+  <div style="margin-top:12px; padding:10px; background:var(--vo-bg-recessed); border-radius:6px; font-size:12px; color:var(--vo-text-tertiary);">
     {{SKIPPED_SUMMARY}}
   </div>
 </div>
@@ -113,9 +134,9 @@
   <script id="jobDurationsData" type="application/json">{{JOB_DURATIONS_DATA}}</script>
 </div>
 
-<p style="text-align:center; color:#555; font-size:11px; margin-top:24px;">
+<div class="footer">
   Generated by Virtual Office Bug Killer | {{DATE}}
-</p>
+</div>
 
 <script>
 /* ---- Sortable Table ---- */
@@ -255,14 +276,15 @@ function clearFilter() {
     }
   }
 
+  /* VDS-aligned colors */
   var colors = {
-    'scan-and-fix': '#4caf50',
-    'open-pr-maintenance': '#00d4ff',
-    'daily-summary': '#ffa726',
-    'pr-comment': '#ab47bc',
-    'merge-conflict': '#f44336'
+    'scan-and-fix': '#22c55e',
+    'open-pr-maintenance': '#3b82f6',
+    'daily-summary': '#f59e0b',
+    'pr-comment': '#8b5cf6',
+    'merge-conflict': '#ef4444'
   };
-  var defaultColor = '#888';
+  var defaultColor = '#8b949e';
 
   var rowH = 32;
   var padTop = 30;
@@ -279,13 +301,13 @@ function clearFilter() {
   }
 
   var svgParts = [];
-  svgParts.push('<svg xmlns="http://www.w3.org/2000/svg" width="' + chartW + '" height="' + chartH + '" style="font-family:Segoe UI,sans-serif;">');
+  svgParts.push('<svg xmlns="http://www.w3.org/2000/svg" width="' + chartW + '" height="' + chartH + '" style="font-family:Inter,sans-serif;">');
 
   /* Y-axis labels */
   for (var j = 0; j < jobNames.length; j++) {
     var y = padTop + j * rowH + rowH / 2;
-    svgParts.push('<text x="' + (padLeft - 8) + '" y="' + (y + 4) + '" text-anchor="end" fill="#aaa" font-size="11">' + jobNames[j] + '</text>');
-    svgParts.push('<line x1="' + padLeft + '" y1="' + y + '" x2="' + (chartW - padRight) + '" y2="' + y + '" stroke="#0f3460" stroke-width="1"/>');
+    svgParts.push('<text x="' + (padLeft - 8) + '" y="' + (y + 4) + '" text-anchor="end" fill="#8b949e" font-size="11">' + jobNames[j] + '</text>');
+    svgParts.push('<line x1="' + padLeft + '" y1="' + y + '" x2="' + (chartW - padRight) + '" y2="' + y + '" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>');
   }
 
   /* X-axis ticks -- up to 6 evenly spaced */
@@ -295,8 +317,8 @@ function clearFilter() {
     var tx = timeX(tv);
     var dt = new Date(tv);
     var lbl = ('0' + dt.getHours()).slice(-2) + ':' + ('0' + dt.getMinutes()).slice(-2);
-    svgParts.push('<line x1="' + tx + '" y1="' + padTop + '" x2="' + tx + '" y2="' + (chartH - padBottom) + '" stroke="#0f3460" stroke-width="1" stroke-dasharray="3,3"/>');
-    svgParts.push('<text x="' + tx + '" y="' + (chartH - padBottom + 16) + '" text-anchor="middle" fill="#666" font-size="10">' + lbl + '</text>');
+    svgParts.push('<line x1="' + tx + '" y1="' + padTop + '" x2="' + tx + '" y2="' + (chartH - padBottom) + '" stroke="rgba(255,255,255,0.05)" stroke-width="1" stroke-dasharray="3,3"/>');
+    svgParts.push('<text x="' + tx + '" y="' + (chartH - padBottom + 16) + '" text-anchor="middle" fill="#484f58" font-size="10">' + lbl + '</text>');
   }
 
   /* Bars */
