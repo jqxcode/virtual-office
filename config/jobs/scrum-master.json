@@ -1,14 +1,14 @@
 {
   "jobs": {
     "ado-status-update": {
-      "prompt": "Run ADO autopilot LIVE for both meeting-join and meeting-notes areas. Note the current time as the job start time. Steps: (1) cd Q:/src/hackathon/ado-autopilot/ (2) git fetch origin main && git reset --hard origin/main to get latest code (never use git pull -- it creates merge commits on diverged branches) (3) Validate configs exist and are valid JSON (4) python src/main.py update-status --config configs/meeting-join.json --auto-approve (5) python src/main.py update-status --config configs/meeting-notes.json --auto-approve. This will generate reports, write approved updates to ADO, and upload reports to SharePoint AAP Reports folder automatically. The share URL is saved to reports/latest-share-url.txt for the poster agent to pick up.",
+      "prompt": "Run ADO autopilot LIVE for both meeting-join and meeting-notes areas. Note the current time as the job start time. Steps: (1) cd Q:/src/hackathon/ado-autopilot/ (2) git fetch origin main && git reset --hard origin/main to get latest code (never use git pull -- it creates merge commits on diverged branches) (3) Validate configs exist and are valid JSON (4) python src/main.py update-status --config configs/meeting-join.json --auto-approve (5) python src/main.py update-status --config configs/meeting-notes.json --auto-approve. This will generate reports, write approved updates to ADO, and upload reports to SharePoint AAP Reports folder automatically. The share URL is saved to reports/latest-share-url.txt for the poster agent to pick up. (6) After both runs complete, copy the latest combined-report HTML from Q:/src/hackathon/ado-autopilot/reports/ to Q:/src/personal_projects/virtual-office/output/scrum-master/ado-status-update-YYYYMMDD.html (use today's date). This MUST be inside output/scrum-master/, not the root output/ dir.",
       "maxRuns": 0,
-      "enabled": true,
+      "enabled": false,
       "saveOutput": false,
       "description": "Runs ADO autopilot status tweet update (live) for Meeting Join and Meeting Notes areas"
     },
     "bug-autopilot-meeting-join": {
-      "prompt": "Run bug-autopilot LIVE for Meeting Join area bugs. Note the current time as the job start time. Steps: (1) cd Q:/src/hackathon/bug-autopilot/ (2) git pull to get latest code (3) Validate configs exist and are valid JSON (4) pip install -r requirements.txt --quiet (5) Run: powershell.exe -File bugautopilot.ps1 -Once.",
+      "prompt": "Run bug-autopilot LIVE for Meeting Join area bugs. Note the current time as the job start time. Steps: (1) cd Q:/src/hackathon/bug-autopilot/ (2) git fetch origin main && git reset --hard origin/main to get latest code (never use git pull -- it creates merge commits on diverged branches) (3) pip install -r requirements.txt --quiet (4) Run: powershell.exe -File bugautopilot.ps1 -Config configs/meeting-join -Once.",
       "maxRuns": 0,
       "enabled": true,
       "saveOutput": false,
@@ -22,7 +22,7 @@
       "description": "Runs ADO autopilot burndown update (live) for Meeting Join and Meeting Notes areas"
     },
     "bug-autopilot-notes": {
-      "prompt": "Run bug-autopilot LIVE for Meeting Notes area bugs. Note the current time as the job start time. Steps: (1) cd Q:/src/hackathon/bug-autopilot/ (2) git pull to get latest code (3) Validate configs exist and are valid JSON (4) pip install -r requirements.txt --quiet (5) Run: powershell.exe -File bugautopilot.ps1 -Config Q:/src/hackathon/bug-autopilot/configs/meeting-notes.json -Once.",
+      "prompt": "Run bug-autopilot LIVE for Meeting Notes area bugs. Note the current time as the job start time. Steps: (1) cd Q:/src/hackathon/bug-autopilot/ (2) git fetch origin main && git reset --hard origin/main to get latest code (never use git pull -- it creates merge commits on diverged branches) (3) pip install -r requirements.txt --quiet (4) Run: powershell.exe -File bugautopilot.ps1 -Config configs/meeting-notes -Once.",
       "maxRuns": 0,
       "enabled": true,
       "saveOutput": false,
