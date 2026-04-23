@@ -7,18 +7,6 @@
       "description": "Sprint progress report weekday mornings at 7am"
     },
     {
-      "agent": "scrum-master",
-      "job": "ado-status-update",
-      "cron": "0 9 * * *",
-      "description": "ADO status tweet update (live) at 9am daily"
-    },
-    {
-      "agent": "scrum-master",
-      "job": "ado-status-update",
-      "cron": "0 21 * * *",
-      "description": "ADO status tweet update (live) at 9pm daily"
-    },
-    {
       "agent": "bug-killer",
       "job": "scan-and-fix",
       "cron": "0 10 * * *",
@@ -137,6 +125,18 @@
       "job": "approve-FFv2",
       "cron": "33 21 * * *",
       "description": "Approve all pending FFv2 flights from directs daily at 9:33pm"
+    },
+    {
+      "agent": "auditor",
+      "job": "agent-harness-performance",
+      "cron": "0 9 * * 0",
+      "description": "Weekly harness performance metrics report every Sunday at 9am"
+    },
+    {
+      "agent": "auditor",
+      "job": "failure-review",
+      "cron": "0 18 * * 5",
+      "description": "Friday failure review at 6pm -- generates harness improvement candidates"
     }
   ]
 }
