@@ -84,10 +84,10 @@
 
 ## Check 6: Stale Tasks from Past Sprints
 
-**Goal**: Non-closed tasks with an assignee stuck in past sprints need owner review. Move to FUTURE sprint (not current) to give review time.
+**Goal**: Non-closed tasks with an assignee stuck in **actual past sprints** need owner review. Move to FUTURE sprint (not current) to give review time. **Do NOT touch backlog items** — only tasks whose iteration path is under the semester prefix (assigned to a real sprint).
 
 1. Get future iteration (first with timeFrame='future').
-2. WIQL: `WHERE [System.WorkItemType] = 'Task' AND [System.State] <> 'Closed' AND [System.State] <> 'Removed' AND [System.IterationPath] <> '<current>' AND [System.IterationPath] <> '<future>' AND [System.AssignedTo] <> ''`
+2. WIQL: `WHERE [System.WorkItemType] = 'Task' AND [System.State] <> 'Closed' AND [System.State] <> 'Removed' AND [System.IterationPath] UNDER '<semester-prefix>' AND [System.IterationPath] <> '<semester-prefix>' AND [System.IterationPath] <> '<current>' AND [System.IterationPath] <> '<future>' AND [System.AssignedTo] <> ''`
 3. PATCH iteration to future sprint, comment @owner asking to review.
 
 ## Check 7: Proposed Bugs > 24 Hours
