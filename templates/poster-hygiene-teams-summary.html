@@ -1,0 +1,34 @@
+<!-- Teams channel message template for shiproom hygiene checks 7 & 8 -->
+<!-- NOTE: Teams messages use basic HTML only (no CSS classes, no <style> blocks) -->
+<!-- Placeholders: {{DATE}}, {{CHECK7_SECTION}}, {{CHECK8_SECTION}}, {{CC_MENTION}} -->
+
+<p><b>Shiproom Hygiene Summary - {{DATE}}</b></p>
+
+{{CHECK7_SECTION}}
+<!-- Replace {{CHECK7_SECTION}} with EMPTY STRING if no check7 items.
+Otherwise replace with:
+<p><b>Proposed Bugs &gt; 24 Hours ({{CHECK7_COUNT}})</b></p>
+<p>These bugs have been in Proposed state for more than 24 hours and need triage (Active or Closed):</p>
+<table>
+  <tr><th>Bug</th><th>Title</th><th>Owner</th><th>Last Changed</th></tr>
+  {{CHECK7_ROWS}}
+</table>
+Each row: <tr><td><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/{id}">{id}</a></td><td>{title}</td><td>{owner}</td><td>{changed}</td></tr>
+-->
+
+{{CHECK8_SECTION}}
+<!-- Replace {{CHECK8_SECTION}} with EMPTY STRING if no check8 items.
+Otherwise replace with:
+<p><b>Committed Features Outside Current Semester ({{CHECK8_COUNT}})</b></p>
+<p>These Features are Committed but their iteration path is not under H1 2026:</p>
+<table>
+  <tr><th>Feature</th><th>Title</th><th>Owner</th><th>Iteration</th></tr>
+  {{CHECK8_ROWS}}
+</table>
+Each row: <tr><td><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/{id}">{id}</a></td><td>{title}</td><td>{owner}</td><td>{iteration}</td></tr>
+-->
+
+<p>{{CC_MENTION}}</p>
+<!-- Replace {{CC_MENTION}} with: <at id="0">Josh Xu</at>
+     Add to mentions array: {"id": 0, "mentionText": "Josh Xu", "mentioned": {"user": {"id": "90b98fe6-a80b-46e1-9209-b5ebcdf6da6b", "displayName": "Josh Xu", "userIdentityType": "aadUser"}}}
+-->
