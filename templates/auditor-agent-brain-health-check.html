@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<!-- vo-theme-0.2.0 -->
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent Brain Health Check - {{DATE}}</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
+  :root {
+    --vo-bg-deep: #0d1117; --vo-bg-panel: #010409; --vo-bg-surface: #161b22;
+    --vo-bg-hover: #1c2128; --vo-bg-recessed: #0a0c10;
+    --vo-text-primary: #e6edf3; --vo-text-secondary: #d0d6e0;
+    --vo-text-tertiary: #8b949e; --vo-text-quaternary: #484f58;
+    --vo-accent: #22c55e; --vo-accent-secondary: #10b981; --vo-accent-hover: #16a34a;
+    --vo-border-subtle: rgba(255,255,255,0.05); --vo-border-standard: rgba(255,255,255,0.08);
+    --vo-border-solid: #30363d; --vo-border-solid-light: #21262d;
+    --vo-status-success: #22c55e; --vo-status-error: #ef4444;
+    --vo-status-warning: #f59e0b; --vo-status-info: #3b82f6;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    font-feature-settings: "cv01", "ss03";
+    background: var(--vo-bg-deep); color: var(--vo-text-secondary); line-height: 1.6;
+    max-width: 1000px; margin: 0 auto; padding: 32px;
+  }
+  h1 { color: var(--vo-text-primary); font-size: 32px; font-weight: 500; letter-spacing: -0.704px; margin-bottom: 4px; }
+  .subtitle { color: var(--vo-text-tertiary); font-size: 13px; margin-bottom: 24px; }
+  .card { background: var(--vo-bg-surface); border: 1px solid var(--vo-border-standard); border-radius: 8px; padding: 24px; margin-bottom: 20px; }
+  .card h2 { color: var(--vo-text-primary); font-size: 18px; font-weight: 500; margin-bottom: 16px; }
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+  .stat-card { background: var(--vo-bg-surface); border: 1px solid var(--vo-border-standard); border-radius: 8px; padding: 20px; text-align: center; }
+  .stat-card .number { font-size: 36px; font-weight: 500; letter-spacing: -1px; color: var(--vo-text-primary); font-feature-settings: "cv01", "ss03", "tnum"; }
+  .stat-card .label { font-size: 13px; color: var(--vo-text-tertiary); margin-top: 4px; }
+  .stat-card .delta { font-size: 13px; font-weight: 500; margin-top: 4px; }
+  .delta-good { color: var(--vo-status-success); }
+  .delta-bad { color: var(--vo-status-error); }
+  .delta-neutral { color: var(--vo-text-tertiary); }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; margin: 16px 0; }
+  th { background: var(--vo-bg-panel); text-align: left; padding: 10px 14px; font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; color: var(--vo-text-tertiary); border-bottom: 1px solid var(--vo-border-standard); }
+  td { padding: 10px 14px; border-bottom: 1px solid var(--vo-border-subtle); color: var(--vo-text-secondary); }
+  tr:hover td { background: var(--vo-bg-hover); }
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 9999px; font-size: 12px; font-weight: 500; }
+  .badge-success { background: rgba(34,197,94,0.15); color: var(--vo-status-success); }
+  .badge-warning { background: rgba(245,158,11,0.15); color: var(--vo-status-warning); }
+  .badge-error { background: rgba(239,68,68,0.15); color: var(--vo-status-error); }
+  .badge-neutral { background: rgba(139,148,158,0.15); color: var(--vo-text-tertiary); }
+  .bar-container { display: flex; align-items: center; gap: 8px; }
+  .bar { height: 20px; border-radius: 4px; min-width: 2px; }
+  .bar-agents { background: var(--vo-status-info); }
+  .bar-memories { background: var(--vo-status-success); }
+  .bar-skills { background: #a78bfa; }
+  .bar-sessions { background: var(--vo-status-warning); }
+  .bar-knowledge { background: #f472b6; }
+  .bar-compiled { background: #67e8f9; }
+  .bar-other { background: var(--vo-text-quaternary); }
+  .bar-label { font-size: 12px; color: var(--vo-text-tertiary); min-width: 90px; }
+  .bar-value { font-size: 12px; color: var(--vo-text-secondary); font-feature-settings: "tnum"; min-width: 40px; text-align: right; }
+  .mono { font-family: 'Cascadia Code', ui-monospace, monospace; font-size: 13px; }
+  a { color: var(--vo-accent); text-decoration: none; }
+  a:hover { color: var(--vo-accent-hover); text-decoration: underline; }
+  .verdict { font-size: 24px; font-weight: 600; padding: 16px; border-radius: 8px; text-align: center; margin-bottom: 24px; }
+  .verdict-healthy { background: rgba(34,197,94,0.1); color: var(--vo-status-success); border: 1px solid rgba(34,197,94,0.3); }
+  .verdict-warning { background: rgba(245,158,11,0.1); color: var(--vo-status-warning); border: 1px solid rgba(245,158,11,0.3); }
+  .verdict-critical { background: rgba(239,68,68,0.1); color: var(--vo-status-error); border: 1px solid rgba(239,68,68,0.3); }
+  .footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid var(--vo-border-subtle); color: var(--vo-text-quaternary); font-size: 12px; }
+</style>
+</head>
+<body>
+
+<h1>Agent Brain Health Check</h1>
+<p class="subtitle">{{VO_SUBTITLE}}</p>
+
+<!-- Verdict Banner -->
+<div class="verdict {{VERDICT_CLASS}}">{{VERDICT_TEXT}}</div>
+
+<!-- Section 1: Summary Stats (4 tiles) -->
+<div class="stats">
+  {{STAT_CARDS}}
+  <!-- Example stat card:
+  <div class="stat-card">
+    <div class="number">642</div>
+    <div class="label">Total Entities</div>
+    <div class="delta delta-good">+12 since last check</div>
+  </div>
+  -->
+</div>
+
+<!-- Section 2: Detailed Check Table -->
+<div class="card">
+  <h2>System Checks</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Check</th>
+        <th>Status</th>
+        <th>Details</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{CHECK_ROWS}}
+      <!-- Example row:
+      <tr>
+        <td>Manifest</td>
+        <td><span class="badge badge-success">OK</span></td>
+        <td>v1.0.0, 2 migrations, last export 2h ago</td>
+      </tr>
+      -->
+    </tbody>
+  </table>
+</div>
+
+<!-- Section 3: Entity Breakdown -->
+<div class="card">
+  <h2>Entity Breakdown</h2>
+  {{ENTITY_BARS}}
+  <!-- Example bar:
+  <div class="bar-container" style="margin-bottom:8px;">
+    <span class="bar-label">sessions</span>
+    <div class="bar bar-sessions" style="width: {{BAR_WIDTH}}px;"></div>
+    <span class="bar-value">264</span>
+  </div>
+  -->
+</div>
+
+<!-- Section 4: Recent Activity -->
+<div class="card">
+  <h2>Recent Activity</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Timestamp</th>
+        <th>Action</th>
+        <th>Details</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{ACTIVITY_ROWS}}
+    </tbody>
+  </table>
+</div>
+
+<!-- Section 5: Git History -->
+<div class="card">
+  <h2>Git History (last 10)</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Commit</th>
+        <th>Message</th>
+        <th>Date</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{GIT_ROWS}}
+    </tbody>
+  </table>
+</div>
+
+<!-- Section 6: Issues & Recommendations -->
+<div class="card">
+  <h2>Issues & Recommendations</h2>
+  {{ISSUES_CONTENT}}
+  <!-- If no issues: <p style="color:var(--vo-status-success);">No issues found. All systems operational.</p> -->
+  <!-- If issues: <ul> <li>...</li> </ul> -->
+</div>
+
+<div class="footer">
+  Agent Brain v{{BRAIN_VERSION}} | Repo: github.com/jqxcode/agent-brain | Generated by Virtual Office Auditor
+</div>
+
+</body>
+</html>
