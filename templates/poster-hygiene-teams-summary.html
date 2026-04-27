@@ -1,6 +1,8 @@
-<!-- Teams channel message template for shiproom hygiene checks 7 & 8 -->
+<!-- Teams channel message template for shiproom hygiene checks 7, 8, 9 -->
 <!-- NOTE: Teams messages use basic HTML only (no CSS classes, no <style> blocks) -->
-<!-- Placeholders: {{DATE}}, {{CHECK7_SECTION}}, {{CHECK8_SECTION}}, {{CC_MENTION}} -->
+<!-- RULE: Only include sections that have items. Omit sections with 0 items entirely (no "all clear" lines). -->
+<!-- If ALL sections are empty, do NOT post at all. -->
+<!-- Placeholders: {{DATE}}, {{CHECK7_SECTION}}, {{CHECK8_SECTION}}, {{CHECK9_SECTION}}, {{CC_MENTION}} -->
 
 <p><b>Shiproom Hygiene Summary - {{DATE}}</b></p>
 
@@ -26,6 +28,18 @@ Otherwise replace with:
   {{CHECK8_ROWS}}
 </table>
 Each row: <tr><td><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/{id}">{id}</a></td><td>{title}</td><td>{owner}</td><td>{iteration}</td></tr>
+-->
+
+{{CHECK9_SECTION}}
+<!-- Replace {{CHECK9_SECTION}} with EMPTY STRING if no check9 items.
+Otherwise replace with:
+<p><b>Stale Bugs &gt; 90 Days ({{CHECK9_COUNT}})</b></p>
+<p>These bugs have been open for more than 90 days. Consider closing stale transfers and reopening with fresh context:</p>
+<table>
+  <tr><th>Bug</th><th>Title</th><th>Owner</th><th>Created</th><th>Age</th><th>Severity</th></tr>
+  {{CHECK9_ROWS}}
+</table>
+Each row: <tr><td><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/{id}">{id}</a></td><td>{title}</td><td>{owner}</td><td>{created}</td><td>{age} days</td><td>{severity}</td></tr>
 -->
 
 <p>{{CC_MENTION}}</p>
