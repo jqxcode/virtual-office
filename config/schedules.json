@@ -137,6 +137,18 @@
       "job": "failure-review",
       "cron": "0 18 * * 5",
       "description": "Friday failure review at 6pm -- generates harness improvement candidates"
+    },
+    {
+      "agent": "auditor",
+      "job": "agent-brain-health-check",
+      "cron": "0 14 * * 6",
+      "description": "Agent Brain ecosystem health check every Saturday at 2pm"
+    },
+    {
+      "agent": "system",
+      "job": "brain-weekly-maintenance",
+      "cron": "0 22 * * 0",
+      "description": "Weekly brain maintenance: archive sessions, compile knowledge, compress, push (Sunday 10pm)"
     }
   ]
 }
