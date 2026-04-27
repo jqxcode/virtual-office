@@ -1,45 +1,85 @@
-<!-- Teams channel message template for shiproom hygiene checks 7, 8, 9 -->
+<!-- Teams channel message template for shiproom hygiene checks 2b, 4, 5, 6, 7, 8, 9 -->
 <!-- NOTE: Teams messages use basic HTML only (no CSS classes, no <style> blocks) -->
-<!-- RULE: Only include sections that have items. Omit sections with 0 items entirely (no "all clear" lines). -->
+<!-- RULE: Only include sections that have items. Omit sections with 0 items entirely. -->
 <!-- If ALL sections are empty, do NOT post at all. -->
-<!-- Placeholders: {{DATE}}, {{CHECK7_SECTION}}, {{CHECK8_SECTION}}, {{CHECK9_SECTION}}, {{CC_MENTION}} -->
 
 <p><b>Shiproom Hygiene Summary - {{DATE}}</b></p>
 
+{{CHECK2B_SECTION}}
+<!-- Replace with EMPTY STRING if no check2b items. Otherwise:
+<p><b>Blocked Features ({{CHECK2B_COUNT}})</b></p>
+<p>These Features are in Blocked state and need attention:</p>
+<table>
+  <tr><th>Feature</th><th>Title</th><th>Owner</th><th>Last Changed</th></tr>
+  {{CHECK2B_ROWS}}
+</table>
+Row: <tr><td><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/{id}">{id}</a></td><td>{title}</td><td>{owner}</td><td>{changed}</td></tr>
+-->
+
+{{CHECK4_SECTION}}
+<!-- Replace with EMPTY STRING if no check4 items. Otherwise:
+<p><b>Tasks Missing Estimates or Parent ({{CHECK4_COUNT}})</b></p>
+<p>Current sprint tasks missing Original Estimate, Remaining Work, or parent link:</p>
+<table>
+  <tr><th>Task</th><th>Title</th><th>Owner</th><th>Issue</th></tr>
+  {{CHECK4_ROWS}}
+</table>
+Row: <tr><td><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/{id}">{id}</a></td><td>{title}</td><td>{owner}</td><td>{issue}</td></tr>
+-->
+
+{{CHECK5_SECTION}}
+<!-- Replace with EMPTY STRING if no check5 items. Otherwise:
+<p><b>Bugs Moved to Current Sprint ({{CHECK5_COUNT}})</b></p>
+<p>Non-closed bugs found outside current sprint, moved automatically:</p>
+<table>
+  <tr><th>Bug</th><th>Title</th><th>Owner</th><th>From Sprint</th></tr>
+  {{CHECK5_ROWS}}
+</table>
+Row: <tr><td><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/{id}">{id}</a></td><td>{title}</td><td>{owner}</td><td>{prev_sprint}</td></tr>
+-->
+
+{{CHECK6_SECTION}}
+<!-- Replace with EMPTY STRING if no check6 items. Otherwise:
+<p><b>Stale Tasks Moved for Review ({{CHECK6_COUNT}})</b></p>
+<p>Non-closed tasks from past sprints moved to future sprint for owner review:</p>
+<table>
+  <tr><th>Task</th><th>Title</th><th>Owner</th><th>From Sprint</th></tr>
+  {{CHECK6_ROWS}}
+</table>
+Row: <tr><td><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/{id}">{id}</a></td><td>{title}</td><td>{owner}</td><td>{prev_sprint}</td></tr>
+-->
+
 {{CHECK7_SECTION}}
-<!-- Replace {{CHECK7_SECTION}} with EMPTY STRING if no check7 items.
-Otherwise replace with:
+<!-- Replace with EMPTY STRING if no check7 items. Otherwise:
 <p><b>Proposed Bugs &gt; 24 Hours ({{CHECK7_COUNT}})</b></p>
 <p>These bugs have been in Proposed state for more than 24 hours and need triage (Active or Closed):</p>
 <table>
   <tr><th>Bug</th><th>Title</th><th>Owner</th><th>Last Changed</th></tr>
   {{CHECK7_ROWS}}
 </table>
-Each row: <tr><td><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/{id}">{id}</a></td><td>{title}</td><td>{owner}</td><td>{changed}</td></tr>
+Row: <tr><td><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/{id}">{id}</a></td><td>{title}</td><td>{owner}</td><td>{changed}</td></tr>
 -->
 
 {{CHECK8_SECTION}}
-<!-- Replace {{CHECK8_SECTION}} with EMPTY STRING if no check8 items.
-Otherwise replace with:
+<!-- Replace with EMPTY STRING if no check8 items. Otherwise:
 <p><b>Committed Features Outside Current Semester ({{CHECK8_COUNT}})</b></p>
 <p>These Features are Committed but their iteration path is not under H1 2026:</p>
 <table>
   <tr><th>Feature</th><th>Title</th><th>Owner</th><th>Iteration</th></tr>
   {{CHECK8_ROWS}}
 </table>
-Each row: <tr><td><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/{id}">{id}</a></td><td>{title}</td><td>{owner}</td><td>{iteration}</td></tr>
+Row: <tr><td><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/{id}">{id}</a></td><td>{title}</td><td>{owner}</td><td>{iteration}</td></tr>
 -->
 
 {{CHECK9_SECTION}}
-<!-- Replace {{CHECK9_SECTION}} with EMPTY STRING if no check9 items.
-Otherwise replace with:
+<!-- Replace with EMPTY STRING if no check9 items. Otherwise:
 <p><b>Stale Bugs &gt; 90 Days ({{CHECK9_COUNT}})</b></p>
-<p>These bugs have been open for more than 90 days. Consider closing stale transfers and reopening with fresh context:</p>
+<p>These bugs have been open for more than 90 days. Consider closing and reopening with fresh context:</p>
 <table>
   <tr><th>Bug</th><th>Title</th><th>Owner</th><th>Created</th><th>Age</th><th>Severity</th></tr>
   {{CHECK9_ROWS}}
 </table>
-Each row: <tr><td><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/{id}">{id}</a></td><td>{title}</td><td>{owner}</td><td>{created}</td><td>{age} days</td><td>{severity}</td></tr>
+Row: <tr><td><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/{id}">{id}</a></td><td>{title}</td><td>{owner}</td><td>{created}</td><td>{age} days</td><td>{severity}</td></tr>
 -->
 
 <p>{{CC_MENTION}}</p>

@@ -46,19 +46,17 @@
 1. WIQL per area: `WHERE [System.State] = 'Resolved' AND [System.AreaPath] UNDER '<area>'`
 2. PATCH state to Closed, add comment: "Item should be closed instead of left Resolved. If there are any questions, reach out to Josh Xu (qitxu@microsoft.com)."
 
-## Check 2b: Features Stuck in Non-Active States
+## Check 2b: Blocked Features
 
-**Goal**: Features should be Active (in progress) or Closed. New/Proposed/etc. are invalid steady states.
+**Goal**: Features in Blocked state need attention. Proposed/RollingOut are valid backlog/deployment states — only Blocked is flagged.
 
 1. WIQL per area:
    ```
    WHERE [System.WorkItemType] = 'Feature'
-     AND [System.State] <> 'Active'
-     AND [System.State] <> 'Closed'
-     AND [System.State] <> 'Removed'
+     AND [System.State] = 'Blocked'
      AND [System.AreaPath] UNDER '<area>'
    ```
-2. Comment @mentioning owner: "This Feature is in '{state}' state. Features should be Active or Closed. Please update the state accordingly."
+2. Comment @mentioning owner: "This Feature is in Blocked state. Please update with a reason or unblock if the blocker is resolved."
 
 ## Check 3: Move Non-Closed Items from Previous Sprint
 
@@ -141,7 +139,7 @@
 
 ## Teams Summary Output
 
-After all checks, write `Q:/src/personal_projects/virtual-office/output/scrum-master/hygiene-teams-summary.json` containing check7 and check8 results. The poster agent's `hygiene-teams-post` job picks this up.
+After all checks, write `Q:/src/personal_projects/virtual-office/output/scrum-master/hygiene-teams-summary.json` containing check2b, check4, check5, check6, check7, check8, and check9 results. The poster agent's `hygiene-teams-post` job picks this up. Only sections with items are posted; empty sections are omitted entirely.
 
 ---
 
