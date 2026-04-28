@@ -63,7 +63,6 @@ function Write-TestConfig {
         [string]$AgentName = "test-agent",
         [string]$JobName = "test-job",
         [int]$MaxRuns = 0,
-        [bool]$Enabled = $true,
         [string]$Prompt = "echo test output"
     )
     # agents.json -- runner reads top-level keys as agent names
@@ -75,7 +74,6 @@ function Write-TestConfig {
         $JobName = @{
             prompt  = $Prompt
             maxRuns = $MaxRuns
-            enabled = $Enabled
             description = "test job"
         }
     } | ConvertTo-Json -Depth 5
@@ -88,6 +86,17 @@ function Import-RunnerFunctions {
     param([string]$Root)
     # Source constants
     . (Join-Path $Root "runner/constants.ps1")
+    # Promote sourced constants to global scope so global helper functions can access them
+    Set-Variable -Name SYSTEM_VERSION -Value $SYSTEM_VERSION -Scope Global
+    Set-Variable -Name PROJECT_ROOT -Value $PROJECT_ROOT -Scope Global
+    Set-Variable -Name CONFIG_DIR -Value $CONFIG_DIR -Scope Global
+    Set-Variable -Name STATE_DIR -Value $STATE_DIR -Scope Global
+    Set-Variable -Name OUTPUT_DIR -Value $OUTPUT_DIR -Scope Global
+    Set-Variable -Name AUDIT_DIR -Value $AUDIT_DIR -Scope Global
+    Set-Variable -Name EVENTS_FILE -Value $EVENTS_FILE -Scope Global
+    Set-Variable -Name ERRORS_FILE -Value $ERRORS_FILE -Scope Global
+    Set-Variable -Name DASHBOARD_FILE -Value $DASHBOARD_FILE -Scope Global
+    Set-Variable -Name DEFAULT_STALE_LOCK_TIMEOUT_MINUTES -Value $DEFAULT_STALE_LOCK_TIMEOUT_MINUTES -Scope Global
 
     # Define helper functions inline (copied from runner) so tests can call them directly.
     # This avoids executing the param() / main flow of Invoke-AgentJob.ps1.
@@ -334,28 +343,6 @@ try {
 }
 
 # ========================================
-# TC5: Disabled job - exits without action
-# ========================================
-Write-Host "`nTC5: Disabled job - skipped" -ForegroundColor Cyan
-$root = New-TestRoot
-try {
-    Write-TestConstants -Root $root
-    Write-TestConfig -Root $root -Enabled $false
-    Import-RunnerFunctions -Root $root
-
-    $result = Invoke-Runner -Root $root
-    Assert-True ($result.ExitCode -eq 0) "Runner exits cleanly for disabled job"
-    Assert-True ($result.Output -match "disabled" -or $result.Output -match "Skipping") "Output mentions disabled"
-
-    # No counter file should be created
-    $stateDir = Join-Path $root "state/agents/test-agent/test-job"
-    $counterFile = Join-Path $stateDir "counter.json"
-    Assert-True (-not (Test-Path $counterFile)) "No counter file created for disabled job"
-} finally {
-    Remove-TestRoot -Root $root
-}
-
-# ========================================
 # TC6: Invalid agent name - errors gracefully
 # ========================================
 Write-Host "`nTC6: Invalid agent name - graceful error" -ForegroundColor Cyan
@@ -421,7 +408,6 @@ try {
         "test-job" = @{
             prompt = "echo test"
             maxRuns = 0
-            enabled = $true
             description = "test job"
         }
     } | ConvertTo-Json -Depth 5
@@ -455,7 +441,6 @@ try {
             "test-job" = @{
                 prompt = "echo test"
                 maxRuns = 0
-                enabled = $true
                 description = "wrapped job"
             }
         }
@@ -560,7 +545,6 @@ try {
         "test-job" = @{
             prompt = "echo test output"
             maxRuns = 0
-            enabled = $true
             description = "test job"
         }
     } | ConvertTo-Json -Depth 5

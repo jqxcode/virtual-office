@@ -3,7 +3,6 @@
     "test-job": {
       "prompt": "Run test job.",
       "maxRuns": 5,
-      "enabled": true,
       "description": "Test job for unit tests"
     }
   }

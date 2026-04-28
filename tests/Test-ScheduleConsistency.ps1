@@ -58,7 +58,7 @@ foreach ($jf in $jobFiles) {
 # ========================================
 # TC1: Every scheduled job has a valid cron expression
 # ========================================
-Write-Host "`nTC1: Every enabled job that has a schedule entry should map to a valid cron expression" -ForegroundColor Cyan
+Write-Host "`nTC1: Every scheduled job has a valid cron expression" -ForegroundColor Cyan
 
 foreach ($entry in $schedules) {
     $agent = $entry["agent"]
@@ -111,25 +111,6 @@ if ($detectHangCount -ge 1) {
     $cron = @($detectHangEntries)[0]["cron"]
     Assert-True ($cron -eq "45 * * * *") "hang-scout/detect-hang cron is '45 * * * *' (got: '$cron')"
 }
-
-# ========================================
-# TC5: No schedule references a disabled job
-# ========================================
-Write-Host "`nTC5: No schedule references a disabled job" -ForegroundColor Cyan
-
-$referencesDisabled = $false
-foreach ($entry in $schedules) {
-    $agent = $entry["agent"]
-    $job = $entry["job"]
-    if ($allJobs.ContainsKey($agent) -and $allJobs[$agent].ContainsKey($job)) {
-        $jobDef = $allJobs[$agent][$job]
-        if ($jobDef.ContainsKey("enabled") -and $jobDef["enabled"] -eq $false) {
-            $referencesDisabled = $true
-            Write-Host "    Schedule references disabled job: '$agent/$job'" -ForegroundColor Yellow
-        }
-    }
-}
-Assert-True (-not $referencesDisabled) "No schedule entries reference a disabled job"
 
 # --- Summary ---
 Write-Host "`n========================================" -ForegroundColor White

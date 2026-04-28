@@ -73,13 +73,6 @@
       "description": "Bug-AutoPilot daily summary post to Teams at 7:30am"
     },
     {
-      "agent": "poster",
-      "job": "AAP-report-posting",
-      "cron": "0 20 * * *",
-      "enabled": false,
-      "description": "ADO Autopilot report link to Teams Test Autopilot channel at 8pm daily (DISABLED 2026-04-27)"
-    },
-    {
       "agent": "hang-scout",
       "job": "detect-hang",
       "cron": "45 * * * *",
