@@ -3,42 +3,36 @@
     "ICM-daily-summary-Notes": {
       "prompt": "IMPORTANT: Before generating any report, read and follow ALL rules in Q:/src/personal_projects/virtual-office/config/report-rules.md. Run the ICM-daily-summary-Notes job (formerly Notes-Customer-ICM-daily-summary). Follow the workflow in your agent definition: (1) Fetch all active ICMs for MeetingNotes team 115354, (2) Get owner last comment dates, (3) Get last comment by anyone + check if CSS via Graph API, (4) Check if author summary was updated, (5) Extract investigation chat/bridge links, (6) Determine Update Needed, (7) Build HTML using template at Q:/src/local_skills/cmd_meetings/icm-active-summary-template.html, (8) Post to Teams Notes - ICM channel. Save payload to Q:/src/tmp/poster-notes-icm-daily.json before posting. Use today's date.",
       "maxRuns": 0,
-      "enabled": true,
       "saveOutput": false,
       "description": "Queries ICM Kusto for active Meeting Notes incidents and posts daily summary with owner engagement status to Teams"
     },
     "ICM-daily-summary-Join": {
       "prompt": "IMPORTANT: Before generating any report, read and follow ALL rules in Q:/src/personal_projects/virtual-office/config/report-rules.md. Run the ICM-daily-summary-Join job. You MUST use the fixed template at Q:/src/personal_projects/virtual-office/templates/poster-icm-daily-summary-join.html for the message body. Follow the workflow in your agent definition: (1) Fetch all active ICMs for MeetingJoin team 73703, (2) Filter out <1d ICMs and stale 199410622, (3) Get owner last comment dates, (4) Get last comment by anyone + check CSS via Graph API, (5) Check ACK status for unassigned ICMs, (6) Find DRI for unassigned ICMs by day, (7) Generate 1-line summaries (<20 words), (8) Determine Update Needed, (9) Build HTML using the template with columns: ICM, Sev, Owner (with cc: DRI for unassigned), ICM Since (MM/DD), Age/Idle, Owner Engaged On, Summary, Update Needed, (10) Post to Teams Test Autopilot channel (channel ID in your agent definition). Only CC Josh Xu (no other mentions). Save payload to Q:/src/tmp/poster-mj-icm-daily.json before posting. Use today's date.",
       "maxRuns": 0,
-      "enabled": true,
       "saveOutput": false,
       "description": "Queries ICM Kusto for active Meeting Join incidents and posts daily summary with DRI lookup and ACK status to Teams"
     },
     "Bug-Autopilot-Adoption-daily-summary": {
       "prompt": "IMPORTANT: Before generating any report, read and follow ALL rules in Q:/src/personal_projects/virtual-office/config/report-rules.md. Post the daily Bug-AutoPilot Adoption summary to the Teams Bug-Autopilot channel. All metrics are computed by a Python script -- do NOT compute metrics yourself. Steps: (1) Run the build script: python Q:/src/personal_projects/virtual-office/scripts/build-bap-adoption-summary.py --output Q:/src/tmp/poster-daily.json. (2) Read the output JSON file Q:/src/tmp/poster-daily.json. It contains: subject, body_html (ready-to-post HTML), pr_reply_html (thread reply HTML), and metrics (summary stats). (3) Post body_html as the Teams message body to the Bug-Autopilot channel (team 35efd52f-43d7-4020-9353-3f937eaf3151, channel 19:YK3RhxtBrUEFTA-iwz-y36IgSpqnSofwhYkZT3BmgFQ1@thread.tacv2). Use subject from the JSON. (4) Post pr_reply_html as a thread reply to the main message. (5) Print the metrics JSON for logging.",
       "maxRuns": 0,
-      "enabled": true,
       "saveOutput": false,
       "description": "Queries ADO Bug-AutoPilot Triaged items and posts formatted summary to Teams Bug-Autopilot channel"
     },
     "AAP-report-posting": {
       "prompt": "IMPORTANT: Before generating any report, read and follow ALL rules in Q:/src/personal_projects/virtual-office/config/report-rules.md. Post the latest ADO Autopilot report link to the Teams Test Autopilot channel. Steps: (1) Read the share URL from Q:/src/hackathon/ado-autopilot/reports/latest-share-url.txt. If the file does not exist or is empty, output 'No AAP report share URL found.' and exit. (2) Read the most recent HTML report file in Q:/src/hackathon/ado-autopilot/reports/ (sort by modification time, pick newest). Extract summary stats from the HTML: total features, updated count, skipped count. (3) Build a Teams channel message with subject 'ADO Autopilot - Status Report (YYYY-MM-DD)' containing: a brief summary line (e.g. '10 features: 4 updated, 6 skipped'), a link to the full report on SharePoint, and CC @mention for Josh Xu. (4) Save payload to Q:/src/tmp/poster-aap-report.json. (5) POST to Teams channel: team 35efd52f-43d7-4020-9353-3f937eaf3151, channel 19:xSmqZj8J0oCRD2uutKlu6GqMVy33JhGNjuPdSlE2GJY1@thread.tacv2. Verify HTTP 201.",
       "maxRuns": 0,
-      "enabled": false,
       "saveOutput": false,
       "description": "Posts ADO Autopilot report SharePoint link to Teams Test Autopilot channel with @mention Josh"
     },
     "hygiene-teams-post": {
       "prompt": "IMPORTANT: Before generating any report, read and follow ALL rules in Q:/src/personal_projects/virtual-office/config/report-rules.md. Post shiproom hygiene summary (checks 2b, 4-11) to Teams.\n\nSteps:\n1. Read `Q:/src/personal_projects/virtual-office/output/scrum-master/hygiene-teams-summary.json`. If missing or empty, output 'No hygiene summary data.' and exit.\n2. Parse all check arrays: check2b (Blocked Features), check4 (missing estimates/parent), check5 (bugs moved to current sprint), check6 (stale tasks moved for review), check7 (Proposed bugs >24h), check8 (Committed Features outside semester), check9 (stale bugs >90d), check10 (Ring target dates past due), check11 (missing sign-offs: Security/Accessibility/Privacy/Compliance).\n3. If ALL arrays are empty, output 'No hygiene issues to post.' and exit. Do NOT post an empty message.\n4. Read the HTML template at `Q:/src/personal_projects/virtual-office/templates/poster-hygiene-teams-summary.html`. Build a Teams message: only include sections that have items. Omit sections with 0 items entirely.\n5. Post to Teams channel:\n   - Team/Group ID: 31ee74d6-0a8f-41a6-b0da-c4d9e3a1db3b\n   - Channel ID: 19:183d481e40af45d09aac7322433fc7ab@thread.tacv2\n   - Channel name: Meeting US (PRODUCTION)\n6. Build @mentions for ALL unique owners that appear in the check items, plus CC Josh Xu. For each unique owner email in the data:\n   a. Look up AAD ID via Graph API: GET https://graph.microsoft.com/v1.0/users/{email}?$select=displayName,id\n   b. Add to the mentions array with incrementing id\n   c. In the HTML body, append owner names as @mentions at the bottom\n   Josh Xu (90b98fe6-a80b-46e1-9209-b5ebcdf6da6b) is always included as CC.\n7. Save payload to Q:/src/tmp/poster-hygiene-teams.json before posting. Verify HTTP 201.",
       "maxRuns": 0,
-      "enabled": true,
       "saveOutput": false,
       "description": "Posts shiproom hygiene summary (checks 2b, 4-11) to Teams Meeting US channel (currently testing channel)"
     },
     "BAP-Perf-Analysis-posting": {
       "prompt": "IMPORTANT: Before generating any report, read and follow ALL rules in Q:/src/personal_projects/virtual-office/config/report-rules.md. Run the BAP-Perf-Analysis-posting job. Read the latest hang-scout daily report from Q:/src/personal_projects/virtual-office/output/hang-scout/daily-report-latest.html. Extract the Bug Autopilot Performance Analysis section. If no report exists for today or no BA perf section found, output 'No BA perf data for today.' and exit. Otherwise, build a Teams message using the fixed template at Q:/src/personal_projects/virtual-office/templates/poster-ba-perf-analysis.html. Post to Teams Test Autopilot channel (channel ID in your agent definition). CC Josh Xu only. Save payload to Q:/src/tmp/poster-ba-perf.json before posting.",
       "maxRuns": 0,
-      "enabled": true,
       "saveOutput": false,
       "description": "Posts Bug Autopilot Performance Analysis from hang-scout daily report to Teams Test Autopilot channel"
     }

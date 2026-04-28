@@ -351,34 +351,13 @@ try {
                     $schedulesJson = [System.IO.File]::ReadAllText($schedulesFile, [System.Text.Encoding]::UTF8)
                     $schedulesObj = $schedulesJson | ConvertFrom-Json
                     foreach ($entry in $schedulesObj.schedules) {
-                        $agentName = $entry.agent
-                        $jobName   = $entry.job
-                        $enabled   = $false
-                        $jobFile   = Join-Path $jobsDir "$agentName.json"
-                        if (Test-Path $jobFile) {
-                            $jobJson  = [System.IO.File]::ReadAllText($jobFile, [System.Text.Encoding]::UTF8)
-                            $jobObj   = $jobJson | ConvertFrom-Json
-                            # jobs is a hashtable/object with job names as keys
-                            $jobEntry = $null
-                            if ($jobObj.jobs.PSObject.Properties[$jobName]) {
-                                $jobEntry = $jobObj.jobs.$jobName
-                            }
-                            if ($jobEntry) {
-                                if ($jobEntry.PSObject.Properties["enabled"]) {
-                                    $enabled = [bool]$jobEntry.enabled
-                                } else {
-                                    $enabled = $true
-                                }
-                            }
-                        }
                         $desc = ""
                         if ($entry.PSObject.Properties["description"]) { $desc = $entry.description }
                         $schedulesList += [PSCustomObject]@{
-                            agent       = $agentName
-                            job         = $jobName
+                            agent       = $entry.agent
+                            job         = $entry.job
                             cron        = $entry.cron
                             description = $desc
-                            enabled     = $enabled
                         }
                     }
                 }

@@ -3,13 +3,14 @@
     "detect-hang": {
       "prompt": "Run hang detection scan now. Read the 'hangDetection' config from this job definition for per-agent thresholds. Scan all VO agent lock files under Q:/src/personal_projects/virtual-office/state/agents/*/lock. For each lock, check if the age exceeds that agent's hangThresholdMinutes (default 60). For hung jobs: walk the process tree, capture py-spy stack traces for Python processes, classify the hang, decide whether to kill (only if age > killThresholdMinutes), log the incident, and file GitHub issues for new patterns. IMPORTANT: After classifying a hang, check the 'perClassification' section for a classification-specific killThresholdMinutes override. If the hang classification matches a key in perClassification, use that killThresholdMinutes instead of the agent-level one. This allows fast-kill for hang types that are unrecoverable (e.g. stale_task_poll). Skip any agents listed in 'exclude'. Output a scan summary at the end. IMPORTANT: Your output MUST use ASCII-only characters. Use -- instead of em dashes, -> instead of arrows (right arrow), <- instead of left arrows, ... instead of ellipsis, and straight quotes instead of curly quotes.",
       "maxRuns": 0,
-      "enabled": true,
       "saveOutput": true,
       "description": "Scans for hung VO agent jobs, diagnoses via process tree and py-spy, kills if safe, logs incidents",
       "hangDetection": {
         "defaultHangThresholdMinutes": 60,
         "defaultKillThresholdMinutes": 120,
-        "exclude": ["hang-scout"],
+        "exclude": [
+          "hang-scout"
+        ],
         "perClassification": {
           "stale_task_poll": {
             "killThresholdMinutes": 75,
@@ -43,14 +44,12 @@
     "detect-scrum-master": {
       "prompt": "Run hang detection scan targeting ONLY the scrum-master agent. Use hangThresholdMinutes=30 and killThresholdMinutes=60 for this scan (override the config defaults). Scan ONLY the lock file at Q:/src/personal_projects/virtual-office/state/agents/scrum-master/lock. If age >= 30 minutes: walk the process tree, capture py-spy stack traces for Python processes, classify the hang, decide whether to kill (only if age > 60 min), log the incident, and file GitHub issues for new patterns. IMPORTANT: After classifying the hang, check the 'perClassification' section in the detect-hang job config for a classification-specific killThresholdMinutes override. If the classification matches (e.g. stale_task_poll -> 75 min), use that threshold instead. Output scan summary. IMPORTANT: Your output MUST use ASCII-only characters. Use -- instead of em dashes, -> instead of arrows (right arrow), <- instead of left arrows, ... instead of ellipsis, and straight quotes instead of curly quotes.",
       "maxRuns": 0,
-      "enabled": true,
       "saveOutput": true,
       "description": "One-off hang detection for scrum-master only with 20min hang / 60min kill thresholds"
     },
     "daily-report": {
       "prompt": "IMPORTANT: Before generating any report, read and follow ALL rules in Q:/src/personal_projects/virtual-office/config/report-rules.md. Generate the daily 5W incident report. (1) Parse audit logs from Q:/src/personal_projects/virtual-office/output/audit/*.jsonl for the past 30 days to extract run durations per agent/job. (2) Collect all hang incidents from Q:/src/personal_projects/virtual-office/output/hang-scout/incidents/ in the last 24 hours. (3) Count Failures (30d): 'Failures' includes jobs with non-zero exit, hangs killed, stale locks cleared, and any hang-scout incident -- not just explicit exit codes. (4) Collect Bug Autopilot (BAP) performance data: read all run-*-summary.json files from the bugAutopilotPerf.logsPath for the last 24 hours (today) and last 7 days (baseline). Merge per_step_aggregate data across runs. Flag outliers (max > outlierMultiplier * avg), threshold breaches (p95 > stepThresholds), trend increases (> trendAlertPercent vs 7-day avg), and slow bugs (> 2x run average). Compute BAP error rate (percentage of bugs with errors). (5) If no meaningful work was done (no incidents in the last 24 hours AND no interesting runtime trends -- no alerts triggered), do NOT generate an HTML report -- just output 'Hang Scout: no incidents or alerts in the last 24 hours.' and exit. Only generate a full report when there are incidents to report or runtime trend alerts were triggered. You MUST use the fixed template at Q:/src/personal_projects/virtual-office/templates/hang-scout-daily-report.html. Read the template file, then replace all {{PLACEHOLDER}} values with actual data. Replace {{VO_SUBTITLE}} with: Agent: Hang Scout | Job: daily-report | Start: <PST timestamp when job started> | Complete: <PST timestamp when report is generated>. Replace {{REPORT_PERIOD_START}} with last report timestamp (or '24h ago') and {{REPORT_PERIOD_END}} with current timestamp. Replace {{TOP_RISK_ISSUE_LINK}} with clickable GitHub issue link if exists. Replace {{INCIDENT_5W_BLOCKS}} with per-incident 5W grid blocks (each incident gets its OWN Who/What/When/Where/Why -- NOT a single overall 5W). Replace {{BAP_PERF_SUMMARY}}, {{BAP_ERROR_RATE}}, {{BAP_PERF_NOTE}}, {{BAP_DURATION_TABLE_ROWS}} with BAP data (use BAP not BA as abbreviation everywhere). For RUNTIME_TABLE_ROWS, include an Analysis column (11th column): for jobs with >100% trend spike, link to known pattern or show 'Unknown - needs investigation'. For RECOMMENDATIONS, use severity CSS classes: rec-critical (CRITICAL items, red), rec-warn (TREND ALERT/RUNTIME LIMIT, yellow), rec-ok (resolved/DATA GAP, green), rec (informational, blue default). For Chart.js data, replace {{TREND_LABELS}}, {{TREND_DATASETS}}, {{BAR_LABELS}}, {{BAR_AVG_30D}}, {{BAR_AVG_24H}} with JSON arrays of the computed data. Save to output/hang-scout/daily-report-YYYYMMDD.html and daily-report-latest.html.",
       "maxRuns": 0,
-      "enabled": true,
       "saveOutput": false,
       "description": "Generates daily 5W incident report with Bug Autopilot (BAP) performance analysis",
       "bugAutopilotPerf": {

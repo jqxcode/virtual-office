@@ -50,23 +50,11 @@ Describe "Task Queue Feature" {
                 foreach ($entry in $schedulesObj.schedules) {
                     $agentName = $entry.agent
                     $jobName   = $entry.job
-                    $enabled   = $false
-                    $jobFile   = Join-Path $jobsDir "$agentName.json"
-                    if (Test-Path $jobFile) {
-                        $jobObj = [System.IO.File]::ReadAllText($jobFile, [System.Text.Encoding]::UTF8) | ConvertFrom-Json
-                        foreach ($j in $jobObj.jobs) {
-                            if ($j.name -eq $jobName) {
-                                $enabled = [bool]$j.enabled
-                                break
-                            }
-                        }
-                    }
                     $schedulesList += [PSCustomObject]@{
                         agent       = $agentName
                         job         = $jobName
                         cron        = $entry.cron
                         description = if ($entry.PSObject.Properties["description"]) { $entry.description } else { "" }
-                        enabled     = $enabled
                     }
                 }
             }
@@ -257,7 +245,7 @@ Describe "Task Queue Feature" {
     # =======================================================================
     Context "Schedule API" {
 
-        It "Returns schedules list with enabled flag from job config" {
+        It "Returns schedules list from job config" {
             $root = New-TestRoot
             try {
                 $schedJson = @{
@@ -269,7 +257,7 @@ Describe "Task Queue Feature" {
 
                 $jobsJson = @{
                     jobs = @(
-                        @{ name = "test-job"; prompt = "echo test"; enabled = $true }
+                        @{ name = "test-job"; prompt = "echo test" }
                     )
                 } | ConvertTo-Json -Depth 5
                 Set-Content -Path (Join-Path $root "config/jobs/test-agent.json") -Value $jobsJson -Encoding UTF8
@@ -280,33 +268,7 @@ Describe "Task Queue Feature" {
                 $result.schedules[0].agent   | Should -Be "test-agent"
                 $result.schedules[0].job     | Should -Be "test-job"
                 $result.schedules[0].cron    | Should -Be "0 7 * * *"
-                $result.schedules[0].enabled | Should -Be $true
                 $result.schedules[0].description | Should -Be "Daily at 7am"
-            } finally {
-                Remove-TestRoot -Root $root
-            }
-        }
-
-        It "Reports enabled=false when job config has enabled set to false" {
-            $root = New-TestRoot
-            try {
-                $schedJson = @{
-                    schedules = @(
-                        @{ agent = "test-agent"; job = "disabled-job"; cron = "0 8 * * *" }
-                    )
-                } | ConvertTo-Json -Depth 5
-                Set-Content -Path (Join-Path $root "config/schedules.json") -Value $schedJson -Encoding UTF8
-
-                $jobsJson = @{
-                    jobs = @(
-                        @{ name = "disabled-job"; prompt = "echo test"; enabled = $false }
-                    )
-                } | ConvertTo-Json -Depth 5
-                Set-Content -Path (Join-Path $root "config/jobs/test-agent.json") -Value $jobsJson -Encoding UTF8
-
-                $result = Invoke-SchedulesLogic -ConfigDir (Join-Path $root "config") -StateDir (Join-Path $root "state")
-
-                $result.schedules[0].enabled | Should -Be $false
             } finally {
                 Remove-TestRoot -Root $root
             }
@@ -391,7 +353,7 @@ Describe "Task Queue Feature" {
             }
         }
 
-        It "Handles missing job config for a schedule entry gracefully (enabled defaults false)" {
+        It "Handles missing job config for a schedule entry gracefully" {
             $root = New-TestRoot
             try {
                 $schedJson = @{
@@ -405,7 +367,6 @@ Describe "Task Queue Feature" {
                 $result = Invoke-SchedulesLogic -ConfigDir (Join-Path $root "config") -StateDir (Join-Path $root "state")
 
                 $result.schedules.Count      | Should -Be 1
-                $result.schedules[0].enabled | Should -Be $false
             } finally {
                 Remove-TestRoot -Root $root
             }
