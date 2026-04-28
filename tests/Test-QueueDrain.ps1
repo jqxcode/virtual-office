@@ -54,8 +54,7 @@ function Write-TestConstants {
 function Write-TestConfig {
     param(
         [string]$Root,
-        [int]$MaxRuns = 0,
-        [bool]$Enabled = $true
+        [int]$MaxRuns = 0
     )
     $agentsJson = @{ "test-agent" = @{ displayName = "Test Agent"; description = "test" } } | ConvertTo-Json
     Set-Content -Path (Join-Path $Root "config/agents.json") -Value $agentsJson -Encoding UTF8
@@ -64,7 +63,6 @@ function Write-TestConfig {
         "test-job" = @{
             prompt      = "echo test"
             maxRuns     = $MaxRuns
-            enabled     = $Enabled
             description = "test job"
         }
     } | ConvertTo-Json -Depth 5
