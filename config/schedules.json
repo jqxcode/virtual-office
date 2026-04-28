@@ -76,7 +76,8 @@
       "agent": "poster",
       "job": "AAP-report-posting",
       "cron": "0 20 * * *",
-      "description": "ADO Autopilot report link to Teams Test Autopilot channel at 8pm daily"
+      "enabled": false,
+      "description": "ADO Autopilot report link to Teams Test Autopilot channel at 8pm daily (DISABLED 2026-04-27)"
     },
     {
       "agent": "hang-scout",

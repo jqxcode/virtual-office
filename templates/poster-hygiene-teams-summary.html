@@ -104,7 +104,19 @@ Row: <tr><td><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit
 Row: <tr><td><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/{id}">{id}</a></td><td>{title}</td><td>{owner}</td><td>{missing}</td></tr>
 -->
 
-<p>{{CC_MENTION}}</p>
-<!-- Replace {{CC_MENTION}} with: <at id="0">Josh Xu</at>
-     Add to mentions array: {"id": 0, "mentionText": "Josh Xu", "mentioned": {"user": {"id": "90b98fe6-a80b-46e1-9209-b5ebcdf6da6b", "displayName": "Josh Xu", "userIdentityType": "aadUser"}}}
+<p>{{OWNER_MENTIONS}}</p>
+<!-- Build {{OWNER_MENTIONS}} dynamically:
+     1. Collect all unique owner emails from all check items
+     2. For each owner, resolve AAD ID via Graph API: GET /v1.0/users/{email}?$select=displayName,id
+     3. Build mentions with incrementing IDs starting at 0
+     4. Josh Xu (90b98fe6-a80b-46e1-9209-b5ebcdf6da6b) is always included as CC (id=0)
+     5. Other owners get id=1, 2, 3...
+     6. In HTML: <at id="0">Josh Xu</at> <at id="1">Owner Name</at> ...
+     7. In mentions JSON array:
+        [
+          {"id": 0, "mentionText": "Josh Xu", "mentioned": {"user": {"id": "90b98fe6-...", "displayName": "Josh Xu", "userIdentityType": "aadUser"}}},
+          {"id": 1, "mentionText": "Owner Name", "mentioned": {"user": {"id": "aad-id", "displayName": "Owner Name", "userIdentityType": "aadUser"}}},
+          ...
+        ]
+     8. If no items at all (shouldn't happen — we don't post when empty), just mention Josh Xu
 -->
