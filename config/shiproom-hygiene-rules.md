@@ -84,11 +84,17 @@
 
 ## Check 6: Stale Tasks from Past Sprints
 
-**Goal**: Non-closed tasks with an assignee stuck in **actual past sprints** need owner review. Move to FUTURE sprint (not current) to give review time. **Do NOT touch backlog items** — only tasks whose iteration path is under the semester prefix (assigned to a real sprint).
+**Goal**: Non-closed tasks with an assignee stuck in past sprints need owner review. Move to FUTURE sprint (not current) to give review time.
+
+**Important exclusions**:
+- **Backlog items**: Only target tasks in actual sprint iterations (path must contain "Sprint" and be `UNDER MSTeams\2026\H1`). Items at root/backlog iteration paths are not stale — they're just backlog.
+- **Grace period**: In the first 2 days of the current sprint, skip tasks still in the previous sprint. People need time to close out work from the last sprint.
 
 1. Get future iteration (first with timeFrame='future').
-2. WIQL: `WHERE [System.WorkItemType] = 'Task' AND [System.State] <> 'Closed' AND [System.State] <> 'Removed' AND [System.IterationPath] UNDER '<semester-prefix>' AND [System.IterationPath] <> '<semester-prefix>' AND [System.IterationPath] <> '<current>' AND [System.IterationPath] <> '<future>' AND [System.AssignedTo] <> ''`
-3. PATCH iteration to future sprint, comment @owner asking to review.
+2. Parse current sprint start date from the sprint name to determine grace period.
+3. WIQL: `WHERE [System.WorkItemType] = 'Task' AND [System.State] <> 'Closed' AND [System.State] <> 'Removed' AND [System.IterationPath] <> '<current>' AND [System.IterationPath] <> '<future>' AND [System.IterationPath] UNDER 'MSTeams\2026\H1' AND [System.AssignedTo] <> ''`
+4. For each result: skip if iteration doesn't contain "Sprint" (backlog); skip if in previous sprint and within grace period.
+5. PATCH remaining items to future sprint, comment @owner asking to review.
 
 ## Check 7: Proposed Bugs > 24 Hours
 
