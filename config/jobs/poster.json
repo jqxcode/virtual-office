@@ -24,7 +24,7 @@
     "AAP-report-posting": {
       "prompt": "IMPORTANT: Before generating any report, read and follow ALL rules in Q:/src/personal_projects/virtual-office/config/report-rules.md. Post the latest ADO Autopilot report link to the Teams Test Autopilot channel. Steps: (1) Read the share URL from Q:/src/hackathon/ado-autopilot/reports/latest-share-url.txt. If the file does not exist or is empty, output 'No AAP report share URL found.' and exit. (2) Read the most recent HTML report file in Q:/src/hackathon/ado-autopilot/reports/ (sort by modification time, pick newest). Extract summary stats from the HTML: total features, updated count, skipped count. (3) Build a Teams channel message with subject 'ADO Autopilot - Status Report (YYYY-MM-DD)' containing: a brief summary line (e.g. '10 features: 4 updated, 6 skipped'), a link to the full report on SharePoint, and CC @mention for Josh Xu. (4) Save payload to Q:/src/tmp/poster-aap-report.json. (5) POST to Teams channel: team 35efd52f-43d7-4020-9353-3f937eaf3151, channel 19:xSmqZj8J0oCRD2uutKlu6GqMVy33JhGNjuPdSlE2GJY1@thread.tacv2. Verify HTTP 201.",
       "maxRuns": 0,
-      "enabled": true,
+      "enabled": false,
       "saveOutput": false,
       "description": "Posts ADO Autopilot report SharePoint link to Teams Test Autopilot channel with @mention Josh"
     },
