@@ -82,6 +82,28 @@ Row: <tr><td><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit
 Row: <tr><td><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/{id}">{id}</a></td><td>{title}</td><td>{owner}</td><td>{created}</td><td>{age} days</td><td>{severity}</td></tr>
 -->
 
+{{CHECK10_SECTION}}
+<!-- Replace with EMPTY STRING if no check10 items. Otherwise:
+<p><b>Ring Target Date Issues ({{CHECK10_COUNT}})</b></p>
+<p>Active Features with Ring 0 or Ring 4 target dates in the past:</p>
+<table>
+  <tr><th>Feature</th><th>Title</th><th>Owner</th><th>Ring0</th><th>Ring4</th><th>Issue</th></tr>
+  {{CHECK10_ROWS}}
+</table>
+Row: <tr><td><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/{id}">{id}</a></td><td>{title}</td><td>{owner}</td><td>{ring0}</td><td>{ring4}</td><td>{issue}</td></tr>
+-->
+
+{{CHECK11_SECTION}}
+<!-- Replace with EMPTY STRING if no check11 items. Otherwise:
+<p><b>Missing Sign-Offs ({{CHECK11_COUNT}})</b></p>
+<p>Active Features missing required governance sign-offs:</p>
+<table>
+  <tr><th>Feature</th><th>Title</th><th>Owner</th><th>Missing</th></tr>
+  {{CHECK11_ROWS}}
+</table>
+Row: <tr><td><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/{id}">{id}</a></td><td>{title}</td><td>{owner}</td><td>{missing}</td></tr>
+-->
+
 <p>{{CC_MENTION}}</p>
 <!-- Replace {{CC_MENTION}} with: <at id="0">Josh Xu</at>
      Add to mentions array: {"id": 0, "mentionText": "Josh Xu", "mentioned": {"user": {"id": "90b98fe6-a80b-46e1-9209-b5ebcdf6da6b", "displayName": "Josh Xu", "userIdentityType": "aadUser"}}}

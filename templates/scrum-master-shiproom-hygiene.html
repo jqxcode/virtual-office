@@ -275,6 +275,44 @@ If no issues, replace {{CHECK8_SECTION}} with empty string. -->
 </div>
 If no issues, replace {{CHECK9_SECTION}} with empty string. -->
 
+<!-- Check 10: Ring Target Date Issues -->
+<!-- ONLY include this section if Check 10 found issues. Omit entirely if no issues. -->
+{{CHECK10_SECTION}}
+<!-- Replace {{CHECK10_SECTION}} with the block below ONLY if issues were found:
+<div class="section">
+  <h2>Check 10: Ring Target Date Issues <span class="count">N flagged</span></h2>
+  <p style="color:var(--vo-text-tertiary); font-size:12px; margin-bottom:12px;">Active Features with Ring 0 or Ring 4 target dates in the past. Rollout dates should be current.</p>
+  {{CHECK10_QUERY_LINK}}
+  <table>
+    <thead>
+      <tr><th>Feature ID</th><th>Title</th><th>Owner</th><th>Ring0 Date</th><th>Ring4 Date</th><th>Issue</th></tr>
+    </thead>
+    <tbody>
+      {{CHECK10_TABLE_ROWS}}
+    </tbody>
+  </table>
+</div>
+If no issues, replace {{CHECK10_SECTION}} with empty string. -->
+
+<!-- Check 11: Missing Sign-Offs -->
+<!-- ONLY include this section if Check 11 found issues. Omit entirely if no issues. -->
+{{CHECK11_SECTION}}
+<!-- Replace {{CHECK11_SECTION}} with the block below ONLY if issues were found:
+<div class="section">
+  <h2>Check 11: Missing Sign-Offs <span class="count">N flagged</span></h2>
+  <p style="color:var(--vo-text-tertiary); font-size:12px; margin-bottom:12px;">Active Features missing Security, Accessibility, Privacy, or Compliance sign-offs.</p>
+  {{CHECK11_QUERY_LINK}}
+  <table>
+    <thead>
+      <tr><th>Feature ID</th><th>Title</th><th>Owner</th><th>Missing Sign-Offs</th></tr>
+    </thead>
+    <tbody>
+      {{CHECK11_TABLE_ROWS}}
+    </tbody>
+  </table>
+</div>
+If no issues, replace {{CHECK11_SECTION}} with empty string. -->
+
 <!-- Future checks: follow the same pattern.
   1. Add a {{CHECKn_SECTION}} placeholder here.
   2. Include it ONLY if the check found issues; omit entirely if clean.

@@ -141,6 +141,40 @@
 2. Collect: ID, Title, State, Owner, CreatedDate, ChangedDate, Severity, AreaPath.
 3. **Report-only** (no auto-fix).
 
+## Check 10: Ring Target Date Issues
+
+**Goal**: Active Features with Ring 0 or Ring 4 target dates in the past need attention — rollout dates should be current.
+
+1. WIQL per area:
+   ```
+   WHERE [System.WorkItemType] = 'Feature'
+     AND [System.State] = 'Active'
+     AND ([MicrosoftTeamsCMMI.Ring0TargetDate] < @today
+       OR [MicrosoftTeamsCMMI.Ring4TargetDate] < @today)
+     AND [System.AreaPath] UNDER '<area>'
+   ```
+2. Collect: ID, Title, Owner, Ring0TargetDate, Ring4TargetDate, AreaPath.
+3. Flag which dates are past due (Ring0, Ring4, or both).
+4. **Report-only** (no auto-fix). Results included in Teams post.
+
+## Check 11: Missing Sign-Offs
+
+**Goal**: Active Features missing required governance sign-offs (Security, Accessibility, Privacy, Compliance).
+
+**ADO field reference names**:
+- Security: `MicrosoftTeamsCMMI.SecurityReview`
+- Accessibility: `MicrosoftTeamsCMMI-Copy.AccessibilityUsability`
+- Privacy: `Custom.1CSUserStoryStatus`
+- Compliance: `Custom.ERP_Compliance_Signoff`
+
+A sign-off is "missing" if the field is empty/null. Features that have all four filled are fine.
+
+1. Query active Features in both areas, fetch all 4 sign-off fields.
+2. For each Feature, check which sign-off fields are empty.
+3. Only flag Features missing at least one sign-off.
+4. Collect: ID, Title, Owner, list of missing sign-offs.
+5. **Report-only** (no auto-fix). Results included in Teams post.
+
 ---
 
 ## Teams Summary Output
