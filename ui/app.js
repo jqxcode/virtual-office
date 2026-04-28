@@ -235,10 +235,19 @@ function getNextCronFires(cronExpr, afterDate, count) {
 // --- URL helpers ---
 
 function stripOutputPrefix(path) {
-  if (path && path.startsWith("output/")) {
-    return path.substring("output/".length);
+  if (!path) return path;
+  // Normalize to forward slashes first
+  var normalized = path.replace(/\\/g, "/");
+  // Handle full Windows paths (e.g. Q:/src/.../virtual-office/output/...)
+  var outputIdx = normalized.indexOf("/output/");
+  if (outputIdx >= 0) {
+    return normalized.substring(outputIdx + "/output/".length);
   }
-  return path;
+  // Handle relative output/ prefix
+  if (normalized.startsWith("output/")) {
+    return normalized.substring("output/".length);
+  }
+  return normalized;
 }
 
 function getReportHref(lastOutput) {
@@ -3089,10 +3098,19 @@ function buildJobOutputLookup() {
 
   Object.keys(merged).forEach(function(agentName) {
     var agentData = merged[agentName];
+    var agentLower = agentName.toLowerCase();
     (agentData.jobs || []).forEach(function(job) {
       if (job.lastOutput) {
-        var key = agentName + "/" + job.name;
-        lookup[key] = job.lastOutput;
+        var normalizedOut = job.lastOutput.replace(/\\/g, "/").toLowerCase();
+        var fileName = normalizedOut.split("/").pop() || "";
+        var jobLower = (job.name || "").toLowerCase().replace(/^todo-/, "");
+        // Valid: in agent subdir, or root file matching job/agent name (not -latest)
+        var inAgentDir = normalizedOut.indexOf("/" + agentLower + "/") >= 0;
+        var rootMatch = (fileName.indexOf(jobLower) === 0 || fileName.indexOf(agentLower + "-") === 0) && fileName.indexOf("-latest") < 0;
+        if (inAgentDir || rootMatch) {
+          var key = agentName + "/" + job.name;
+          lookup[key] = job.lastOutput;
+        }
       }
     });
   });
@@ -3295,12 +3313,13 @@ function renderTeamTab() {
   schedules.forEach(function(s) {
     if (!scheduleLookup[s.agent]) scheduleLookup[s.agent] = {};
     if (!scheduleLookup[s.agent][s.job]) scheduleLookup[s.agent][s.job] = [];
-    scheduleLookup[s.agent][s.job].push({ cron: s.cron, description: s.description || "" });
+    scheduleLookup[s.agent][s.job].push({ cron: s.cron, description: s.description || "", enabled: s.enabled !== false });
   });
   var overviewEl = document.getElementById("team-overview");
   var hooksCount = 0;
   if (config.hooks) { Object.keys(config.hooks).forEach(function(k) { if (Array.isArray(config.hooks[k])) hooksCount += config.hooks[k].length; }); }
-  var overviewText = agentNames.length + " agents \u2022 " + schedules.length + " scheduled jobs";
+  var enabledSchedules = schedules.filter(function(s) { return s.enabled !== false; });
+  var overviewText = agentNames.length + " agents \u2022 " + enabledSchedules.length + " scheduled jobs";
   if (hooksCount > 0) overviewText += " \u2022 " + hooksCount + " hook" + (hooksCount > 1 ? "s" : "");
   if (overviewEl) overviewEl.textContent = overviewText;
   var listEl = document.getElementById("team-agent-list");
@@ -3368,7 +3387,10 @@ function renderTeamTab() {
           se.forEach(function(sched, idx) {
             var tr = document.createElement("tr");
             if (idx === 0) tr.appendChild(mkNameCell(jobName)); else tr.appendChild(document.createElement("td"));
-            var ts = document.createElement("td"); ts.className = "team-skill-schedule"; ts.textContent = cronToShortHuman(sched.cron); ts.title = sched.cron; tr.appendChild(ts);
+            var ts = document.createElement("td"); ts.className = "team-skill-schedule";
+            if (sched.enabled === false) { ts.textContent = "disabled"; ts.style.color = "#484f58"; ts.style.fontStyle = "italic"; }
+            else { ts.textContent = cronToShortHuman(sched.cron); ts.title = sched.cron; }
+            tr.appendChild(ts);
             var td = document.createElement("td"); td.className = "team-skill-desc";
             if (idx === 0) { td.textContent = desc; td.title = desc; } tr.appendChild(td); tbd.appendChild(tr);
           });
@@ -3944,6 +3966,26 @@ function buildHistoryRuns() {
           result = "timeout";
         }
       }
+      // Extract per-run output file from audit event details
+      // Validate: path must belong to the agent (in agent subdir, or root file matching job/agent name)
+      // Reject: paths from other agents, -latest.html, or generic root files
+      var rawOutputFile = (evt.details && evt.details.output_file) ? evt.details.output_file : null;
+      var runAgent = (startEvt ? startEvt.agent : agent).toLowerCase();
+      var runJob = (startEvt ? startEvt.job : job).toLowerCase().replace(/^todo-/, "");
+      var outputFile = null;
+      if (rawOutputFile && rawOutputFile !== "(not saved)") {
+        var normalizedOut = rawOutputFile.replace(/\\/g, "/").toLowerCase();
+        var fileName = normalizedOut.split("/").pop() || "";
+        // Case 1: in agent's own subdir
+        if (normalizedOut.indexOf("/" + runAgent + "/") >= 0) {
+          outputFile = rawOutputFile;
+        }
+        // Case 2: root-level file matching job or agent name (not -latest)
+        else if ((fileName.indexOf(runJob) === 0 || fileName.indexOf(runAgent + "-") === 0) && fileName.indexOf("-latest") < 0) {
+          outputFile = rawOutputFile;
+        }
+        // else: bogus path -- discard
+      }
       runs.push({
         agent: startEvt ? startEvt.agent : agent,
         job: startEvt ? startEvt.job : job,
@@ -3951,7 +3993,8 @@ function buildHistoryRuns() {
         end: endTs,
         durationMs: durationMs,
         result: result,
-        runId: runId
+        runId: runId,
+        outputFile: outputFile
       });
       delete startedMap[runId];
     }
@@ -4203,17 +4246,20 @@ function renderHistoryTable() {
     tdResult.appendChild(badge);
     tr.appendChild(tdResult);
 
-    // Report
+    // Report — use per-run output file, fall back to job-level latest
     var tdReport = document.createElement("td");
-    var outputKey = run.agent + "/" + run.job;
-    var lastOutput = jobOutputLookup[outputKey];
-    if (lastOutput && run.result === "success") {
+    var runOutput = run.outputFile;
+    if (!runOutput || runOutput === "(not saved)") {
+      var outputKey = run.agent + "/" + run.job;
+      runOutput = jobOutputLookup[outputKey];
+    }
+    if (runOutput && runOutput !== "(not saved)" && run.result === "success") {
       var reportLink = document.createElement("a");
       reportLink.className = "report-link";
-      reportLink.href = getReportHref(lastOutput);
+      reportLink.href = getReportHref(runOutput);
       reportLink.target = "_blank";
       reportLink.textContent = "Report";
-      reportLink.title = lastOutput;
+      reportLink.title = runOutput;
       tdReport.appendChild(reportLink);
     }
     tr.appendChild(tdReport);
