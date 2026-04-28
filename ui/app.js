@@ -407,7 +407,6 @@ function switchTopTab(tabName) {
 // --- Render agents ---
 
 function getAgentStatus(agentData) {
-  if (agentData.enabled === false) return "disabled";
   if (agentData.running_job || agentData.status === "busy") return "busy";
   return "idle";
 }
@@ -702,9 +701,8 @@ function mergeConfigAndDashboard(config, dashboard) {
         Object.keys(cfg.jobs).forEach(function (jobName) {
           merged[name].jobs.push({
             name: jobName,
-            status: cfg.jobs[jobName].enabled === false ? "disabled" : "idle",
+            status: "idle",
             description: cfg.jobs[jobName].description || "",
-            enabled: cfg.jobs[jobName].enabled !== false,
             started: null,
             runId: null,
             runsCompleted: 0,
@@ -779,7 +777,6 @@ function mergeConfigAndDashboard(config, dashboard) {
             name: jobName,
             status: normalized.status,
             description: "",
-            enabled: true,
             started: normalized.started,
             runId: normalized.runId,
             runsCompleted: normalized.runsCompleted,
@@ -1942,25 +1939,9 @@ function renderScheduleTable() {
     var agent = sched.agent || "";
     var job = sched.job || "";
     var cron = sched.cron || "";
-    var enabled = sched.enabled !== false;
     var description = sched.description || "";
     var cronHuman = cronToHuman(cron);
-    var fires = enabled ? getNextCronFires(cron, now, 10) : [];
-
-    if (!enabled) {
-      // Show one row for disabled schedules
-      allItems.push({
-        fireTime: null,
-        agent: agent,
-        job: job,
-        cron: cron,
-        cronHuman: cronHuman,
-        description: description,
-        enabled: false,
-        status: "disabled"
-      });
-      return;
-    }
+    var fires = getNextCronFires(cron, now, 10);
 
     fires.forEach(function(fireTime) {
       allItems.push({
@@ -1970,7 +1951,6 @@ function renderScheduleTable() {
         cron: cron,
         cronHuman: cronHuman,
         description: description,
-        enabled: true,
         status: "scheduled"
       });
     });
@@ -1982,7 +1962,6 @@ function renderScheduleTable() {
   var queuedMarked = {};
 
   allItems.forEach(function(item) {
-    if (!item.enabled) return;
     var key = item.agent + "/" + item.job;
     var agentData = mergedAgents[item.agent];
     if (!agentData) return;
@@ -2417,7 +2396,7 @@ function renderQueueCards() {
 
     // Next scheduled
     var agentSchedules = schedules.filter(function(s) {
-      return s.agent === agentName && s.enabled !== false;
+      return s.agent === agentName;
     });
     if (agentSchedules.length > 0) {
       var nextFireDiv = document.createElement("div");
@@ -2712,7 +2691,7 @@ function renderV2QueueCards() {
 
     // Next scheduled
     var agentSchedules = schedules.filter(function(s) {
-      return s.agent === agentName && s.enabled !== false;
+      return s.agent === agentName;
     });
     if (agentSchedules.length > 0) {
       var nextFireDiv = document.createElement("div");
@@ -2882,25 +2861,15 @@ function getV2UpcomingItems() {
     var agent = sched.agent || "";
     var job = sched.job || "";
     var cron = sched.cron || "";
-    var enabled = sched.enabled !== false;
     var description = sched.description || "";
     var cronHuman = cronToHuman(cron);
-    var fires = enabled ? getNextCronFires(cron, now, 10) : [];
-
-    if (!enabled) {
-      allItems.push({
-        fireTime: null, agent: agent, job: job, cron: cron,
-        cronHuman: cronHuman, description: description,
-        enabled: false, status: "disabled"
-      });
-      return;
-    }
+    var fires = getNextCronFires(cron, now, 10);
 
     fires.forEach(function(fireTime) {
       allItems.push({
         fireTime: fireTime, agent: agent, job: job, cron: cron,
         cronHuman: cronHuman, description: description,
-        enabled: true, status: "scheduled"
+        status: "scheduled"
       });
     });
   });
@@ -2911,7 +2880,6 @@ function getV2UpcomingItems() {
   var queuedMarked = {};
 
   allItems.forEach(function(item) {
-    if (!item.enabled) return;
     var key = item.agent + "/" + item.job;
     var agentData = mergedAgents[item.agent];
     if (!agentData) return;
@@ -3313,13 +3281,12 @@ function renderTeamTab() {
   schedules.forEach(function(s) {
     if (!scheduleLookup[s.agent]) scheduleLookup[s.agent] = {};
     if (!scheduleLookup[s.agent][s.job]) scheduleLookup[s.agent][s.job] = [];
-    scheduleLookup[s.agent][s.job].push({ cron: s.cron, description: s.description || "", enabled: s.enabled !== false });
+    scheduleLookup[s.agent][s.job].push({ cron: s.cron, description: s.description || "" });
   });
   var overviewEl = document.getElementById("team-overview");
   var hooksCount = 0;
   if (config.hooks) { Object.keys(config.hooks).forEach(function(k) { if (Array.isArray(config.hooks[k])) hooksCount += config.hooks[k].length; }); }
-  var enabledSchedules = schedules.filter(function(s) { return s.enabled !== false; });
-  var overviewText = agentNames.length + " agents \u2022 " + enabledSchedules.length + " scheduled jobs";
+  var overviewText = agentNames.length + " agents \u2022 " + schedules.length + " scheduled jobs";
   if (hooksCount > 0) overviewText += " \u2022 " + hooksCount + " hook" + (hooksCount > 1 ? "s" : "");
   if (overviewEl) overviewEl.textContent = overviewText;
   var listEl = document.getElementById("team-agent-list");
@@ -3387,9 +3354,7 @@ function renderTeamTab() {
           se.forEach(function(sched, idx) {
             var tr = document.createElement("tr");
             if (idx === 0) tr.appendChild(mkNameCell(jobName)); else tr.appendChild(document.createElement("td"));
-            var ts = document.createElement("td"); ts.className = "team-skill-schedule";
-            if (sched.enabled === false) { ts.textContent = "disabled"; ts.style.color = "#484f58"; ts.style.fontStyle = "italic"; }
-            else { ts.textContent = cronToShortHuman(sched.cron); ts.title = sched.cron; }
+            var ts = document.createElement("td"); ts.className = "team-skill-schedule"; ts.textContent = cronToShortHuman(sched.cron); ts.title = sched.cron;
             tr.appendChild(ts);
             var td = document.createElement("td"); td.className = "team-skill-desc";
             if (idx === 0) { td.textContent = desc; td.title = desc; } tr.appendChild(td); tbd.appendChild(tr);
@@ -4331,28 +4296,17 @@ function renderScheduleV2Tab() {
     var agent = sched.agent || "";
     var job = sched.job || "";
     var cron = sched.cron || "";
-    var enabled = sched.enabled !== false;
     var description = sched.description || "";
     var cronHuman = cronToHuman(cron);
 
     if (agentFilter && agent !== agentFilter) return;
 
-    var fires = enabled ? getNextCronFires(cron, now, 10) : [];
-
-    if (!enabled) {
-      allItems.push({
-        fireTime: null, agent: agent, job: job,
-        cronHuman: cronHuman, description: description,
-        enabled: false
-      });
-      return;
-    }
+    var fires = getNextCronFires(cron, now, 10);
 
     fires.forEach(function(fireTime) {
       allItems.push({
         fireTime: fireTime, agent: agent, job: job,
-        cronHuman: cronHuman, description: description,
-        enabled: true
+        cronHuman: cronHuman, description: description
       });
     });
   });
@@ -4381,10 +4335,6 @@ function renderScheduleV2Tab() {
     if (item.fireTime && item.fireTime.getTime() <= in24h) {
       tr.classList.add("next-24h");
     }
-    if (!item.enabled) {
-      tr.classList.add("disabled-row");
-    }
-
     // Next Run
     var tdTime = document.createElement("td");
     if (item.fireTime) {
@@ -4414,19 +4364,14 @@ function renderScheduleV2Tab() {
 
     // Last Result
     var tdLastResult = document.createElement("td");
-    if (item.enabled) {
-      var lastResult = getLastRunResult(item.agent, item.job);
-      if (lastResult) {
-        var resultBadge = document.createElement("span");
-        resultBadge.className = "result-badge " + lastResult;
-        resultBadge.textContent = lastResult === "success" ? "\u2713" : "\u2717";
-        tdLastResult.appendChild(resultBadge);
-      } else {
-        tdLastResult.textContent = "--";
-        tdLastResult.style.color = "#484f58";
-      }
+    var lastResult = getLastRunResult(item.agent, item.job);
+    if (lastResult) {
+      var resultBadge = document.createElement("span");
+      resultBadge.className = "result-badge " + lastResult;
+      resultBadge.textContent = lastResult === "success" ? "\u2713" : "\u2717";
+      tdLastResult.appendChild(resultBadge);
     } else {
-      tdLastResult.textContent = "disabled";
+      tdLastResult.textContent = "--";
       tdLastResult.style.color = "#484f58";
     }
     tr.appendChild(tdLastResult);

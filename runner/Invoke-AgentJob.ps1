@@ -7,7 +7,7 @@
 .PARAMETER Agent
     The agent name (must exist in config/agents.json).
 .PARAMETER Job
-    The job name (must exist in config/jobs/{agent}.json and be enabled).
+    The job name (must exist in config/jobs/{agent}.json).
 #>
 [CmdletBinding()]
 param(
@@ -349,10 +349,6 @@ if (-not $jobsConfig.ContainsKey($Job)) {
     exit 1
 }
 $jobDef = $jobsConfig[$Job]
-if ($jobDef.ContainsKey("enabled") -and -not $jobDef["enabled"]) {
-    Write-Host "Job '$Job' for agent '$Agent' is disabled. Skipping."
-    exit 0
-}
 
 $prompt = $jobDef["prompt"]
 if (-not $prompt) {
@@ -618,7 +614,7 @@ while ($keepRunning) {
 
                 # Switch to the queued job: reload its config and prompt
                 $otherJobDef = $jobsConfig[$otherJobName]
-                if ($otherJobDef -and (-not $otherJobDef.ContainsKey("enabled") -or $otherJobDef["enabled"])) {
+                if ($otherJobDef) {
                     $Job = $otherJobName
                     $jobDef = $otherJobDef
                     $prompt = $otherJobDef["prompt"]
@@ -628,7 +624,7 @@ while ($keepRunning) {
                     $keepRunning = $true
                     break
                 } else {
-                    Write-Host "Queued job '$otherJobName' is disabled or missing. Skipping."
+                    Write-Host "Queued job '$otherJobName' not found in config. Skipping."
                 }
             }
         }

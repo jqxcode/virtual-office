@@ -170,18 +170,6 @@ if (-not (Test-Path $schedulesFile)) {
 
 $schedules = Get-Content -Path $schedulesFile -Raw | ConvertFrom-Json -AsHashtable
 
-# Pre-load all job configs so we can check enabled status
-$jobConfigs = @{}
-foreach ($jobFile in (Get-ChildItem -Path (Join-Path $CONFIG_DIR "jobs") -Filter "*.json" -File)) {
-    $agentKey = $jobFile.BaseName
-    try {
-        $raw = Get-Content -Path $jobFile.FullName -Raw | ConvertFrom-Json -AsHashtable
-        $jobConfigs[$agentKey] = if ($raw.ContainsKey("jobs")) { $raw["jobs"] } else { $raw }
-    } catch {
-        Write-Warning "Could not parse $($jobFile.Name): $_"
-    }
-}
-
 $registered = @()
 $expectedTaskNames = @{}
 
@@ -203,15 +191,6 @@ foreach ($entry in $schedules["schedules"]) {
         $taskName = "${TASK_PREFIX}$agentName-$jobName"
     } else {
         $taskName = "${TASK_PREFIX}$agentName-$jobName-$occurrence"
-    }
-
-    # Skip disabled jobs -- don't register them, so orphan cleanup will remove them
-    if ($jobConfigs.ContainsKey($agentName) -and $jobConfigs[$agentName].ContainsKey($jobName)) {
-        $jd = $jobConfigs[$agentName][$jobName]
-        if ($jd.ContainsKey("enabled") -and -not $jd["enabled"]) {
-            Write-Host "Skipping disabled job: $taskName" -ForegroundColor DarkGray
-            continue
-        }
     }
 
     $expectedTaskNames[$taskName] = $true
