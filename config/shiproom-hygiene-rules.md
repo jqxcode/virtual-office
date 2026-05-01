@@ -175,6 +175,24 @@ A sign-off is "missing" if the field is empty/null. Features that have all four 
 4. Collect: ID, Title, Owner, list of missing sign-offs.
 5. **Report-only** (no auto-fix). Results included in Teams post.
 
+## Check 12: Invalid Ring Date Ordering (R4 <= R0)
+
+**Goal**: Ring 4 target date must be after Ring 0 target date. If R4 <= R0 (or R4 is set but R0 is empty), the rollout plan is invalid.
+
+1. Query all Features (any state except Closed/Removed) in both areas where both Ring dates exist, or R4 exists but R0 doesn't:
+   ```
+   WHERE [System.WorkItemType] = 'Feature'
+     AND [System.State] <> 'Closed'
+     AND [System.State] <> 'Removed'
+     AND [MicrosoftTeamsCMMI.Ring4TargetDate] <> ''
+     AND [System.AreaPath] UNDER '<area>'
+   ```
+2. For each Feature, check:
+   a. If R4 is set but R0 is empty → flag "R0 missing"
+   b. If both set and R4 <= R0 → flag "R4 before R0"
+3. Collect: ID, Title, Owner, Ring0Date, Ring4Date, Issue.
+4. **Report-only** (no auto-fix). Results included in Teams post.
+
 ---
 
 ## Teams Summary Output

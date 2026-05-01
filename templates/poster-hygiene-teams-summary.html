@@ -104,6 +104,17 @@ Row: <tr><td><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit
 Row: <tr><td><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/{id}">{id}</a></td><td>{title}</td><td>{owner}</td><td>{missing}</td></tr>
 -->
 
+{{CHECK12_SECTION}}
+<!-- Replace with EMPTY STRING if no check12 items. Otherwise:
+<p><b>Invalid Ring Date Ordering ({{CHECK12_COUNT}})</b></p>
+<p>Ring 4 must be after Ring 0. These Features have R0 missing or R4 <= R0:</p>
+<table>
+  <tr><th>Feature</th><th>Title</th><th>Owner</th><th>Ring0</th><th>Ring4</th><th>Issue</th></tr>
+  {{CHECK12_ROWS}}
+</table>
+Row: <tr><td><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/{id}">{id}</a></td><td>{title}</td><td>{owner}</td><td>{ring0}</td><td>{ring4}</td><td>{issue}</td></tr>
+-->
+
 <p>{{OWNER_MENTIONS}}</p>
 <!-- Build {{OWNER_MENTIONS}} dynamically:
      1. Collect all unique owner emails from all check items
