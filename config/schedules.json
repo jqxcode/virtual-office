@@ -112,7 +112,7 @@
       "agent": "scrum-master",
       "job": "shiproom-hygiene-check",
       "cron": "0 5 * * *",
-      "description": "Shiproom hygiene checks (Task-to-Task parent links) at 5am daily"
+      "description": "Shiproom hygiene: 13 ADO checks at 5am daily"
     },
     {
       "agent": "approver",
