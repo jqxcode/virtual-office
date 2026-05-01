@@ -109,16 +109,10 @@
       "description": "Feature Flight V2 daily report for direct reports flights, weekdays at noon"
     },
     {
-      "agent": "scrum-master",
-      "job": "shiproom-hygiene-check",
-      "cron": "0 5 * * *",
-      "description": "Shiproom hygiene: 13 ADO checks at 5am daily"
-    },
-    {
       "agent": "poster",
       "job": "post-shiproom-hygiene-check",
       "cron": "0 6 * * *",
-      "description": "Post shiproom hygiene summary to Meeting US channel at 6am daily"
+      "description": "Run fresh hygiene check (13 ADO checks) then post summary to Meeting US channel at 6am daily"
     },
     {
       "agent": "approver",
