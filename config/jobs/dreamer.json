@@ -3,7 +3,7 @@
     "wish-list": {
       "prompt": "Run the wish-list job. Read the wish list from Q:/src/personal_projects/virtual-office/state/wish-list.json. Generate an inventory of all wishes with their status, next steps, and resume commands. If the user specifies a particular wish to work on, load its details, research feasibility, update next steps, and save. For new wishes, add them to the list with status 'idea' and a conversation name for future resume. Always display the inventory table after any operation.",
       "maxRuns": 0,
-      "saveOutput": false,
+      "saveOutput": true,
       "description": "Inventories wish-list ideas, tracks next steps, supports resume via conversation names"
     }
   }
