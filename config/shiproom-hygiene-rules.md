@@ -149,12 +149,14 @@
    ```
    WHERE [System.WorkItemType] = 'Feature'
      AND [System.State] = 'Active'
-     AND ([MicrosoftTeamsCMMI.Ring0TargetDate] < @today
+     AND ([Microsoft.VSTS.Scheduling.TargetDate] < @today
        OR [MicrosoftTeamsCMMI.Ring4TargetDate] < @today)
      AND [System.AreaPath] UNDER '<area>'
    ```
-2. Collect: ID, Title, Owner, Ring0TargetDate, Ring4TargetDate, AreaPath.
-3. Flag which dates are past due (Ring0, Ring4, or both).
+2. Collect: ID, Title, Owner, TargetDate (=Ring0), Ring4TargetDate, AreaPath.
+3. Flag which dates are past due (R0/TargetDate, Ring4, or both).
+
+**Field mapping**: Ring 0 = `Microsoft.VSTS.Scheduling.TargetDate` (the standard "Target Date" field). Ring 4 = `MicrosoftTeamsCMMI.Ring4TargetDate`.
 4. **Report-only** (no auto-fix). Results included in Teams post.
 
 ## Check 11: Missing Sign-Offs
