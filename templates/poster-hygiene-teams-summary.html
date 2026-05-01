@@ -1,7 +1,18 @@
-<!-- Teams channel message template for shiproom hygiene checks 2b, 4, 5, 6, 7, 8, 9 -->
+<!-- Teams channel message template for shiproom hygiene checks 2b, 4-12 -->
 <!-- NOTE: Teams messages use basic HTML only (no CSS classes, no <style> blocks) -->
 <!-- RULE: Only include sections that have items. Omit sections with 0 items entirely. -->
 <!-- If ALL sections are empty, do NOT post at all. -->
+
+<!-- INLINE @MENTIONS: Owner column in every table row must be an @mention, not plain text.
+     How to build:
+     1. Before building HTML, collect ALL unique owner emails across all checks
+     2. Resolve each via Graph API: GET /v1.0/users/{email}?$select=displayName,id
+     3. Assign incrementing mention IDs (0, 1, 2...)
+     4. In table rows, render Owner as: <at id="{N}">{displayName}</at>
+     5. Build the mentions JSON array with all resolved owners
+     6. Same person appearing in multiple rows reuses the same mention ID
+     7. Josh Xu (90b98fe6-a80b-46e1-9209-b5ebcdf6da6b) is always included even if not an owner
+-->
 
 <p><b>Shiproom Hygiene Summary - {{DATE}}</b></p>
 
@@ -13,7 +24,7 @@
   <tr><th>Feature</th><th>Title</th><th>Owner</th><th>Last Changed</th></tr>
   {{CHECK2B_ROWS}}
 </table>
-Row: <tr><td><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/{id}">{id}</a></td><td>{title}</td><td>{owner}</td><td>{changed}</td></tr>
+Row: <tr><td><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/{id}">{id}</a></td><td>{title}</td><td><at id="{mention_id}">{owner}</at></td><td>{changed}</td></tr>
 -->
 
 {{CHECK4_SECTION}}
@@ -24,7 +35,7 @@ Row: <tr><td><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit
   <tr><th>Task</th><th>Title</th><th>Owner</th><th>Issue</th></tr>
   {{CHECK4_ROWS}}
 </table>
-Row: <tr><td><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/{id}">{id}</a></td><td>{title}</td><td>{owner}</td><td>{issue}</td></tr>
+Row: <tr><td><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/{id}">{id}</a></td><td>{title}</td><td><at id="{mention_id}">{owner}</at></td><td>{issue}</td></tr>
 -->
 
 {{CHECK5_SECTION}}
@@ -35,7 +46,7 @@ Row: <tr><td><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit
   <tr><th>Bug</th><th>Title</th><th>Owner</th><th>From Sprint</th></tr>
   {{CHECK5_ROWS}}
 </table>
-Row: <tr><td><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/{id}">{id}</a></td><td>{title}</td><td>{owner}</td><td>{prev_sprint}</td></tr>
+Row: <tr><td><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/{id}">{id}</a></td><td>{title}</td><td><at id="{mention_id}">{owner}</at></td><td>{prev_sprint}</td></tr>
 -->
 
 {{CHECK6_SECTION}}
@@ -46,7 +57,7 @@ Row: <tr><td><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit
   <tr><th>Task</th><th>Title</th><th>Owner</th><th>From Sprint</th></tr>
   {{CHECK6_ROWS}}
 </table>
-Row: <tr><td><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/{id}">{id}</a></td><td>{title}</td><td>{owner}</td><td>{prev_sprint}</td></tr>
+Row: <tr><td><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/{id}">{id}</a></td><td>{title}</td><td><at id="{mention_id}">{owner}</at></td><td>{prev_sprint}</td></tr>
 -->
 
 {{CHECK7_SECTION}}
@@ -57,7 +68,7 @@ Row: <tr><td><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit
   <tr><th>Bug</th><th>Title</th><th>Owner</th><th>Last Changed</th></tr>
   {{CHECK7_ROWS}}
 </table>
-Row: <tr><td><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/{id}">{id}</a></td><td>{title}</td><td>{owner}</td><td>{changed}</td></tr>
+Row: <tr><td><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/{id}">{id}</a></td><td>{title}</td><td><at id="{mention_id}">{owner}</at></td><td>{changed}</td></tr>
 -->
 
 {{CHECK8_SECTION}}
@@ -68,7 +79,7 @@ Row: <tr><td><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit
   <tr><th>Feature</th><th>Title</th><th>Owner</th><th>Iteration</th></tr>
   {{CHECK8_ROWS}}
 </table>
-Row: <tr><td><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/{id}">{id}</a></td><td>{title}</td><td>{owner}</td><td>{iteration}</td></tr>
+Row: <tr><td><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/{id}">{id}</a></td><td>{title}</td><td><at id="{mention_id}">{owner}</at></td><td>{iteration}</td></tr>
 -->
 
 {{CHECK9_SECTION}}
@@ -79,7 +90,7 @@ Row: <tr><td><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit
   <tr><th>Bug</th><th>Title</th><th>Owner</th><th>Created</th><th>Age</th><th>Severity</th></tr>
   {{CHECK9_ROWS}}
 </table>
-Row: <tr><td><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/{id}">{id}</a></td><td>{title}</td><td>{owner}</td><td>{created}</td><td>{age} days</td><td>{severity}</td></tr>
+Row: <tr><td><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/{id}">{id}</a></td><td>{title}</td><td><at id="{mention_id}">{owner}</at></td><td>{created}</td><td>{age} days</td><td>{severity}</td></tr>
 -->
 
 {{CHECK10_SECTION}}
@@ -90,7 +101,7 @@ Row: <tr><td><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit
   <tr><th>Feature</th><th>Title</th><th>Owner</th><th>Ring0</th><th>Ring4</th><th>Issue</th></tr>
   {{CHECK10_ROWS}}
 </table>
-Row: <tr><td><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/{id}">{id}</a></td><td>{title}</td><td>{owner}</td><td>{ring0}</td><td>{ring4}</td><td>{issue}</td></tr>
+Row: <tr><td><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/{id}">{id}</a></td><td>{title}</td><td><at id="{mention_id}">{owner}</at></td><td>{ring0}</td><td>{ring4}</td><td>{issue}</td></tr>
 -->
 
 {{CHECK11_SECTION}}
@@ -101,7 +112,7 @@ Row: <tr><td><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit
   <tr><th>Feature</th><th>Title</th><th>Owner</th><th>Missing</th></tr>
   {{CHECK11_ROWS}}
 </table>
-Row: <tr><td><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/{id}">{id}</a></td><td>{title}</td><td>{owner}</td><td>{missing}</td></tr>
+Row: <tr><td><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/{id}">{id}</a></td><td>{title}</td><td><at id="{mention_id}">{owner}</at></td><td>{missing}</td></tr>
 -->
 
 {{CHECK12_SECTION}}
@@ -112,22 +123,5 @@ Row: <tr><td><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit
   <tr><th>Feature</th><th>Title</th><th>Owner</th><th>Ring0</th><th>Ring4</th><th>Issue</th></tr>
   {{CHECK12_ROWS}}
 </table>
-Row: <tr><td><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/{id}">{id}</a></td><td>{title}</td><td>{owner}</td><td>{ring0}</td><td>{ring4}</td><td>{issue}</td></tr>
--->
-
-<p>{{OWNER_MENTIONS}}</p>
-<!-- Build {{OWNER_MENTIONS}} dynamically:
-     1. Collect all unique owner emails from all check items
-     2. For each owner, resolve AAD ID via Graph API: GET /v1.0/users/{email}?$select=displayName,id
-     3. Build mentions with incrementing IDs starting at 0
-     4. Josh Xu (90b98fe6-a80b-46e1-9209-b5ebcdf6da6b) is always included as CC (id=0)
-     5. Other owners get id=1, 2, 3...
-     6. In HTML: <at id="0">Josh Xu</at> <at id="1">Owner Name</at> ...
-     7. In mentions JSON array:
-        [
-          {"id": 0, "mentionText": "Josh Xu", "mentioned": {"user": {"id": "90b98fe6-...", "displayName": "Josh Xu", "userIdentityType": "aadUser"}}},
-          {"id": 1, "mentionText": "Owner Name", "mentioned": {"user": {"id": "aad-id", "displayName": "Owner Name", "userIdentityType": "aadUser"}}},
-          ...
-        ]
-     8. If no items at all (shouldn't happen — we don't post when empty), just mention Josh Xu
+Row: <tr><td><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/{id}">{id}</a></td><td>{title}</td><td><at id="{mention_id}">{owner}</at></td><td>{ring0}</td><td>{ring4}</td><td>{issue}</td></tr>
 -->
