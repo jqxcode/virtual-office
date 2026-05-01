@@ -115,6 +115,12 @@
       "description": "Shiproom hygiene: 13 ADO checks at 5am daily"
     },
     {
+      "agent": "poster",
+      "job": "post-shiproom-hygiene-check",
+      "cron": "0 6 * * *",
+      "description": "Post shiproom hygiene summary to Meeting US channel at 6am daily"
+    },
+    {
       "agent": "approver",
       "job": "approve-FFv2",
       "cron": "33 21 * * *",

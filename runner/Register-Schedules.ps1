@@ -204,7 +204,7 @@ foreach ($entry in $schedules["schedules"]) {
     }
 
     $action = New-VOTaskAction -AgentName $agentName -JobName $jobName
-    $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -WakeToRun
+    $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
 
     if ($DryRun) {
         Write-Host "  [DRY RUN] Would register: $taskName" -ForegroundColor Cyan
