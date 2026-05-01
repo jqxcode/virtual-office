@@ -3,32 +3,32 @@
     "ado-status-update": {
       "prompt": "Run ADO autopilot LIVE for both meeting-join and meeting-notes areas. Note the current time as the job start time. Steps: (1) cd Q:/src/hackathon/ado-autopilot/ (2) git fetch origin main && git reset --hard origin/main to get latest code (never use git pull -- it creates merge commits on diverged branches) (3) Validate configs exist and are valid JSON (4) python src/main.py update-status --config configs/meeting-join.json --auto-approve (5) python src/main.py update-status --config configs/meeting-notes.json --auto-approve. This will generate reports, write approved updates to ADO, and upload reports to SharePoint AAP Reports folder automatically. The share URL is saved to reports/latest-share-url.txt for the poster agent to pick up. (6) After both runs complete, copy the latest combined-report HTML from Q:/src/hackathon/ado-autopilot/reports/ to Q:/src/personal_projects/virtual-office/output/scrum-master/ado-status-update-YYYYMMDD.html (use today's date). This MUST be inside output/scrum-master/, not the root output/ dir.",
       "maxRuns": 0,
-      "saveOutput": false,
+      "saveOutput": true,
       "description": "Runs ADO autopilot status tweet update (live) for Meeting Join and Meeting Notes areas"
     },
     "bug-autopilot-meeting-join": {
       "prompt": "Run bug-autopilot LIVE for Meeting Join area bugs. Note the current time as the job start time. Steps: (1) cd Q:/src/hackathon/bug-autopilot/ (2) git fetch origin main && git reset --hard origin/main to get latest code (never use git pull -- it creates merge commits on diverged branches) (3) pip install -r requirements.txt --quiet (4) Run: powershell.exe -File bugautopilot.ps1 -Config configs/meeting-join -Once.",
       "maxRuns": 0,
-      "saveOutput": false,
+      "saveOutput": true,
       "description": "Runs bug-autopilot live for Meeting Join bugs"
     },
     "ado-burndown-update": {
       "prompt": "Run ADO autopilot burndown LIVE for both meeting-join and meeting-notes areas. Note the current time as the job start time. Steps: (1) cd Q:/src/hackathon/ado-autopilot/ (2) git fetch origin main && git reset --hard origin/main to get latest code (never use git pull -- it creates merge commits on diverged branches) (3) Validate configs exist and are valid JSON (4) python src/main.py update-burndown --config configs/meeting-join.json --auto-approve (5) python src/main.py update-burndown --config configs/meeting-notes.json --auto-approve. This will generate reports AND write approved burndown updates to ADO.",
       "maxRuns": 0,
-      "saveOutput": false,
+      "saveOutput": true,
       "description": "Runs ADO autopilot burndown update (live) for Meeting Join and Meeting Notes areas"
     },
     "bug-autopilot-notes": {
       "prompt": "Run bug-autopilot LIVE for Meeting Notes area bugs. Note the current time as the job start time. Steps: (1) cd Q:/src/hackathon/bug-autopilot/ (2) git fetch origin main && git reset --hard origin/main to get latest code (never use git pull -- it creates merge commits on diverged branches) (3) pip install -r requirements.txt --quiet (4) Run: powershell.exe -File bugautopilot.ps1 -Config configs/meeting-notes -Once.",
       "maxRuns": 0,
-      "saveOutput": false,
+      "saveOutput": true,
       "description": "Runs bug-autopilot live for Meeting Notes bugs"
     },
     "shiproom-hygiene-check": {
-      "prompt": "Run shiproom hygiene checks for Meeting Join and Meeting Notes areas. Note the current time as the job start time.\n\nRead the rules file at `Q:/src/personal_projects/virtual-office/config/shiproom-hygiene-rules.md` for all check definitions, WIQL patterns, ADO API patterns, and output rules.\n\nExecute checks 1, 2, 2b, 3, 4, 5, 6, 7, 8, 9, 10, 11 in order. Use the HTML template at `Q:/src/personal_projects/virtual-office/templates/scrum-master-shiproom-hygiene.html` for report output. Follow the output rules in the rules file for placeholder replacement and section visibility.\n\nAfter all checks, write `hygiene-teams-summary.json` (all check data) to `output/scrum-master/` for the poster agent.",
+      "prompt": "Run shiproom hygiene checks for Meeting Join and Meeting Notes areas. Note the current time as the job start time.\n\nRead the rules file at `Q:/src/personal_projects/virtual-office/config/shiproom-hygiene-rules.md` for all check definitions, WIQL patterns, ADO API patterns, and output rules.\n\nExecute checks 1, 2, 2b, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12 in order. Use the HTML template at `Q:/src/personal_projects/virtual-office/templates/scrum-master-shiproom-hygiene.html` for report output. Follow the output rules in the rules file for placeholder replacement and section visibility.\n\nAfter all checks, write `hygiene-teams-summary.json` (all check data) to `output/scrum-master/`.",
       "maxRuns": 0,
-      "saveOutput": false,
-      "description": "12 ADO hygiene checks: Task-to-Task links, close Resolved, Blocked Features, sprint leftovers, missing estimates, stale bugs, Proposed >24h, Committed Features, 90-day bugs, Ring date issues, missing sign-offs"
+      "saveOutput": true,
+      "description": "13 ADO hygiene checks: Task-to-Task links, close Resolved, Blocked Features, sprint leftovers, missing estimates, stale bugs, Proposed >24h, Committed Features, 90-day bugs, Ring date issues, missing sign-offs, invalid R4<=R0 dates"
     }
   }
 }

@@ -3,37 +3,37 @@
     "consolidate-agent-memories": {
       "prompt": "IMPORTANT: Before generating any report, read and follow ALL rules in Q:/src/personal_projects/virtual-office/config/report-rules.md. Run memory consolidation. Working directory is Q:/src. Scan all sub-project memory dirs under C:/Users/qitxu/.claude/projects/Q--src*/memory/, compare against root memory at C:/Users/qitxu/.claude/projects/Q--src/memory/, copy new/updated files with ext_ prefix, remove duplicates, update MEMORY.md index (keep under 200 lines), run permission audit, root hygiene, stale file cleanup, and report template audit (scan all agent .md files under C:/Users/qitxu/.claude/agents/ and job configs under Q:/src/personal_projects/virtual-office/config/jobs/*.json to verify HTML reports have VO subtitle, dark theme, Segoe UI, and are self-contained). If no meaningful work was done (no new memories found, no duplicates removed, no conflicts detected, and no stale files cleaned), do NOT generate an HTML report -- just output 'Memory consolidation: no changes found.' and exit. Only generate a full report when at least one memory was added, updated, deduplicated, or cleaned up. You MUST use the fixed template at Q:/src/personal_projects/virtual-office/templates/auditor-memory-consolidation.html. Read the template file, then replace all {{PLACEHOLDER}} values with actual data. Replace {{VO_SUBTITLE}} with: Agent: Auditor | Job: consolidate-agent-memories | Start: <PST timestamp when job started> | Complete: <PST timestamp when report is generated>. Save the report to Q:/src/local_skills/session_management/memory-report-YYYYMMDD.html.",
       "maxRuns": 0,
-      "saveOutput": false,
+      "saveOutput": true,
       "description": "Consolidates all sub-project memories into root, deduplicates, generates HTML report"
     },
     "TODO-sprint-progress": {
       "prompt": "IMPORTANT: Before generating any report, read and follow ALL rules in Q:/src/personal_projects/virtual-office/config/report-rules.md. Generate a sprint progress update now. Query BOTH the current AND previous sprint iterations for comparison. You MUST use the fixed template at Q:/src/personal_projects/virtual-office/templates/scrum-master-sprint-progress.html. Read the template file, then replace all {{PLACEHOLDER}} values with actual data from ADO. Replace {{VO_SUBTITLE}} with: Agent: Auditor | Job: TODO-sprint-progress | Start: <PST timestamp when job started> | Complete: <PST timestamp when report is generated>. Sprint summary tile numbers must link to ADO WIQL queries. Show features/user stories first, bugs in separate section. R0 blockers are bugs only (Priority 0 or tagged R0/Ring0). Save the report to Q:/src/personal_projects/virtual-office/output/auditor/sprint-progress-YYYYMMDD.html (using today's date, MUST be inside output/auditor/, not the root output/ dir). Also save a copy to Q:/src/personal_projects/virtual-office/output/auditor/sprint-progress-latest.html.",
       "maxRuns": 0,
-      "saveOutput": false,
+      "saveOutput": true,
       "description": "Queries ADO work items and meeting notes to generate sprint progress report"
     },
     "YTD-OOF-Summary": {
       "prompt": "IMPORTANT: Before generating any report, read and follow ALL rules in Q:/src/personal_projects/virtual-office/config/report-rules.md. Run the YTD-OOF-Summary job. Query both Teams channels (Absence and OOF/WFH/Late) via WorkIQ for all messages from Dec 1 of previous year through today. Filter for direct reports only, classify each absence as full-day OOF or BRB/partial, count only current-year working days. You MUST use the fixed template at Q:/src/personal_projects/virtual-office/templates/auditor-ytd-oof-summary.html. Read the template file, then replace all {{PLACEHOLDER}} values with actual data. Replace {{VO_SUBTITLE}} with: Agent: Auditor | Job: YTD-OOF-Summary | Start: <PST timestamp when job started> | Complete: <PST timestamp when report is generated>. Save the report to Q:/src/personal_projects/virtual-office/output/auditor/ytd-oof-summary-YYYYMMDD.html (MUST be inside output/auditor/, not the root output/ dir). Also save a copy to Q:/src/personal_projects/virtual-office/output/auditor/ytd-oof-summary-latest.html.",
       "maxRuns": 0,
-      "saveOutput": false,
+      "saveOutput": true,
       "description": "Monthly YTD OOF summary for direct reports from Teams channels"
     },
     "teams-posting-audit": {
       "prompt": "IMPORTANT: Read Q:/src/personal_projects/virtual-office/config/report-rules.md Rule #8 and Rule #9 first. Run a Teams posting permission audit across all VO agent definitions and job configs. Scan: (1) All agent .md files in C:/Users/qitxu/.claude/agents/*.md -- search for keywords: Teams, channel, post, message, Graph API, graph.microsoft.com, chatMessage, @mention, agency copilot, send, notify. (2) All job configs in Q:/src/personal_projects/virtual-office/config/jobs/*.json -- same keywords. (3) All runner scripts in Q:/src/personal_projects/virtual-office/runner/ -- same keywords. For EACH match found, classify as: AUTHORIZED (poster agent job with explicit channel ID + fixed template in templates/), READ-ONLY (Graph API GET for data ingestion, not posting), DEPRECATED (has explicit deprecation note), or VIOLATION (unauthorized posting instruction -- any agent other than poster that posts to Teams, any posting without explicit channel ID, any posting without a fixed template). File a GitHub issue in jqxcode/virtual-office for each VIOLATION found, with the file path, line number, exact text, and recommended fix. If no violations found, output 'Teams posting audit: all clear.' and exit. Do NOT generate an HTML report for this job.",
       "maxRuns": 0,
-      "saveOutput": false,
+      "saveOutput": true,
       "description": "Weekly audit of all agent defs and job configs for unauthorized Teams posting instructions"
     },
     "TEMP-consolidate-Edge-reports": {
       "prompt": "Consolidate Edge browser tabs by running: python Q:/src/personal_projects/edge-tab-exporter/get-tabs.py --consolidate. This moves ungrouped report tabs into their corresponding groups (AAP, BAP, PR, BKiller, Sprint) with correct ordering and exclusions, creates groups if missing, closes duplicates, and sorts tabs within each group by URL (old to new). Report how many tabs were moved, duplicates closed, and tabs reordered. If nothing changed, output 'Edge tab consolidation: no changes.' and exit. Do NOT generate an HTML report for this job.",
       "maxRuns": 0,
-      "saveOutput": false,
+      "saveOutput": true,
       "description": "Moves ungrouped Edge report tabs into AAP/BAP/BKiller/PR/Sprint groups and closes duplicates"
     },
     "resolve-bugs-cleanup": {
       "prompt": "IMPORTANT: Before generating any report, read and follow ALL rules in Q:/src/personal_projects/virtual-office/config/report-rules.md. Run the resolve-bugs-cleanup job in dry-run mode. Query ADO for all Resolved bugs assigned to qitxu@microsoft.com or under Meeting Join (all sub-areas) / Meeting Notes area paths. Validate each bug: resolved for at least 1 day, linked PRs are merged, no comments in last 3 days, not blocked. Close validated bugs automatically (auto-close mode). Use wit_update_work_item to set System.State to Closed and add a comment: Auto-closed by Virtual Office Auditor agent. You MUST use the fixed template at Q:/src/personal_projects/virtual-office/templates/auditor-resolve-bugs-cleanup.html. Read the template file, then replace all {{PLACEHOLDER}} values with actual data. Replace {{VO_SUBTITLE}} with: Agent: Auditor | Job: resolve-bugs-cleanup | Start: <PST timestamp when job started> | Complete: <PST timestamp when report is generated>. Save report to Q:/src/personal_projects/virtual-office/output/auditor/resolve-bugs-cleanup-YYYYMMDD.html (MUST be inside output/auditor/, not the root output/ dir). Also save a copy to Q:/src/personal_projects/virtual-office/output/auditor/resolve-bugs-cleanup-latest.html.",
       "maxRuns": 0,
-      "saveOutput": false,
+      "saveOutput": true,
       "mode": "auto-close",
       "stalenessThresholdDays": 1,
       "description": "Auto-close stale Resolved bugs assigned to me or in my area paths"
@@ -41,25 +41,25 @@
     "agent-harness-performance": {
       "prompt": "IMPORTANT: Before generating any report, read and follow ALL rules in Q:/src/personal_projects/virtual-office/config/report-rules.md. Run the agent-harness-performance job. Analyze VO agent run metrics from the past 7 days vs the 7 days before that. Data sources: (1) Audit logs at Q:/src/personal_projects/virtual-office/output/audit/2026-*.jsonl -- each line is JSON with timestamp, agent, job, action (started/completed/failed), details (exit_code, duration). Parse duration as seconds (remove 's' suffix). (2) Error log at Q:/src/personal_projects/virtual-office/state/errors.jsonl -- each line has agent, job, exitCode, summary, duration. (3) Hang incidents at Q:/src/personal_projects/virtual-office/output/hang-scout/*.jsonl and incidents/. (4) Loop detector at $TEMP/claude-loop-detector.jsonl (may not exist yet). Compute these metrics for current vs previous week: (a) Total runs and success rate (exit_code 0 vs non-zero), (b) Average run duration per agent, (c) Error count by agent, (d) Hang count, (e) Loop detection count. For each metric, compute the delta and mark as good/bad/neutral. Generate per-agent breakdown rows. For the duration chart, compute daily average duration across all agents. You MUST use the fixed template at Q:/src/personal_projects/virtual-office/templates/auditor-harness-performance.html. Read the template, replace all {{PLACEHOLDER}} values. Replace {{VO_SUBTITLE}} with: Agent: Auditor | Job: agent-harness-performance | Start: <PST> | Complete: <PST>. Replace {{BASELINE_DATE}} with 2026-04-14. Replace {{HARNESS_CHANGES}} with: Phase 0 (env vars: DISABLE_ADAPTIVE_THINKING, NO_FLICKER, showThinkingSummaries), Phase 1 (CLAUDE.md hard rules, VO agent output rules, behavioral rules in all 9 agents), Phase 5 (PreToolUse test-before-commit hook, PostToolUse loop-detector hook). Save to Q:/src/personal_projects/virtual-office/output/auditor/harness-performance-YYYYMMDD.html and harness-performance-latest.html. Open in Edge.",
       "maxRuns": 0,
-      "saveOutput": false,
+      "saveOutput": true,
       "description": "Weekly harness improvement metrics: error rates, durations, hangs, loops vs previous week"
     },
     "FFv2-daily-summary": {
       "prompt": "Run the FFv2 daily summary report. Execute: python Q:/src/local_skills/data_tools/ffv2-daily-summary.py. This scrapes the Teams DevOps Portal Feature Flight page via headless Edge CDP, gets all direct reports flights (Pending Approval + In Progress), fetches details for each flight, and generates an interactive HTML report at Q:/src/tmp/ff-approval-report.html. The report has two-row multi-select filters (Category and Current Status), sortable columns, and links to each flight page. Opens in Edge automatically.",
       "maxRuns": 0,
-      "saveOutput": false,
+      "saveOutput": true,
       "description": "Feature Flight V2 daily report for direct reports flights (weekdays at noon)"
     },
     "failure-review": {
       "prompt": "IMPORTANT: Before generating any report, read and follow ALL rules in Q:/src/personal_projects/virtual-office/config/report-rules.md. Run the failure-review job. Analyze the past 7 days of VO agent failures to identify recurring patterns and harness improvement candidates. Data sources: (1) Audit logs at Q:/src/personal_projects/virtual-office/output/audit/2026-*.jsonl -- look for action='failed' entries. (2) Error log at Q:/src/personal_projects/virtual-office/state/errors.jsonl -- all unresolved errors. (3) Hang incidents at Q:/src/personal_projects/virtual-office/output/hang-scout/incidents/. For each failure: extract the error summary, agent, job, and duration. Group failures by pattern (same error message template, same agent, same exit code). For each pattern that occurred 2+ times, generate a 'harness improvement candidate': what CLAUDE.md rule, skill, or hook would prevent this class of failure. Output format: HTML report with sections: (1) Failure Summary (total failures, unique patterns, most-failing agent), (2) Recurring Patterns table (pattern, count, agents affected, sample error, candidate fix type: rule/skill/hook), (3) One-Off Failures (happened once, low priority), (4) Recommended Harness Changes (prioritized list of specific changes to propose). Save to Q:/src/personal_projects/virtual-office/output/auditor/failure-review-YYYYMMDD.html and failure-review-latest.html. Open in Edge.",
       "maxRuns": 0,
-      "saveOutput": false,
+      "saveOutput": true,
       "description": "Weekly failure pattern analysis and harness improvement candidates"
     },
     "agent-brain-health-check": {
       "prompt": "IMPORTANT: Before generating any report, read and follow ALL rules in Q:/src/personal_projects/virtual-office/config/report-rules.md. Run the agent-brain-health-check job. First run: python Q:/src/personal_projects/agent-brain/scripts/health_check.py and capture all output. Then collect additional metrics: session archive coverage (sessions/ count vs ~/.claude/projects/ JSONL count), knowledge card freshness, last 10 git commits, audit log entries this week, entity counts. You MUST use the fixed template at Q:/src/personal_projects/virtual-office/templates/auditor-agent-brain-health-check.html. Read the template file, then replace all {{PLACEHOLDER}} values with actual data. Replace {{VO_SUBTITLE}} with: Agent: Auditor | Job: agent-brain-health-check | Start: <PST timestamp when job started> | Complete: <PST timestamp when report is generated>. Use color thresholds: Green (sync <24h, digest <7d, 0 issues, all tests pass), Yellow (sync 24-48h, digest 7-14d, 1-2 issues), Red (sync >48h, digest >14d, 3+ issues, test failures). Save report to Q:/src/personal_projects/virtual-office/output/auditor/agent-brain-health-YYYYMMDD.html (MUST be inside output/auditor/). Also save to Q:/src/personal_projects/virtual-office/output/auditor/agent-brain-health-latest.html. Open the report in Edge after generation.",
       "maxRuns": 0,
-      "saveOutput": false,
+      "saveOutput": true,
       "description": "Weekly Agent Brain ecosystem health check with HTML dashboard report"
     }
   }
