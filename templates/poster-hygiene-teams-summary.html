@@ -12,9 +12,14 @@
      5. Same person appearing in multiple rows reuses the same mention ID
      6. Josh Xu (90b98fe6-a80b-46e1-9209-b5ebcdf6da6b) is always included even if not an owner
 
-     CRITICAL - SENDING: You MUST use MCP tool SendMessageToChannel with the `mentions` parameter.
-     The mentions param is a JSON string array: [{"displayName":"Name","id":"aad-guid","type":"user"},...]
-     Using curl/Graph API directly will SILENTLY DROP mentions. Only the MCP tool works.
+     CRITICAL - MENTIONS PER OCCURRENCE: Each table row gets its OWN incrementing <at id>.
+     Same person in 3 rows = 3 separate mention entries (different ids, same user AAD guid).
+     The mentions array must have one entry per <at id> tag in the body.
+
+     CRITICAL - SENDING: You MUST post via Python requests (NOT curl, NOT MCP tool).
+     curl shell-escaping silently drops the mentions array.
+     MCP SendMessageToChannel only replaces the FIRST @DisplayName occurrence per person.
+     Only Python requests.post(url, json=payload) preserves all mentions correctly.
 -->
 
 <p><b>Shiproom Hygiene Summary - {{DATE}}</b></p>
