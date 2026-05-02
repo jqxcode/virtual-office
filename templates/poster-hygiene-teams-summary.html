@@ -9,9 +9,12 @@
      2. Resolve each via Graph API: GET /v1.0/users/{email}?$select=displayName,id
      3. Assign incrementing mention IDs (0, 1, 2...)
      4. In table rows, render Owner as: <at id="{N}">{displayName}</at>
-     5. Build the mentions JSON array with all resolved owners
-     6. Same person appearing in multiple rows reuses the same mention ID
-     7. Josh Xu (90b98fe6-a80b-46e1-9209-b5ebcdf6da6b) is always included even if not an owner
+     5. Same person appearing in multiple rows reuses the same mention ID
+     6. Josh Xu (90b98fe6-a80b-46e1-9209-b5ebcdf6da6b) is always included even if not an owner
+
+     CRITICAL - SENDING: You MUST use MCP tool SendMessageToChannel with the `mentions` parameter.
+     The mentions param is a JSON string array: [{"displayName":"Name","id":"aad-guid","type":"user"},...]
+     Using curl/Graph API directly will SILENTLY DROP mentions. Only the MCP tool works.
 -->
 
 <p><b>Shiproom Hygiene Summary - {{DATE}}</b></p>
