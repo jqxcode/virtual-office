@@ -111,8 +111,8 @@
     {
       "agent": "poster",
       "job": "post-shiproom-hygiene-check",
-      "cron": "0 6 * * *",
-      "description": "Run fresh hygiene check (13 ADO checks) then post summary to Meeting US channel at 6am daily"
+      "cron": "0 6 * * 1-5",
+      "description": "Run fresh hygiene check (13 ADO checks) then post summary to Meeting US channel at 6am weekdays"
     },
     {
       "agent": "approver",
