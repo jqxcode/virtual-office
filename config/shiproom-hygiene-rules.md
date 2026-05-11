@@ -66,9 +66,13 @@
 
 **Goal**: All items in the completed sprint should be Closed. Leftovers move to current sprint.
 
+**Grace period**: Do NOT auto-move items during the first 3 days of a new sprint. ICs need time to close out work from the previous sprint. During the grace period, report leftover items but do not PATCH them.
+
 1. Get current iteration (timeframe=current) and previous iteration (the one immediately before by finishDate).
-2. WIQL: `WHERE [System.State] <> 'Closed' AND [System.State] <> 'Removed' AND [System.IterationPath] = '<previous>'`
-3. PATCH iteration to current sprint, add comment explaining the move.
+2. Calculate days since previous sprint ended (use the current sprint's startDate). If <= 3 days, set `grace_period = true`.
+3. WIQL: `WHERE [System.State] <> 'Closed' AND [System.State] <> 'Removed' AND [System.IterationPath] = '<previous>'`
+4. If `grace_period` is true: **report-only** — list items but do NOT PATCH. Include "(grace period — X days remaining)" in the summary.
+5. If `grace_period` is false: PATCH iteration to current sprint, add comment explaining the move.
 
 ## Check 4: Current Sprint Tasks — Estimates and Parent
 
