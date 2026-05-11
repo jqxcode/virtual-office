@@ -6,7 +6,11 @@
   - `MSTeams\Calling Meeting Devices (CMD)\Meetings\Meeting Join\Fundamentals`
   - `MSTeams\Calling Meeting Devices (CMD)\Meetings\Notes`
 - **Team**: CMD - Meeting Join (US) (ID: `6f72ea4e-c73a-4a15-b622-46cdacc53987`)
-- **Current semester prefix**: `MSTeams\2026\H1`
+- **Current semester prefix**: Compute dynamically based on today's date:
+  - If today <= June 30 of this year → `MSTeams\{year}\H1`
+  - If today > June 30 → `MSTeams\{year}\H2`
+  - Example: 2026-05-11 → `MSTeams\2026\H1`; 2026-07-01 → `MSTeams\2026\H2`
+  - Use `<current_semester>` as placeholder in all WIQL queries below — resolve it at runtime
 
 ## ADO API Patterns
 
@@ -87,12 +91,12 @@
 **Goal**: Non-closed tasks with an assignee stuck in past sprints need owner review. Move to FUTURE sprint (not current) to give review time.
 
 **Important exclusions**:
-- **Backlog items**: Only target tasks in actual sprint iterations (path must contain "Sprint" and be `UNDER MSTeams\2026\H1`). Items at root/backlog iteration paths are not stale — they're just backlog.
+- **Backlog items**: Only target tasks in actual sprint iterations (path must contain "Sprint" and be `UNDER <current_semester>`). Items at root/backlog iteration paths are not stale — they're just backlog.
 - **Grace period**: In the first 2 days of the current sprint, skip tasks still in the previous sprint. People need time to close out work from the last sprint.
 
 1. Get future iteration (first with timeFrame='future').
 2. Parse current sprint start date from the sprint name to determine grace period.
-3. WIQL: `WHERE [System.WorkItemType] = 'Task' AND [System.State] <> 'Closed' AND [System.State] <> 'Removed' AND [System.IterationPath] <> '<current>' AND [System.IterationPath] <> '<future>' AND [System.IterationPath] UNDER 'MSTeams\2026\H1' AND [System.AssignedTo] <> ''`
+3. WIQL: `WHERE [System.WorkItemType] = 'Task' AND [System.State] <> 'Closed' AND [System.State] <> 'Removed' AND [System.IterationPath] <> '<current>' AND [System.IterationPath] <> '<future>' AND [System.IterationPath] UNDER '<current_semester>' AND [System.AssignedTo] <> ''`
 4. For each result: skip if iteration doesn't contain "Sprint" (backlog); skip if in previous sprint and within grace period.
 5. PATCH remaining items to future sprint, comment @owner asking to review.
 
@@ -119,7 +123,7 @@
    ```
    WHERE [System.WorkItemType] = 'Feature'
      AND [System.State] = 'Committed'
-     AND NOT [System.IterationPath] UNDER 'MSTeams\2026\H1'
+     AND NOT [System.IterationPath] UNDER '<current_semester>'
      AND [System.AreaPath] UNDER '<area>'
    ```
 2. Collect: ID, Title, Owner, IterationPath, AreaPath.
@@ -149,6 +153,7 @@
    ```
    WHERE [System.WorkItemType] = 'Feature'
      AND [System.State] = 'Active'
+     AND [System.IterationPath] UNDER '<current_semester>'
      AND ([Microsoft.VSTS.Scheduling.TargetDate] < @today
        OR [MicrosoftTeamsCMMI.Ring4TargetDate] < @today)
      AND [System.AreaPath] UNDER '<area>'
@@ -171,7 +176,7 @@
 
 A sign-off is "missing" if the field is empty/null. Features that have all four filled are fine.
 
-1. Query active Features in both areas, fetch all 4 sign-off fields.
+1. Query active Features **in the current semester** (`[System.IterationPath] UNDER '<current_semester>'`) in both areas, fetch all 4 sign-off fields.
 2. For each Feature, check which sign-off fields are empty.
 3. Only flag Features missing at least one sign-off.
 4. Collect: ID, Title, Owner, list of missing sign-offs.
@@ -181,11 +186,12 @@ A sign-off is "missing" if the field is empty/null. Features that have all four 
 
 **Goal**: Ring 4 target date must be after Ring 0 target date. If R4 <= R0 (or R4 is set but R0 is empty), the rollout plan is invalid.
 
-1. Query all Features (any state except Closed/Removed) in both areas where both Ring dates exist, or R4 exists but R0 doesn't:
+1. Query Features **in the current semester** (any state except Closed/Removed) in both areas where R4 exists:
    ```
    WHERE [System.WorkItemType] = 'Feature'
      AND [System.State] <> 'Closed'
      AND [System.State] <> 'Removed'
+     AND [System.IterationPath] UNDER '<current_semester>'
      AND [MicrosoftTeamsCMMI.Ring4TargetDate] <> ''
      AND [System.AreaPath] UNDER '<area>'
    ```
