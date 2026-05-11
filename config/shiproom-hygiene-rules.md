@@ -66,12 +66,12 @@
 
 **Goal**: All items in the completed sprint should be Closed. Leftovers move to current sprint.
 
-**Grace period**: Do NOT auto-move items during the first 3 days of a new sprint. ICs need time to close out work from the previous sprint. During the grace period, report leftover items but do not PATCH them.
+**Grace period (5 days)**: During the first 5 days of a new sprint, do NOT auto-move items. Instead, comment @mention the owner to remind them to close out or move their work. After the grace period, auto-move.
 
 1. Get current iteration (timeframe=current) and previous iteration (the one immediately before by finishDate).
-2. Calculate days since previous sprint ended (use the current sprint's startDate). If <= 3 days, set `grace_period = true`.
+2. Calculate days since previous sprint ended (use the current sprint's startDate). If <= 5 days, set `grace_period = true`.
 3. WIQL: `WHERE [System.State] <> 'Closed' AND [System.State] <> 'Removed' AND [System.IterationPath] = '<previous>'`
-4. If `grace_period` is true: **report-only** — list items but do NOT PATCH. Include "(grace period — X days remaining)" in the summary.
+4. If `grace_period` is true: **comment @mention owner** — do NOT PATCH iteration. Add comment: "This item is still in Sprint {prev}. Please close it or move to Sprint {current} within {days_remaining} days, or it will be auto-moved." Include "(grace period — X days remaining)" in the summary.
 5. If `grace_period` is false: PATCH iteration to current sprint, add comment explaining the move.
 
 ## Check 4: Current Sprint Tasks — Estimates and Parent
@@ -96,13 +96,15 @@
 
 **Important exclusions**:
 - **Backlog items**: Only target tasks in actual sprint iterations (path must contain "Sprint" and be `UNDER <current_semester>`). Items at root/backlog iteration paths are not stale — they're just backlog.
-- **Grace period**: In the first 2 days of the current sprint, skip tasks still in the previous sprint. People need time to close out work from the last sprint.
+
+**Grace period (5 days)**: Same as Check 3. During the first 5 days of the current sprint, do NOT auto-move tasks from the previous sprint. Instead, comment @mention the owner. After grace period, auto-move.
 
 1. Get future iteration (first with timeFrame='future').
-2. Parse current sprint start date from the sprint name to determine grace period.
+2. Calculate days since current sprint started. If <= 5 days, set `grace_period = true`.
 3. WIQL: `WHERE [System.WorkItemType] = 'Task' AND [System.State] <> 'Closed' AND [System.State] <> 'Removed' AND [System.IterationPath] <> '<current>' AND [System.IterationPath] <> '<future>' AND [System.IterationPath] UNDER '<current_semester>' AND [System.AssignedTo] <> ''`
-4. For each result: skip if iteration doesn't contain "Sprint" (backlog); skip if in previous sprint and within grace period.
-5. PATCH remaining items to future sprint, comment @owner asking to review.
+4. For each result: skip if iteration doesn't contain "Sprint" (backlog).
+5. If in previous sprint and `grace_period` is true: **comment @mention owner** — do NOT PATCH. Add comment: "This task is still in Sprint {prev}. Please close or move within {days_remaining} days, or it will be auto-moved to Sprint {future}."
+6. If `grace_period` is false or item is from an older sprint (not just previous): PATCH to future sprint, comment @owner asking to review.
 
 ## Check 7: Proposed Bugs > 24 Hours
 
