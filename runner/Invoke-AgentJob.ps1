@@ -319,9 +319,30 @@ function Set-QueueDepth {
 
 # --- Main flow ---
 
+# Step 0: Startup log -- written before anything else so we know pwsh actually started.
+# If the script crashes later (file contention, drive not ready), this line proves it launched.
+$startupTs = Get-Date -Format "o"
+try {
+    $startupLine = @{ ts = $startupTs; agent = $Agent; job = $Job; event = "runner_startup"; pid = $PID } | ConvertTo-Json -Compress
+    $startupLogFile = Join-Path $PSScriptRoot ".." "state" "runner-startup.log"
+    $startupLogDir = Split-Path -Parent $startupLogFile
+    if (-not (Test-Path $startupLogDir)) {
+        New-Item -ItemType Directory -Path $startupLogDir -Force | Out-Null
+    }
+    Add-Content -Path $startupLogFile -Value $startupLine -Encoding ASCII -ErrorAction SilentlyContinue
+} catch {
+    # Best-effort -- if even this fails, the drive isn't ready; nothing we can do.
+}
+
 # Step 1: Reconcile any dashboard entries stuck on "running" from a prior killed process.
 # Must run before agent config is loaded so it runs even for agents that have no active lock.
-Repair-StuckDashboard
+# Wrapped in try/catch: this is best-effort cleanup. File contention with concurrent runners
+# (e.g. after hibernate wake when multiple tasks catch up simultaneously) must NOT crash the script.
+try {
+    Repair-StuckDashboard
+} catch {
+    Write-Host "Repair-StuckDashboard failed (non-fatal, likely file contention): $_"
+}
 
 # Step 2: Load and validate agent config
 $agentsFile = Join-Path $CONFIG_DIR "agents.json"
@@ -374,32 +395,42 @@ if ($agentsConfig[$Agent].ContainsKey("staleLockTimeoutMinutes")) {
 }
 
 if (Test-Path $lockFile) {
-    $lockContent = Get-Content -Path $lockFile -Raw -ErrorAction SilentlyContinue
-    $lockAge = $null
-    $lockedByJob = "unknown"
+    $lockHandled = $false
     try {
-        $parsed = $lockContent.Trim() | ConvertFrom-Json
-        $lockTime = [DateTime]::Parse($parsed.ts)
-        $lockAge = (Get-Date) - $lockTime
-        $lockedByJob = $parsed.job
+        $lockContent = Get-Content -Path $lockFile -Raw -ErrorAction SilentlyContinue
+        $lockAge = $null
+        $lockedByJob = "unknown"
+        try {
+            $parsed = $lockContent.Trim() | ConvertFrom-Json
+            $lockTime = [DateTime]::Parse($parsed.ts)
+            $lockAge = (Get-Date) - $lockTime
+            $lockedByJob = $parsed.job
+        } catch {
+            $lockAge = [TimeSpan]::FromMinutes($staleLockTimeout + 1)
+        }
+
+        if ($lockAge -and $lockAge.TotalMinutes -gt $staleLockTimeout) {
+            # Stale lock -- force clear
+            Remove-Item -Path $lockFile -Force
+            Write-Event -AgentName $Agent -JobName $Job -Event "stale_lock_cleared" -Details @{
+                locked_by_job = $lockedByJob
+                lock_age_minutes = [math]::Round($lockAge.TotalMinutes)
+                timeout_minutes = $staleLockTimeout
+            }
+            Write-AuditEntry -Action "stale_lock_cleared" -AgentName $Agent -JobName $Job -RunId "N/A" -Details @{
+                locked_by_job = $lockedByJob
+                lock_age_minutes = [math]::Round($lockAge.TotalMinutes)
+            }
+            Write-Host "Stale lock cleared for '$Agent' (was held by '$lockedByJob', age: $([math]::Round($lockAge.TotalMinutes))m, timeout: ${staleLockTimeout}m)."
+        } else {
+            $lockHandled = $true
+        }
     } catch {
-        $lockAge = [TimeSpan]::FromMinutes($staleLockTimeout + 1)
+        Write-Host "Lock check failed (file contention): $_. Treating as busy."
+        $lockHandled = $true
     }
 
-    if ($lockAge -and $lockAge.TotalMinutes -gt $staleLockTimeout) {
-        # Stale lock -- force clear
-        Remove-Item -Path $lockFile -Force
-        Write-Event -AgentName $Agent -JobName $Job -Event "stale_lock_cleared" -Details @{
-            locked_by_job = $lockedByJob
-            lock_age_minutes = [math]::Round($lockAge.TotalMinutes)
-            timeout_minutes = $staleLockTimeout
-        }
-        Write-AuditEntry -Action "stale_lock_cleared" -AgentName $Agent -JobName $Job -RunId "N/A" -Details @{
-            locked_by_job = $lockedByJob
-            lock_age_minutes = [math]::Round($lockAge.TotalMinutes)
-        }
-        Write-Host "Stale lock cleared for '$Agent' (was held by '$lockedByJob', age: $([math]::Round($lockAge.TotalMinutes))m, timeout: ${staleLockTimeout}m)."
-    } else {
+    if ($lockHandled) {
         # Agent is busy -- queue this job
         $depth = Get-QueueDepth -QueueFile $queueFile
         $depth++

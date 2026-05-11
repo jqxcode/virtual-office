@@ -3,8 +3,8 @@
     {
       "agent": "auditor",
       "job": "TODO-sprint-progress",
-      "cron": "0 7 * * 1-5",
-      "description": "Sprint progress report weekday mornings at 7am"
+      "cron": "15 8 * * 1-5",
+      "description": "Sprint progress report weekday mornings at 8:15am"
     },
     {
       "agent": "bug-killer",
@@ -27,26 +27,26 @@
     {
       "agent": "auditor",
       "job": "teams-posting-audit",
-      "cron": "0 6 * * 1",
-      "description": "Teams posting permission audit every Monday at 6am"
+      "cron": "30 8 * * 1",
+      "description": "Teams posting permission audit every Monday at 8:30am"
     },
     {
       "agent": "bug-killer",
       "job": "daily-summary",
-      "cron": "30 1 * * *",
-      "description": "Bug killer daily activity summary at 1:30am"
+      "cron": "40 7 * * *",
+      "description": "Bug killer daily activity summary at 7:40am"
     },
     {
       "agent": "emailer",
       "job": "scan-all-mailboxes",
-      "cron": "0 7 * * *",
-      "description": "Gmail scan all mailboxes at 7am daily"
+      "cron": "50 7 * * *",
+      "description": "Gmail scan all mailboxes at 7:50am daily"
     },
     {
       "agent": "auditor",
       "job": "consolidate-agent-memories",
-      "cron": "0 3 * * *",
-      "description": "Memory consolidation and report at 3am daily"
+      "cron": "45 8 * * *",
+      "description": "Memory consolidation and report at 8:45am daily"
     },
     {
       "agent": "auditor",
@@ -81,8 +81,8 @@
     {
       "agent": "hang-scout",
       "job": "daily-report",
-      "cron": "0 0 * * *",
-      "description": "Daily 5W incident report at midnight"
+      "cron": "35 7 * * *",
+      "description": "Daily 5W incident report at 7:35am"
     },
     {
       "agent": "auditor",
@@ -111,8 +111,8 @@
     {
       "agent": "poster",
       "job": "post-shiproom-hygiene-check",
-      "cron": "0 6 * * 1-5",
-      "description": "Run fresh hygiene check (13 ADO checks) then post summary to Meeting US channel at 6am weekdays"
+      "cron": "45 7 * * 1-5",
+      "description": "Run fresh hygiene check (13 ADO checks) then post summary to Meeting US channel at 7:45am weekdays"
     },
     {
       "agent": "approver",
