@@ -92,19 +92,32 @@
 
 ## Check 6: Stale Tasks from Past Sprints
 
-**Goal**: Non-closed tasks with an assignee stuck in past sprints need owner review. Move to FUTURE sprint (not current) to give review time.
+**Goal**: Non-closed tasks with an assignee stuck in **past** sprints (sprints that have already ended) need owner review.
+
+**Critical scope rule**: Only flag tasks whose sprint has already ended (finishDate < today). Tasks in the current sprint or ANY future sprint are intentionally scheduled there — do NOT touch them.
 
 **Important exclusions**:
 - **Backlog items**: Only target tasks in actual sprint iterations (path must contain "Sprint" and be `UNDER <current_semester>`). Items at root/backlog iteration paths are not stale — they're just backlog.
+- **Future sprints**: Tasks in sprints that haven't ended yet are NOT stale. The owner scheduled them there intentionally.
 
-**Grace period (5 days)**: Same as Check 3. During the first 5 days of the current sprint, do NOT auto-move tasks from the previous sprint. Instead, comment @mention the owner. After grace period, auto-move.
+**Grace period (5 days)**: Same as Check 3. During the first 5 days of the current sprint, do NOT auto-move tasks from the previous sprint. Instead, comment @mention the owner. After grace period, auto-move to current sprint.
 
-1. Get future iteration (first with timeFrame='future').
+1. Get all iterations under `<current_semester>` with their start/finish dates. Identify current sprint and previous sprint.
 2. Calculate days since current sprint started. If <= 5 days, set `grace_period = true`.
-3. WIQL: `WHERE [System.WorkItemType] = 'Task' AND [System.State] <> 'Closed' AND [System.State] <> 'Removed' AND [System.IterationPath] <> '<current>' AND [System.IterationPath] <> '<future>' AND [System.IterationPath] UNDER '<current_semester>' AND [System.AssignedTo] <> ''`
-4. For each result: skip if iteration doesn't contain "Sprint" (backlog).
-5. If in previous sprint and `grace_period` is true: **comment @mention owner** — do NOT PATCH. Add comment: "This task is still in Sprint {prev}. Please close or move within {days_remaining} days, or it will be auto-moved to Sprint {future}."
-6. If `grace_period` is false or item is from an older sprint (not just previous): PATCH to future sprint, comment @owner asking to review.
+3. WIQL:
+   ```
+   WHERE [System.WorkItemType] = 'Task'
+     AND [System.State] <> 'Closed'
+     AND [System.State] <> 'Removed'
+     AND [System.IterationPath] UNDER '<current_semester>'
+     AND [System.AssignedTo] <> ''
+   ```
+4. For each result:
+   a. Skip if iteration path doesn't contain "Sprint" (backlog).
+   b. **Skip if the task's sprint finishDate >= today** — it's in a current or future sprint, not stale.
+   c. Only tasks in sprints that have already ended proceed to step 5/6.
+5. If in previous sprint and `grace_period` is true: **comment @mention owner** — do NOT PATCH. Add comment: "This task is still in Sprint {prev}. Please close or move within {days_remaining} days, or it will be auto-moved."
+6. If `grace_period` is false or item is from an older sprint (not just previous): PATCH to current sprint, comment @owner asking to review.
 
 ## Check 7: Proposed Bugs > 24 Hours
 
