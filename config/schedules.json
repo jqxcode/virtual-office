@@ -112,13 +112,7 @@
       "agent": "scrum-master",
       "job": "shiproom-hygiene-check",
       "cron": "25 7 * * 1-5",
-      "description": "Run 13 ADO hygiene checks at 7:25am weekdays (data for poster at 7:45am)"
-    },
-    {
-      "agent": "poster",
-      "job": "post-shiproom-hygiene-check",
-      "cron": "45 7 * * 1-5",
-      "description": "Run fresh hygiene check (13 ADO checks) then post summary to Meeting US channel at 7:45am weekdays"
+      "description": "Run 13 ADO hygiene checks at 7:25am weekdays, then triggerOnComplete fires poster/post-shiproom-hygiene-check"
     },
     {
       "agent": "approver",
