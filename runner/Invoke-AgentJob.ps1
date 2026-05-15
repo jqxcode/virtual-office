@@ -377,28 +377,49 @@ if (Test-Path $lockFile) {
     $lockContent = Get-Content -Path $lockFile -Raw -ErrorAction SilentlyContinue
     $lockAge = $null
     $lockedByJob = "unknown"
+    $lockPidAlive = $true
+    $lockPid = $null
     try {
         $parsed = $lockContent.Trim() | ConvertFrom-Json
         $lockTime = [DateTime]::Parse($parsed.ts)
         $lockAge = (Get-Date) - $lockTime
         $lockedByJob = $parsed.job
+        if ($null -ne $parsed.PSObject.Properties['pid']) {
+            $lockPid = [int]$parsed.pid
+            $proc = Get-Process -Id $lockPid -ErrorAction SilentlyContinue
+            $lockPidAlive = ($null -ne $proc)
+        }
     } catch {
         $lockAge = [TimeSpan]::FromMinutes($staleLockTimeout + 1)
     }
 
-    if ($lockAge -and $lockAge.TotalMinutes -gt $staleLockTimeout) {
-        # Stale lock -- force clear
+    $clearLock = $false
+    $clearReason = ""
+    if (-not $lockPidAlive) {
+        # PID is dead -- process crashed without cleanup, clear immediately
+        $clearLock = $true
+        $clearReason = "dead_pid"
+    } elseif ($lockAge -and $lockAge.TotalMinutes -gt $staleLockTimeout) {
+        $clearLock = $true
+        $clearReason = "timeout"
+    }
+
+    if ($clearLock) {
         Remove-Item -Path $lockFile -Force
-        Write-Event -AgentName $Agent -JobName $Job -Event "stale_lock_cleared" -Details @{
+        $eventDetails = @{
             locked_by_job = $lockedByJob
             lock_age_minutes = [math]::Round($lockAge.TotalMinutes)
             timeout_minutes = $staleLockTimeout
+            clear_reason = $clearReason
         }
-        Write-AuditEntry -Action "stale_lock_cleared" -AgentName $Agent -JobName $Job -RunId "N/A" -Details @{
-            locked_by_job = $lockedByJob
-            lock_age_minutes = [math]::Round($lockAge.TotalMinutes)
+        if ($null -ne $lockPid) { $eventDetails["dead_pid"] = $lockPid }
+        Write-Event -AgentName $Agent -JobName $Job -Event "stale_lock_cleared" -Details $eventDetails
+        Write-AuditEntry -Action "stale_lock_cleared" -AgentName $Agent -JobName $Job -RunId "N/A" -Details $eventDetails
+        if ($clearReason -eq "dead_pid") {
+            Write-Host "Dead-process lock cleared for '$Agent' (PID $lockPid dead, was '$lockedByJob', age: $([math]::Round($lockAge.TotalMinutes))m)."
+        } else {
+            Write-Host "Stale lock cleared for '$Agent' (was held by '$lockedByJob', age: $([math]::Round($lockAge.TotalMinutes))m, timeout: ${staleLockTimeout}m)."
         }
-        Write-Host "Stale lock cleared for '$Agent' (was held by '$lockedByJob', age: $([math]::Round($lockAge.TotalMinutes))m, timeout: ${staleLockTimeout}m)."
     } else {
         # Agent is busy -- queue this job
         $depth = Get-QueueDepth -QueueFile $queueFile
