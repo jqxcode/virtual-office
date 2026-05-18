@@ -3405,6 +3405,16 @@ function renderTeamTab() {
           var tr = document.createElement("tr");
           var tdName = document.createElement("td");
           var nameSpan = document.createElement("span"); nameSpan.className = "team-skill-name"; nameSpan.textContent = hook.name;
+          // Click-to-copy: copy the hook command
+          var copyText = hook.command || hook.name;
+          nameSpan.title = "Click to copy: " + copyText;
+          nameSpan.style.cursor = "pointer";
+          nameSpan.addEventListener("click", function() {
+            navigator.clipboard.writeText(copyText).then(function() {
+              nameSpan.classList.add("team-skill-copied");
+              setTimeout(function() { nameSpan.classList.remove("team-skill-copied"); }, 600);
+            });
+          });
           tdName.appendChild(nameSpan); tr.appendChild(tdName);
           var tdTrigger = document.createElement("td"); tdTrigger.className = "team-skill-schedule"; tdTrigger.textContent = hook.trigger || ""; tr.appendChild(tdTrigger);
           var tdDesc = document.createElement("td"); tdDesc.className = "team-skill-desc"; tdDesc.textContent = hook.description || ""; tdDesc.title = hook.description || ""; tr.appendChild(tdDesc);
