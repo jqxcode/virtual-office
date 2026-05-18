@@ -1,0 +1,334 @@
+<!-- Cost Summary Section Partial -->
+<!-- Usage: Read this file, replace all {{PLACEHOLDER}} values, then embed in any auditor report. -->
+<!-- Placeholders:
+     {{COST_PERIOD}}           - Human-readable date range, e.g. "2026-05-11 to 2026-05-18"
+     {{COST_TOTAL}}            - Total cost in USD, e.g. "$1.24"
+     {{COST_RUNS}}             - Total number of job runs, e.g. "42"
+     {{COST_AVG}}              - Average cost per run in USD, e.g. "$0.03"
+     {{COST_TOKENS}}           - Total tokens (input + output + cache), e.g. "1,240,000"
+     {{COST_AGENT_ROWS}}       - <tr> rows for per-agent breakdown table (see schema below)
+     {{COST_CONTEXT_ALERTS}}   - <li> items for context budget alerts, or empty string if none
+     {{COST_ANOMALY_ALERTS}}   - <li> items for anomaly alerts, or empty string if none
+-->
+<!-- COST_AGENT_ROWS schema (one <tr> per agent):
+     <tr>
+       <td>agent-name</td>
+       <td>12</td>
+       <td>$0.48</td>
+       <td>$0.04</td>
+       <td>320,000</td>
+       <td>88,000</td>
+     </tr>
+-->
+<!-- COST_CONTEXT_ALERTS schema (one <li> per job at >=70% context):
+     <li class="alert-warning">job-name (agent) -- 85% context used on 2026-05-17</li>
+     <li class="alert-danger">job-name (agent) -- 93% context used on 2026-05-16</li>
+-->
+<!-- COST_ANOMALY_ALERTS schema (one <li> per anomalous run):
+     <li class="alert-warning">job-name (agent) -- $0.24 on 2026-05-17 is 3.1x the average ($0.08)</li>
+-->
+
+<style>
+  /* --- Stripe design system tokens (light theme) --- */
+  .cs-root {
+    --stripe-font-primary: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --stripe-font-mono: 'Source Code Pro', 'SF Mono', 'Cascadia Code', Consolas, monospace;
+    --stripe-font-features: "cv01", "ss03";
+    --stripe-font-features-tabular: "tnum";
+
+    --stripe-purple: #533afd;
+    --stripe-purple-hover: #4434d4;
+    --stripe-purple-light: #b9b9f9;
+    --stripe-navy: #061b31;
+    --stripe-text-heading: #061b31;
+    --stripe-text-label: #273951;
+    --stripe-text-body: #64748d;
+    --stripe-success: #15be53;
+    --stripe-success-text: #108c3d;
+    --stripe-warning: #9b6829;
+    --stripe-border: #e5edf5;
+    --stripe-border-soft-purple: #d6d9fc;
+    --stripe-shadow-blue: rgba(50, 50, 93, 0.25);
+    --stripe-shadow-black: rgba(0, 0, 0, 0.1);
+    --stripe-shadow-ambient: rgba(23, 23, 23, 0.08);
+    --stripe-elevation-2: 0px 15px 35px var(--stripe-shadow-ambient);
+    --stripe-elevation-3: 0px 30px 45px -30px var(--stripe-shadow-blue), 0px 18px 36px -18px var(--stripe-shadow-black);
+    --stripe-radius-sm: 4px;
+    --stripe-radius-md: 5px;
+    --stripe-radius-lg: 6px;
+    --stripe-radius-xl: 8px;
+    --stripe-space-4: 4px;
+    --stripe-space-6: 6px;
+    --stripe-space-8: 8px;
+    --stripe-space-12: 12px;
+    --stripe-space-16: 16px;
+    --stripe-space-20: 20px;
+  }
+
+  /* --- Section wrapper --- */
+  .cs-section {
+    font-family: var(--stripe-font-primary);
+    font-feature-settings: var(--stripe-font-features);
+    color: var(--stripe-text-body);
+    margin: var(--stripe-space-20) 0;
+  }
+
+  .cs-section-header {
+    display: flex;
+    align-items: baseline;
+    gap: var(--stripe-space-12);
+    margin-bottom: var(--stripe-space-16);
+    border-bottom: 1px solid var(--stripe-border);
+    padding-bottom: var(--stripe-space-8);
+  }
+
+  .cs-section-title {
+    font-size: 22px;
+    font-weight: 300;
+    letter-spacing: -0.22px;
+    color: var(--stripe-text-heading);
+    margin: 0;
+  }
+
+  .cs-period-label {
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--stripe-text-body);
+    font-feature-settings: var(--stripe-font-features);
+  }
+
+  /* --- KPI cards --- */
+  .cs-kpi-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: var(--stripe-space-16);
+    margin-bottom: var(--stripe-space-20);
+  }
+
+  .cs-kpi-card {
+    background: #ffffff;
+    border: 1px solid var(--stripe-border);
+    border-radius: var(--stripe-radius-xl);
+    padding: var(--stripe-space-20);
+    box-shadow: var(--stripe-elevation-2);
+    text-align: center;
+  }
+
+  .cs-kpi-value {
+    font-size: 32px;
+    font-weight: 300;
+    letter-spacing: -0.64px;
+    color: var(--stripe-text-heading);
+    font-feature-settings: "tnum";
+    line-height: 1.1;
+    margin-bottom: var(--stripe-space-4);
+  }
+
+  .cs-kpi-label {
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--stripe-text-body);
+    font-feature-settings: var(--stripe-font-features);
+  }
+
+  /* --- Breakdown table card --- */
+  .cs-card {
+    background: #ffffff;
+    border: 1px solid var(--stripe-border);
+    border-radius: var(--stripe-radius-xl);
+    padding: var(--stripe-space-20);
+    box-shadow: var(--stripe-elevation-2);
+    margin-bottom: var(--stripe-space-16);
+  }
+
+  .cs-card-title {
+    font-size: 16px;
+    font-weight: 400;
+    color: var(--stripe-text-heading);
+    margin: 0 0 var(--stripe-space-12) 0;
+    font-feature-settings: var(--stripe-font-features);
+  }
+
+  .cs-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    font-feature-settings: var(--stripe-font-features);
+  }
+
+  .cs-table th {
+    background: #f8fafc;
+    text-align: left;
+    padding: var(--stripe-space-8) var(--stripe-space-12);
+    font-size: 11px;
+    font-weight: 400;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--stripe-text-label);
+    border-bottom: 1px solid var(--stripe-border);
+  }
+
+  .cs-table th.cs-num,
+  .cs-table td.cs-num {
+    text-align: right;
+    font-feature-settings: "tnum";
+  }
+
+  .cs-table td {
+    padding: var(--stripe-space-8) var(--stripe-space-12);
+    border-bottom: 1px solid var(--stripe-border);
+    color: var(--stripe-text-body);
+    vertical-align: middle;
+  }
+
+  .cs-table tr:last-child td {
+    border-bottom: none;
+  }
+
+  .cs-table tr:hover td {
+    background: #f8fafc;
+  }
+
+  .cs-agent-name {
+    font-weight: 400;
+    color: var(--stripe-text-heading);
+    font-feature-settings: var(--stripe-font-features);
+  }
+
+  /* --- Alerts --- */
+  .cs-alerts-card {
+    background: #ffffff;
+    border: 1px solid var(--stripe-border);
+    border-radius: var(--stripe-radius-xl);
+    padding: var(--stripe-space-20);
+    box-shadow: var(--stripe-elevation-2);
+    margin-bottom: var(--stripe-space-16);
+  }
+
+  .cs-alerts-card .cs-card-title {
+    margin-bottom: var(--stripe-space-8);
+  }
+
+  .cs-alert-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--stripe-space-6);
+  }
+
+  .cs-alert-list li {
+    font-size: 13px;
+    padding: var(--stripe-space-6) var(--stripe-space-12);
+    border-radius: var(--stripe-radius-sm);
+    font-feature-settings: var(--stripe-font-features);
+  }
+
+  /* yellow: 70-89% context or moderate anomaly */
+  .cs-alert-list li.alert-warning {
+    background: rgba(155, 104, 41, 0.08);
+    border: 1px solid rgba(155, 104, 41, 0.25);
+    color: var(--stripe-warning);
+  }
+
+  /* red: >=90% context or large anomaly */
+  .cs-alert-list li.alert-danger {
+    background: rgba(234, 34, 97, 0.07);
+    border: 1px solid rgba(234, 34, 97, 0.22);
+    color: #c0173f;
+  }
+
+  .cs-no-alerts {
+    font-size: 13px;
+    color: var(--stripe-success-text);
+    font-feature-settings: var(--stripe-font-features);
+  }
+
+  /* --- Badge used in table (model name, etc.) --- */
+  .cs-badge {
+    display: inline-block;
+    padding: 1px var(--stripe-space-6);
+    border-radius: var(--stripe-radius-sm);
+    font-size: 11px;
+    font-weight: 400;
+    background: rgba(83, 58, 253, 0.07);
+    color: var(--stripe-purple);
+    border: 1px solid var(--stripe-border-soft-purple, #d6d9fc);
+    font-feature-settings: var(--stripe-font-features);
+  }
+</style>
+
+<!-- ============================================================
+     COST SUMMARY SECTION
+     ============================================================ -->
+<section class="cs-root cs-section" aria-label="Cost Summary">
+
+  <!-- Section header -->
+  <div class="cs-section-header">
+    <h2 class="cs-section-title">Cost Summary</h2>
+    <span class="cs-period-label">Period: {{COST_PERIOD}}</span>
+  </div>
+
+  <!-- KPI cards row -->
+  <div class="cs-kpi-row">
+    <div class="cs-kpi-card">
+      <div class="cs-kpi-value">{{COST_TOTAL}}</div>
+      <div class="cs-kpi-label">Total Cost (USD)</div>
+    </div>
+    <div class="cs-kpi-card">
+      <div class="cs-kpi-value">{{COST_RUNS}}</div>
+      <div class="cs-kpi-label">Total Runs</div>
+    </div>
+    <div class="cs-kpi-card">
+      <div class="cs-kpi-value">{{COST_AVG}}</div>
+      <div class="cs-kpi-label">Avg Cost / Run</div>
+    </div>
+    <div class="cs-kpi-card">
+      <div class="cs-kpi-value">{{COST_TOKENS}}</div>
+      <div class="cs-kpi-label">Total Tokens</div>
+    </div>
+  </div>
+
+  <!-- Per-agent breakdown table -->
+  <div class="cs-card">
+    <h3 class="cs-card-title">Per-Agent Cost Breakdown</h3>
+    <table class="cs-table" aria-label="Per-agent cost breakdown">
+      <thead>
+        <tr>
+          <th>Agent</th>
+          <th class="cs-num">Runs</th>
+          <th class="cs-num">Total Cost</th>
+          <th class="cs-num">Avg Cost / Run</th>
+          <th class="cs-num">Input Tokens</th>
+          <th class="cs-num">Output Tokens</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{COST_AGENT_ROWS}}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Context budget alerts -->
+  <div class="cs-alerts-card">
+    <h3 class="cs-card-title">Context Budget Alerts</h3>
+    <p style="font-size:12px; color:var(--stripe-text-body); margin:0 0 8px 0; font-feature-settings:var(--stripe-font-features);">
+      Yellow = job used &ge;70% context window &mdash; Red = job used &ge;90% context window (risk of truncation).
+    </p>
+    {{COST_CONTEXT_ALERTS}}
+  </div>
+
+  <!-- Cost anomaly alerts -->
+  <div class="cs-alerts-card">
+    <h3 class="cs-card-title">Cost Anomaly Alerts</h3>
+    <p style="font-size:12px; color:var(--stripe-text-body); margin:0 0 8px 0; font-feature-settings:var(--stripe-font-features);">
+      Jobs where the last run cost exceeded 2x the agent's rolling average for the period.
+    </p>
+    {{COST_ANOMALY_ALERTS}}
+  </div>
+
+</section>
+<!-- ============================================================
+     END COST SUMMARY SECTION
+     ============================================================ -->

@@ -2156,13 +2156,48 @@ body {
   padding: 0.8rem 1rem;
 }
 
+.team-hooks-card .team-skills-table {
+  width: 100%;
+  table-layout: fixed;
+}
+
+.team-hooks-card .team-skills-table th:nth-child(1),
+.team-hooks-card .team-skills-table td:nth-child(1) {
+  width: 25%;
+}
+
+.team-hooks-card .team-skills-table th:nth-child(2),
+.team-hooks-card .team-skills-table td:nth-child(2) {
+  width: 20%;
+}
+
+.team-hooks-card .team-skills-table th:nth-child(3),
+.team-hooks-card .team-skills-table td:nth-child(3) {
+  width: 55%;
+}
+
+.team-hooks-card .team-skill-desc {
+  max-width: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .team-hooks-type {
-  font-size: 0.75rem;
-  font-weight: 500;
+  font-size: 0.68rem;
+  font-weight: 600;
   color: #8b949e;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin: 0.5rem 0 0.3rem;
+  letter-spacing: 0.08em;
+  margin: 0.75rem 0 0.35rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid #21262d;
+}
+
+.team-hooks-type:first-of-type {
+  margin-top: 0.4rem;
+  border-top: none;
+  padding-top: 0;
 }
 
 /* === OFFICE Tab === */
