@@ -565,6 +565,11 @@ try {
                             # Only parse lines that contain cost data
                             if ($trimmed -notmatch '"cost"') { continue }
                             if ($trimmed -notmatch '"completed"' -and $trimmed -notmatch '"failed"') { continue }
+                            # Split concatenated JSON objects (same as events endpoint)
+                            $parts = [regex]::Split($trimmed, '(?<=\})(?=\{)')
+                            foreach ($part in $parts) {
+                            $trimmed = $part.Trim()
+                            if ($trimmed.Length -eq 0 -or -not $trimmed.StartsWith('{')) { continue }
                             try {
                                 $obj = $trimmed | ConvertFrom-Json
                                 if ($obj.timestamp -ge $cutoff -and $obj.details -and $obj.details.cost) {
@@ -587,6 +592,7 @@ try {
                                     }
                                 }
                             } catch { }
+                            } # end foreach $part
                         }
                     }
                 }
@@ -603,7 +609,7 @@ try {
                     $agentTotals[$aKey]["inputTokens"] += $e.inputTokens
                     $agentTotals[$aKey]["outputTokens"] += $e.outputTokens
 
-                    $day = $e.timestamp.Substring(0, 10)
+                    $day = ([string]$e.timestamp).Substring(0, 10)
                     if (-not $dailyRollups.ContainsKey($day)) {
                         $dailyRollups[$day] = @{ costUSD = 0; runs = 0 }
                     }
