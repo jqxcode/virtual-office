@@ -181,11 +181,93 @@ try {
                     }
                     # Merge hooks config if exists
                     $hooksFile = Join-Path $ConfigDir "hooks.json"
+                    $hooksObj = $null
                     if (Test-Path $hooksFile) {
                         $hooksJson = [System.IO.File]::ReadAllText($hooksFile, [System.Text.Encoding]::UTF8)
                         $hooksObj = $hooksJson | ConvertFrom-Json
-                        $agentsObj | Add-Member -NotePropertyName "hooks" -NotePropertyValue $hooksObj -Force
+                    } else {
+                        $hooksObj = New-Object PSObject
                     }
+
+                    # Merge Claude Code lifecycle hooks from settings.json
+                    $ccSettingsFile = "C:/Users/qitxu/.claude/settings.json"
+                    if (Test-Path $ccSettingsFile) {
+                        $ccJson = [System.IO.File]::ReadAllText($ccSettingsFile, [System.Text.Encoding]::UTF8)
+                        $ccObj = $ccJson | ConvertFrom-Json
+                        if ($ccObj.hooks) {
+                            # Lookup table for hook descriptions
+                            $hookDescriptions = @{
+                                "pre-commit-test" = "Run VO test suite before git commit"
+                                "port-5000-check" = "Warn if port 5000 already in use"
+                                "git-guardrails" = "Block dangerous git commands (reset --hard, clean, checkout .)"
+                                "loop-detector" = "Detect 3+ repeated failures, suggest different approach"
+                                "verify-read-before-edit" = "Warn if edited file path doesn't exist"
+                                "echo-session-name" = "Log session identifier"
+                                "archive-session" = "Archive session state to Agent Brain repo"
+                                "session-end-score" = "Log session scorecard to rules engine"
+                                "fix-session-snapshot" = "Fix broken session snapshot records"
+                                "trigger-file-write" = "Signal RDP client that session ended"
+                                "shadow-sync-push" = "Push Agent Brain state to repo"
+                                "session-start-verify" = "Run rules engine verification checks"
+                            }
+                            # Map CC event types to portal hook types
+                            $typeMap = @{
+                                "PreToolUse" = "pre-tool"
+                                "PostToolUse" = "post-tool"
+                                "SessionEnd" = "session-end"
+                                "Stop" = "session-stop"
+                            }
+                            foreach ($eventType in @($ccObj.hooks.PSObject.Properties.Name)) {
+                                $portalType = $typeMap[$eventType]
+                                if (-not $portalType) { $portalType = $eventType.ToLower() }
+                                $entries = @($ccObj.hooks.$eventType)
+                                $hookItems = @()
+                                foreach ($entry in $entries) {
+                                    $matcherLabel = if ($entry.matcher) { $entry.matcher } else { "all tools" }
+                                    $cmds = @($entry.hooks)
+                                    foreach ($cmd in $cmds) {
+                                        $cmdStr = [string]$cmd.command
+                                        # Extract name from command path
+                                        $hookName = ""
+                                        if ($cmdStr -match '[\\/]([^\\/]+)\.(sh|py|ps1)') {
+                                            $hookName = $Matches[1]
+                                        } elseif ($cmdStr -match 'block-dangerous-git') {
+                                            $hookName = "git-guardrails"
+                                        } elseif ($cmdStr -match 'port.?5000|lsof.*5000') {
+                                            $hookName = "port-5000-check"
+                                        } elseif ($cmdStr -match 'archive_session') {
+                                            $hookName = "archive-session"
+                                        } elseif ($cmdStr -match 'shadow_sync') {
+                                            $hookName = "shadow-sync-push"
+                                        } elseif ($cmdStr -match 'fix.session.snapshot') {
+                                            $hookName = "fix-session-snapshot"
+                                        } elseif ($cmdStr -match 'claude\.trigger') {
+                                            $hookName = "trigger-file-write"
+                                        } else {
+                                            $hookName = $cmdStr.Substring(0, [Math]::Min(40, $cmdStr.Length))
+                                        }
+                                        $desc = $hookDescriptions[$hookName]
+                                        if (-not $desc) { $desc = $cmdStr.Substring(0, [Math]::Min(80, $cmdStr.Length)) }
+                                        $triggerText = "before $matcherLabel commands"
+                                        if ($eventType -eq "PostToolUse") { $triggerText = "after $matcherLabel commands" }
+                                        elseif ($eventType -eq "SessionEnd") { $triggerText = "when session ends" }
+                                        elseif ($eventType -eq "Stop") { $triggerText = "when agent stops" }
+                                        $hookItem = [PSCustomObject]@{
+                                            name = $hookName
+                                            trigger = $triggerText
+                                            description = $desc
+                                            command = $cmdStr
+                                        }
+                                        $hookItems += $hookItem
+                                    }
+                                }
+                                if ($hookItems.Count -gt 0) {
+                                    $hooksObj | Add-Member -NotePropertyName $portalType -NotePropertyValue $hookItems -Force
+                                }
+                            }
+                        }
+                    }
+                    $agentsObj | Add-Member -NotePropertyName "hooks" -NotePropertyValue $hooksObj -Force
                     $merged = $agentsObj | ConvertTo-Json -Depth 10
                     Send-TextResponse $context 200 "application/json" $merged
                 } else {
