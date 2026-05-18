@@ -139,7 +139,7 @@
       "description": "Agent Brain ecosystem health check every Saturday at 2pm"
     },
     {
-      "agent": "system",
+      "agent": "auditor",
       "job": "brain-weekly-maintenance",
       "cron": "0 22 * * 0",
       "description": "Weekly brain maintenance: archive sessions, compile knowledge, compress, push (Sunday 10pm)"
