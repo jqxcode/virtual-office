@@ -233,11 +233,33 @@ A sign-off is "missing" if the field is empty/null. Features that have all four 
 2. Wait 12 seconds for page load and auth.
 3. The "Complete by Date" end-date field defaults to today. Change it to **today + 15 days** (format: M/D/YYYY). Use triple-click to select the field, then type the new date + Enter.
 4. Wait 3 seconds for the report to refresh.
-5. Take a screenshot. Extract the table data: Employee Name, Required Course #, Required Courses Completed, Required Course Completion %.
-6. Flag anyone with Completion % < 100%.
+5. **Summary view**: Take a screenshot of the Summary tab. Extract: Employee Name, Required Course #, Completed #, Completion %. Flag anyone < 100%.
+6. **Detail view**: For each person below 100%, click the expand arrow (⊞) next to their name OR click the "Detail" tab to see individual courses. Extract each incomplete course:
+   - Course Title
+   - Completion Status (should be "Not Started" or "In Progress")
+   - Url (the course link from the "Url" column — this is clickable in the Power BI table)
 7. Close the CDP tab after extraction.
-8. Collect: Name, Required #, Completed #, Completion %, Missing Count (= Required - Completed).
+8. Collect per person: Name, Completion %, list of incomplete courses with title + URL.
 9. **Report-only** (no auto-fix). Include in Teams post and hygiene-teams-summary.json as `check13`.
+
+**check13 JSON format**:
+```json
+{
+  "items": [
+    {
+      "name": "Josh Xu",
+      "completionPct": 71,
+      "required": 7,
+      "completed": 5,
+      "missing": [
+        {"title": "Course Name Here", "url": "https://..."},
+        {"title": "Another Course", "url": "https://..."}
+      ]
+    }
+  ],
+  "count": 9
+}
+```
 
 **If CDP fails** (Edge not running, auth expired, page doesn't load): Skip this check gracefully. Output "Check 13 skipped: CDP unavailable" and continue with other checks.
 
