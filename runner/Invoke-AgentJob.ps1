@@ -551,8 +551,8 @@ while ($keepRunning) {
                     $m = $models[$modelName]
                     $costData["model"] = $modelName
                     $costData["contextWindow"] = if ($m.ContainsKey("contextWindow")) { $m["contextWindow"] } else { 0 }
-                    $totalInput = $costData["inputTokens"] + $costData["cacheCreationTokens"] + $costData["cacheReadTokens"]
-                    $totalTokens = $totalInput + $costData["outputTokens"]
+                    # Context usage = input + cache_creation + output (cache_read is FREE - doesn't consume context)
+                    $totalTokens = $costData["inputTokens"] + $costData["cacheCreationTokens"] + $costData["outputTokens"]
                     if ($costData["contextWindow"] -gt 0) {
                         $costData["contextUsedPct"] = [math]::Round(($totalTokens / $costData["contextWindow"]) * 100, 1)
                     }
