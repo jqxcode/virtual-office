@@ -220,11 +220,32 @@ A sign-off is "missing" if the field is empty/null. Features that have all four 
 3. Collect: ID, Title, Owner, Ring0Date, Ring4Date, Issue.
 4. **Report-only** (no auto-fix). Results included in Teams post.
 
+## Check 13: Required Training Compliance (Power BI)
+
+**Goal**: All team members must complete required trainings before their due dates. Flag anyone below 100% completion when looking 15 days ahead.
+
+**Data source**: Power BI dashboard (NOT ADO). Requires Edge CDP to extract data.
+- URL: `https://msit.powerbi.com/groups/me/reports/c2390d89-5de8-474a-aa2d-fb29b2998d65/ReportSection607c7fe0d8afd1ba9d6f?experience=power-bi`
+- Tab: "Myself and My Directs"
+
+**Steps**:
+1. Open the Power BI URL via Edge CDP (`Target.createTarget` with `background:True`). Set viewport to 1920x1080.
+2. Wait 12 seconds for page load and auth.
+3. The "Complete by Date" end-date field defaults to today. Change it to **today + 15 days** (format: M/D/YYYY). Use triple-click to select the field, then type the new date + Enter.
+4. Wait 3 seconds for the report to refresh.
+5. Take a screenshot. Extract the table data: Employee Name, Required Course #, Required Courses Completed, Required Course Completion %.
+6. Flag anyone with Completion % < 100%.
+7. Close the CDP tab after extraction.
+8. Collect: Name, Required #, Completed #, Completion %, Missing Count (= Required - Completed).
+9. **Report-only** (no auto-fix). Include in Teams post and hygiene-teams-summary.json as `check13`.
+
+**If CDP fails** (Edge not running, auth expired, page doesn't load): Skip this check gracefully. Output "Check 13 skipped: CDP unavailable" and continue with other checks.
+
 ---
 
 ## Teams Summary Output
 
-After all checks, write `Q:/src/personal_projects/virtual-office/output/scrum-master/hygiene-teams-summary.json` containing check2b, check4, check5, check6, check7, check8, and check9 results. The poster agent's `hygiene-teams-post` job picks this up. Only sections with items are posted; empty sections are omitted entirely.
+After all checks, write `Q:/src/personal_projects/virtual-office/output/scrum-master/hygiene-teams-summary.json` containing check2b, check4, check5, check6, check7, check8, check9, check10, check11, check12, and check13 results. The poster agent's `hygiene-teams-post` job picks this up. Only sections with items are posted; empty sections are omitted entirely.
 
 ---
 
