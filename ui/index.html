@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Agent Virtual Office</title>
-  <link rel="stylesheet" href="styles.css?v=13">
+  <link rel="stylesheet" href="styles.css?v=14">
 </head>
 <body>
   <header class="header">
@@ -26,6 +26,8 @@
     <button class="top-tab" data-tab="office">OFFICE</button>
     <button class="top-tab" data-tab="history">HISTORY</button>
     <button class="top-tab" data-tab="schedule">SCHEDULE</button>
+    <button class="top-tab" data-tab="costs">COSTS</button>
+    <button class="top-tab" data-tab="board">BOARD</button>
   </nav>
 
   <main class="main-content">
@@ -140,8 +142,95 @@
         <button class="v2-show-more-btn" id="schedule-v2-more-btn">Show more</button>
       </div>
     </section>
+
+    <!-- Costs View -->
+    <section id="view-costs" class="view" style="display:none">
+      <div class="section-header">
+        <span>Cost Tracking</span>
+        <span class="section-badge" id="costs-period">30d</span>
+      </div>
+      <!-- KPI Cards -->
+      <div id="costs-kpi-cards" class="costs-kpi-cards"></div>
+      <!-- Anomaly Alerts -->
+      <div id="costs-anomalies" class="costs-anomalies"></div>
+      <!-- Daily Sparkline -->
+      <div class="section-header" style="margin-top:1.5rem">
+        <span>Daily Spend</span>
+      </div>
+      <div id="costs-sparkline" class="costs-sparkline"></div>
+      <!-- Per-Agent Breakdown -->
+      <div class="section-header" style="margin-top:1.5rem">
+        <span>Per-Agent Breakdown</span>
+      </div>
+      <div id="costs-agent-table-wrapper">
+        <table class="history-table" id="costs-agent-table">
+          <thead>
+            <tr>
+              <th>Agent</th>
+              <th>Runs</th>
+              <th>Total Cost</th>
+              <th>Input Tokens</th>
+              <th>Output Tokens</th>
+              <th>Avg Cost/Run</th>
+            </tr>
+          </thead>
+          <tbody id="costs-agent-tbody"></tbody>
+        </table>
+      </div>
+      <!-- Recent Runs with Cost -->
+      <div class="section-header" style="margin-top:1.5rem">
+        <span>Recent Runs</span>
+        <span class="section-badge" id="costs-runs-count">--</span>
+      </div>
+      <div id="costs-runs-table-wrapper">
+        <table class="history-table" id="costs-runs-table">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Agent</th>
+              <th>Job</th>
+              <th>Cost</th>
+              <th>Tokens (In/Out)</th>
+              <th>Context %</th>
+              <th>Turns</th>
+            </tr>
+          </thead>
+          <tbody id="costs-runs-tbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Board View (Kanban) -->
+    <section id="view-board" class="view" style="display:none">
+      <div class="section-header">
+        <span>Board</span>
+      </div>
+      <div class="kanban-board" id="kanban-board">
+        <div class="kanban-column" id="kanban-your-turn">
+          <div class="kanban-column-header">
+            <span class="kanban-column-title">Your Turn</span>
+            <span class="kanban-column-count" id="kanban-your-count">0</span>
+          </div>
+          <div class="kanban-column-body" id="kanban-your-body"></div>
+        </div>
+        <div class="kanban-column" id="kanban-claude-turn">
+          <div class="kanban-column-header">
+            <span class="kanban-column-title">Claude's Turn</span>
+            <span class="kanban-column-count" id="kanban-claude-count">0</span>
+          </div>
+          <div class="kanban-column-body" id="kanban-claude-body"></div>
+        </div>
+        <div class="kanban-column" id="kanban-done">
+          <div class="kanban-column-header">
+            <span class="kanban-column-title">Done (24h)</span>
+            <span class="kanban-column-count" id="kanban-done-count">0</span>
+          </div>
+          <div class="kanban-column-body" id="kanban-done-body"></div>
+        </div>
+      </div>
+    </section>
   </main>
 
-  <script src="app.js?v=13"></script>
+  <script src="app.js?v=14"></script>
 </body>
 </html>
