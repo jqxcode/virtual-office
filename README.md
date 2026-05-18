@@ -63,10 +63,14 @@ virtual-office/
 
 The Mission Control dashboard at localhost:8400 provides:
 
-- **Agents tab**: Live status cards for all 6 agents (idle/working/disabled)
+- **OFFICE tab**: Live status cards for all 6 agents (idle/working/disabled), with context budget badges (green <70%, yellow 70-90%, red >90%)
+- **COSTS tab**: Per-job token cost tracking, daily cost sparklines, per-agent breakdown, and anomaly detection (highlights jobs exceeding 2x average cost)
+- **BOARD tab**: Kanban-style task board with Your Turn / Claude's Turn / Done columns for tracking wish and task progress
 - **Event Log tab**: Filterable event history with per-agent dropdown
 - **Task Queue tab**: Upcoming schedule, queue depths, force-stop/cancel actions
 - **Stats tiles**: Jobs completed/failed, agents online, system heartbeat
+
+For full details on the dashboard upgrade, see [docs/vo-dashboard-upgrade--progress--2026-05-18.html](docs/vo-dashboard-upgrade--progress--2026-05-18.html).
 
 ## Version
 
