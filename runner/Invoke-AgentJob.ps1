@@ -655,6 +655,21 @@ while ($keepRunning) {
 
     Write-Host "Job '$Job' for agent '$Agent' $completedAction (run: $runId, output: $auditOutputFile, duration: $runDuration)"
 
+    # Post-run hook: triggerOnComplete -- chain to a dependent job on success
+    if ($exitCode -eq 0 -and $jobDef.ContainsKey("triggerOnComplete")) {
+        try {
+            $trigger = $jobDef["triggerOnComplete"]
+            $triggerAgent = $trigger["agent"]
+            $triggerJob = $trigger["job"]
+            $invokeScript = Join-Path $PSScriptRoot "Invoke-AgentJob.ps1"
+            Write-Host "triggerOnComplete: firing $triggerAgent/$triggerJob"
+            Start-Process -FilePath "pwsh" -ArgumentList @("-NoProfile", "-File", $invokeScript, "-Agent", $triggerAgent, "-Job", $triggerJob) -WindowStyle Hidden
+            Write-Event -AgentName $Agent -JobName $Job -Event "trigger_fired" -Details @{ target_agent = $triggerAgent; target_job = $triggerJob }
+        } catch {
+            Write-Host "triggerOnComplete failed (non-fatal): $_"
+        }
+    }
+
     # Post-run hook: consolidate Edge report tabs (non-blocking)
     if ($Job -ne "TEMP-consolidate-Edge-reports") {
         try {
