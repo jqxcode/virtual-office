@@ -6,7 +6,11 @@
   - `MSTeams\Calling Meeting Devices (CMD)\Meetings\Meeting Join\Fundamentals`
   - `MSTeams\Calling Meeting Devices (CMD)\Meetings\Notes`
 - **Team**: CMD - Meeting Join (US) (ID: `6f72ea4e-c73a-4a15-b622-46cdacc53987`)
-- **Current semester prefix**: `MSTeams\2026\H1`
+- **Current semester prefix**: Compute dynamically based on today's date:
+  - If today <= June 30 of this year → `MSTeams\{year}\H1`
+  - If today > June 30 → `MSTeams\{year}\H2`
+  - Example: 2026-05-11 → `MSTeams\2026\H1`; 2026-07-01 → `MSTeams\2026\H2`
+  - Use `<current_semester>` as placeholder in all WIQL queries below — resolve it at runtime
 
 ## ADO API Patterns
 
@@ -62,9 +66,13 @@
 
 **Goal**: All items in the completed sprint should be Closed. Leftovers move to current sprint.
 
+**Grace period (5 days)**: During the first 5 days of a new sprint, do NOT auto-move items. Instead, comment @mention the owner to remind them to close out or move their work. After the grace period, auto-move.
+
 1. Get current iteration (timeframe=current) and previous iteration (the one immediately before by finishDate).
-2. WIQL: `WHERE [System.State] <> 'Closed' AND [System.State] <> 'Removed' AND [System.IterationPath] = '<previous>'`
-3. PATCH iteration to current sprint, add comment explaining the move.
+2. Calculate days since previous sprint ended (use the current sprint's startDate). If <= 5 days, set `grace_period = true`.
+3. WIQL: `WHERE [System.State] <> 'Closed' AND [System.State] <> 'Removed' AND [System.IterationPath] = '<previous>'`
+4. If `grace_period` is true: **comment @mention owner** — do NOT PATCH iteration. Add comment: "This item is still in Sprint {prev}. Please close it or move to Sprint {current} within {days_remaining} days, or it will be auto-moved." Include "(grace period — X days remaining)" in the summary.
+5. If `grace_period` is false: PATCH iteration to current sprint, add comment explaining the move.
 
 ## Check 4: Current Sprint Tasks — Estimates and Parent
 
@@ -84,17 +92,32 @@
 
 ## Check 6: Stale Tasks from Past Sprints
 
-**Goal**: Non-closed tasks with an assignee stuck in past sprints need owner review. Move to FUTURE sprint (not current) to give review time.
+**Goal**: Non-closed tasks with an assignee stuck in **past** sprints (sprints that have already ended) need owner review.
+
+**Critical scope rule**: Only flag tasks whose sprint has already ended (finishDate < today). Tasks in the current sprint or ANY future sprint are intentionally scheduled there — do NOT touch them.
 
 **Important exclusions**:
-- **Backlog items**: Only target tasks in actual sprint iterations (path must contain "Sprint" and be `UNDER MSTeams\2026\H1`). Items at root/backlog iteration paths are not stale — they're just backlog.
-- **Grace period**: In the first 2 days of the current sprint, skip tasks still in the previous sprint. People need time to close out work from the last sprint.
+- **Backlog items**: Only target tasks in actual sprint iterations (path must contain "Sprint" and be `UNDER <current_semester>`). Items at root/backlog iteration paths are not stale — they're just backlog.
+- **Future sprints**: Tasks in sprints that haven't ended yet are NOT stale. The owner scheduled them there intentionally.
 
-1. Get future iteration (first with timeFrame='future').
-2. Parse current sprint start date from the sprint name to determine grace period.
-3. WIQL: `WHERE [System.WorkItemType] = 'Task' AND [System.State] <> 'Closed' AND [System.State] <> 'Removed' AND [System.IterationPath] <> '<current>' AND [System.IterationPath] <> '<future>' AND [System.IterationPath] UNDER 'MSTeams\2026\H1' AND [System.AssignedTo] <> ''`
-4. For each result: skip if iteration doesn't contain "Sprint" (backlog); skip if in previous sprint and within grace period.
-5. PATCH remaining items to future sprint, comment @owner asking to review.
+**Grace period (5 days)**: Same as Check 3. During the first 5 days of the current sprint, do NOT auto-move tasks from the previous sprint. Instead, comment @mention the owner. After grace period, auto-move to current sprint.
+
+1. Get all iterations under `<current_semester>` with their start/finish dates. Identify current sprint and previous sprint.
+2. Calculate days since current sprint started. If <= 5 days, set `grace_period = true`.
+3. WIQL:
+   ```
+   WHERE [System.WorkItemType] = 'Task'
+     AND [System.State] <> 'Closed'
+     AND [System.State] <> 'Removed'
+     AND [System.IterationPath] UNDER '<current_semester>'
+     AND [System.AssignedTo] <> ''
+   ```
+4. For each result:
+   a. Skip if iteration path doesn't contain "Sprint" (backlog).
+   b. **Skip if the task's sprint finishDate >= today** — it's in a current or future sprint, not stale.
+   c. Only tasks in sprints that have already ended proceed to step 5/6.
+5. If in previous sprint and `grace_period` is true: **comment @mention owner** — do NOT PATCH. Add comment: "This task is still in Sprint {prev}. Please close or move within {days_remaining} days, or it will be auto-moved."
+6. If `grace_period` is false or item is from an older sprint (not just previous): PATCH to current sprint, comment @owner asking to review.
 
 ## Check 7: Proposed Bugs > 24 Hours
 
@@ -119,7 +142,7 @@
    ```
    WHERE [System.WorkItemType] = 'Feature'
      AND [System.State] = 'Committed'
-     AND NOT [System.IterationPath] UNDER 'MSTeams\2026\H1'
+     AND NOT [System.IterationPath] UNDER '<current_semester>'
      AND [System.AreaPath] UNDER '<area>'
    ```
 2. Collect: ID, Title, Owner, IterationPath, AreaPath.
@@ -149,12 +172,15 @@
    ```
    WHERE [System.WorkItemType] = 'Feature'
      AND [System.State] = 'Active'
-     AND ([MicrosoftTeamsCMMI.Ring0TargetDate] < @today
+     AND [System.IterationPath] UNDER '<current_semester>'
+     AND ([Microsoft.VSTS.Scheduling.TargetDate] < @today
        OR [MicrosoftTeamsCMMI.Ring4TargetDate] < @today)
      AND [System.AreaPath] UNDER '<area>'
    ```
-2. Collect: ID, Title, Owner, Ring0TargetDate, Ring4TargetDate, AreaPath.
-3. Flag which dates are past due (Ring0, Ring4, or both).
+2. Collect: ID, Title, Owner, TargetDate (=Ring0), Ring4TargetDate, AreaPath.
+3. Flag which dates are past due (R0/TargetDate, Ring4, or both).
+
+**Field mapping**: Ring 0 = `Microsoft.VSTS.Scheduling.TargetDate` (the standard "Target Date" field). Ring 4 = `MicrosoftTeamsCMMI.Ring4TargetDate`.
 4. **Report-only** (no auto-fix). Results included in Teams post.
 
 ## Check 11: Missing Sign-Offs
@@ -169,7 +195,7 @@
 
 A sign-off is "missing" if the field is empty/null. Features that have all four filled are fine.
 
-1. Query active Features in both areas, fetch all 4 sign-off fields.
+1. Query active Features **in the current semester** (`[System.IterationPath] UNDER '<current_semester>'`) in both areas, fetch all 4 sign-off fields.
 2. For each Feature, check which sign-off fields are empty.
 3. Only flag Features missing at least one sign-off.
 4. Collect: ID, Title, Owner, list of missing sign-offs.
@@ -179,11 +205,12 @@ A sign-off is "missing" if the field is empty/null. Features that have all four 
 
 **Goal**: Ring 4 target date must be after Ring 0 target date. If R4 <= R0 (or R4 is set but R0 is empty), the rollout plan is invalid.
 
-1. Query all Features (any state except Closed/Removed) in both areas where both Ring dates exist, or R4 exists but R0 doesn't:
+1. Query Features **in the current semester** (any state except Closed/Removed) in both areas where R4 exists:
    ```
    WHERE [System.WorkItemType] = 'Feature'
      AND [System.State] <> 'Closed'
      AND [System.State] <> 'Removed'
+     AND [System.IterationPath] UNDER '<current_semester>'
      AND [MicrosoftTeamsCMMI.Ring4TargetDate] <> ''
      AND [System.AreaPath] UNDER '<area>'
    ```
