@@ -36,7 +36,7 @@ function Write-AtomicFile {
     if (-not (Test-Path $dir)) {
         New-Item -ItemType Directory -Path $dir -Force | Out-Null
     }
-    $tmpPath = "$Path.tmp"
+    $tmpPath = "$Path.$PID.tmp"
     if ($Encoding) {
         [System.IO.File]::WriteAllText($tmpPath, $Content, $Encoding)
     } else {
