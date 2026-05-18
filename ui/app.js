@@ -402,6 +402,16 @@ function switchTopTab(tabName) {
       }
     });
   }
+
+  // Load data when switching to costs tab
+  if (tabName === "costs") {
+    loadCostsData();
+  }
+
+  // Render board when switching to board tab
+  if (tabName === "board") {
+    renderBoardTab();
+  }
 }
 
 // --- Render agents ---
@@ -3649,6 +3659,24 @@ function renderOfficeTab() {
         rd.appendChild(document.createTextNode(formatRelativeTime(ljt))); desk.appendChild(rd);
       } else { jd.textContent = "no runs yet"; desk.appendChild(jd); }
     }
+    // Context budget badge from lastCost data
+    var costInfo = getLastCostForAgent(name, lastDashboard);
+    if (costInfo && costInfo.contextUsedPct > 0) {
+      var ctxDiv = document.createElement("div"); ctxDiv.style.cssText = "margin-top:0.25rem";
+      var ctxClass = "green";
+      if (costInfo.contextUsedPct >= 90) ctxClass = "red";
+      else if (costInfo.contextUsedPct >= 70) ctxClass = "yellow";
+      var badge = document.createElement("span"); badge.className = "context-badge " + ctxClass;
+      badge.textContent = costInfo.contextUsedPct + "% ctx";
+      ctxDiv.appendChild(badge);
+      if (costInfo.costUSD) {
+        var costSpan = document.createElement("span");
+        costSpan.style.cssText = "font-size:0.65rem;color:#8b949e;margin-left:0.5rem;font-feature-settings:'tnum'";
+        costSpan.textContent = formatCost(costInfo.costUSD);
+        ctxDiv.appendChild(costSpan);
+      }
+      desk.appendChild(ctxDiv);
+    }
     _floorTarget.appendChild(desk);
     });
   });
@@ -4541,3 +4569,266 @@ document.addEventListener("DOMContentLoaded", function () {
 
   startPolling();
 });
+
+// === COSTS TAB ===
+
+var costsData = null;
+
+function loadCostsData() {
+  fetch("/api/costs?days=30")
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      costsData = data;
+      renderCostsTab();
+    })
+    .catch(function(e) { console.warn("Costs fetch failed:", e.message); });
+}
+
+function renderCostsTab() {
+  if (!costsData) return;
+  renderCostsKPIs();
+  renderCostsAnomalies();
+  renderCostsSparkline();
+  renderCostsAgentTable();
+  renderCostsRunsTable();
+}
+
+function renderCostsKPIs() {
+  var el = document.getElementById("costs-kpi-cards");
+  if (!el) return;
+  var d = costsData;
+  var avgCostPerRun = d.totalRuns > 0 ? (d.totalCost / d.totalRuns) : 0;
+  var totalTokens = 0;
+  if (d.entries) {
+    d.entries.forEach(function(e) {
+      totalTokens += (e.inputTokens || 0) + (e.outputTokens || 0);
+    });
+  }
+  el.innerHTML =
+    '<div class="costs-kpi-card"><div class="costs-kpi-label">Total Cost (' + d.period + ')</div><div class="costs-kpi-value">$' + d.totalCost.toFixed(2) + '</div></div>' +
+    '<div class="costs-kpi-card"><div class="costs-kpi-label">Total Runs</div><div class="costs-kpi-value">' + d.totalRuns + '</div></div>' +
+    '<div class="costs-kpi-card"><div class="costs-kpi-label">Avg Cost/Run</div><div class="costs-kpi-value">$' + avgCostPerRun.toFixed(4) + '</div></div>' +
+    '<div class="costs-kpi-card"><div class="costs-kpi-label">Total Tokens</div><div class="costs-kpi-value">' + formatTokenCount(totalTokens) + '</div></div>' +
+    '<div class="costs-kpi-card"><div class="costs-kpi-label">Anomalies</div><div class="costs-kpi-value' + (d.anomalies.length > 0 ? ' danger' : '') + '">' + d.anomalies.length + '</div></div>';
+}
+
+function formatTokenCount(n) {
+  if (n >= 1000000) return (n / 1000000).toFixed(1) + "M";
+  if (n >= 1000) return (n / 1000).toFixed(1) + "K";
+  return "" + n;
+}
+
+function formatCost(n) {
+  if (n === 0 || n === undefined || n === null) return "$0.00";
+  if (n < 0.01) return "$" + n.toFixed(4);
+  return "$" + n.toFixed(2);
+}
+
+function renderCostsAnomalies() {
+  var el = document.getElementById("costs-anomalies");
+  if (!el) return;
+  if (!costsData.anomalies || costsData.anomalies.length === 0) {
+    el.innerHTML = "";
+    return;
+  }
+  el.innerHTML = costsData.anomalies.map(function(a) {
+    return '<div class="costs-anomaly-alert"><span class="anomaly-job">' +
+      escapeHtml(a.job) + '</span> cost ' + formatCost(a.lastCost) +
+      ' is <strong>' + a.ratio + 'x</strong> the average (' + formatCost(a.avgCost) + ')</div>';
+  }).join("");
+}
+
+function renderCostsSparkline() {
+  var el = document.getElementById("costs-sparkline");
+  if (!el) return;
+  var daily = costsData.daily || {};
+  var days = Object.keys(daily).sort();
+  if (days.length === 0) {
+    el.innerHTML = '<div style="color:var(--vo-text-secondary);font-size:0.8rem;padding:1rem;text-align:center">No cost data yet. Costs will appear after jobs run with the updated runner.</div>';
+    return;
+  }
+  var maxCost = 0;
+  days.forEach(function(d) { if (daily[d].costUSD > maxCost) maxCost = daily[d].costUSD; });
+  if (maxCost === 0) maxCost = 1;
+  el.innerHTML = days.map(function(d) {
+    var pct = (daily[d].costUSD / maxCost) * 100;
+    var h = Math.max(4, pct);
+    return '<div class="sparkline-bar" style="height:' + h + '%"><div class="sparkline-tooltip">' +
+      d + ': ' + formatCost(daily[d].costUSD) + ' (' + daily[d].runs + ' runs)</div></div>';
+  }).join("");
+}
+
+function renderCostsAgentTable() {
+  var tbody = document.getElementById("costs-agent-tbody");
+  if (!tbody) return;
+  var agents = costsData.agents || {};
+  var rows = Object.keys(agents).sort().map(function(name) {
+    var a = agents[name];
+    var avg = a.runs > 0 ? a.costUSD / a.runs : 0;
+    return "<tr><td>" + escapeHtml(name) + "</td><td>" + a.runs +
+      "</td><td>" + formatCost(a.costUSD) + "</td><td>" + formatTokenCount(a.inputTokens || 0) +
+      "</td><td>" + formatTokenCount(a.outputTokens || 0) + "</td><td>" + formatCost(avg) + "</td></tr>";
+  });
+  tbody.innerHTML = rows.join("") || '<tr><td colspan="6" style="text-align:center;color:var(--vo-text-secondary)">No cost data yet</td></tr>';
+}
+
+function renderCostsRunsTable() {
+  var tbody = document.getElementById("costs-runs-tbody");
+  var countEl = document.getElementById("costs-runs-count");
+  if (!tbody) return;
+  var entries = (costsData.entries || []).slice().reverse().slice(0, 50);
+  if (countEl) countEl.textContent = entries.length;
+  tbody.innerHTML = entries.map(function(e) {
+    var ctxClass = "green";
+    if (e.contextUsedPct >= 90) ctxClass = "red";
+    else if (e.contextUsedPct >= 70) ctxClass = "yellow";
+    var time = e.timestamp ? new Date(e.timestamp).toLocaleString() : "--";
+    return "<tr><td>" + time + "</td><td>" + escapeHtml(e.agent) +
+      "</td><td>" + escapeHtml(e.job) + "</td><td>" + formatCost(e.costUSD) +
+      "</td><td>" + formatTokenCount(e.inputTokens || 0) + " / " + formatTokenCount(e.outputTokens || 0) +
+      '</td><td><span class="context-badge ' + ctxClass + '">' + (e.contextUsedPct || 0) + '%</span></td>' +
+      "<td>" + (e.numTurns || 0) + "</td></tr>";
+  }).join("") || '<tr><td colspan="7" style="text-align:center;color:var(--vo-text-secondary)">No cost data yet</td></tr>';
+}
+
+function escapeHtml(s) {
+  if (!s) return "";
+  var div = document.createElement("div");
+  div.appendChild(document.createTextNode(s));
+  return div.innerHTML;
+}
+
+// === BOARD (KANBAN) TAB ===
+
+function renderBoardTab() {
+  var yourBody = document.getElementById("kanban-your-body");
+  var claudeBody = document.getElementById("kanban-claude-body");
+  var doneBody = document.getElementById("kanban-done-body");
+  if (!yourBody || !claudeBody || !doneBody) return;
+
+  var yourCards = [];
+  var claudeCards = [];
+  var doneCards = [];
+  var now = Date.now();
+  var oneDayAgo = now - (24 * 60 * 60 * 1000);
+
+  // Parse dashboard data into kanban columns
+  if (lastDashboard && lastDashboard.agents) {
+    var agents = lastDashboard.agents;
+    Object.keys(agents).forEach(function(agentName) {
+      var agentData = agents[agentName];
+      Object.keys(agentData).forEach(function(key) {
+        // Skip agent-level fields
+        if (key === "errorCount" || key === "lastError") return;
+        var job = agentData[key];
+        if (!job || typeof job !== "object" || !job.status) return;
+
+        var card = {
+          agent: agentName,
+          job: key,
+          status: job.status,
+          started: job.started,
+          lastCompleted: job.last_completed,
+          runsCompleted: job.runs_completed || 0,
+          lastCost: job.lastCost || null,
+          lastOutput: job.lastOutput
+        };
+
+        if (job.status === "running") {
+          claudeCards.push(card);
+        } else if (job.status === "queued") {
+          claudeCards.push(card);
+        } else if (job.status === "idle") {
+          // Check if completed recently (last 24h) -> Done column
+          var completedTime = job.last_completed ? new Date(job.last_completed).getTime() : 0;
+          if (completedTime > oneDayAgo) {
+            doneCards.push(card);
+          } else {
+            // Idle and not recently completed -> Your Turn (needs attention)
+            yourCards.push(card);
+          }
+        }
+      });
+    });
+  }
+
+  // Sort: running/queued by start time, done by completion time desc
+  claudeCards.sort(function(a, b) { return new Date(b.started || 0) - new Date(a.started || 0); });
+  doneCards.sort(function(a, b) { return new Date(b.lastCompleted || 0) - new Date(a.lastCompleted || 0); });
+  yourCards.sort(function(a, b) { return (a.agent + a.job).localeCompare(b.agent + b.job); });
+
+  // Update counts
+  document.getElementById("kanban-your-count").textContent = yourCards.length;
+  document.getElementById("kanban-claude-count").textContent = claudeCards.length;
+  document.getElementById("kanban-done-count").textContent = doneCards.length;
+
+  // Render columns
+  yourBody.innerHTML = yourCards.length === 0
+    ? '<div class="kanban-empty">All jobs running or recently completed</div>'
+    : yourCards.map(function(c) { return renderKanbanCard(c, "idle"); }).join("");
+
+  claudeBody.innerHTML = claudeCards.length === 0
+    ? '<div class="kanban-empty">No jobs currently running</div>'
+    : claudeCards.map(function(c) { return renderKanbanCard(c, c.status); }).join("");
+
+  doneBody.innerHTML = doneCards.length === 0
+    ? '<div class="kanban-empty">No completions in last 24h</div>'
+    : doneCards.map(function(c) { return renderKanbanCard(c, "done"); }).join("");
+}
+
+function renderKanbanCard(card, type) {
+  var cssClass = "kanban-card";
+  if (type === "running") cssClass += " running";
+  else if (type === "queued") cssClass += " queued";
+  else if (type === "done") cssClass += " done-success";
+
+  var meta = [];
+  if (card.runsCompleted) meta.push(card.runsCompleted + " runs");
+  if (card.lastCost && card.lastCost.costUSD) {
+    meta.push('<span class="cost-tag">' + formatCost(card.lastCost.costUSD) + '</span>');
+  }
+  if (card.lastCost && card.lastCost.contextUsedPct) {
+    var ctxClass = "green";
+    if (card.lastCost.contextUsedPct >= 90) ctxClass = "red";
+    else if (card.lastCost.contextUsedPct >= 70) ctxClass = "yellow";
+    meta.push('<span class="context-badge ' + ctxClass + '">' + card.lastCost.contextUsedPct + '% ctx</span>');
+  }
+  if (type === "running" && card.started) {
+    var elapsed = Math.round((Date.now() - new Date(card.started).getTime()) / 1000);
+    if (elapsed > 60) meta.push(Math.round(elapsed / 60) + "m elapsed");
+    else meta.push(elapsed + "s elapsed");
+  }
+  if (type === "done" && card.lastCompleted) {
+    meta.push(timeAgo(new Date(card.lastCompleted)));
+  }
+
+  return '<div class="' + cssClass + '">' +
+    '<div class="kanban-card-agent">' + escapeHtml(card.agent) + '</div>' +
+    '<div class="kanban-card-job">' + escapeHtml(card.job) + '</div>' +
+    '<div class="kanban-card-meta">' + meta.join(" &middot; ") + '</div>' +
+    '</div>';
+}
+
+function getLastCostForAgent(agentName, dashboard) {
+  if (!dashboard || !dashboard.agents || !dashboard.agents[agentName]) return null;
+  var agent = dashboard.agents[agentName];
+  var bestCost = null;
+  var bestTime = 0;
+  Object.keys(agent).forEach(function(key) {
+    if (key === "errorCount" || key === "lastError") return;
+    var job = agent[key];
+    if (job && job.lastCost && job.last_completed) {
+      var t = new Date(job.last_completed).getTime();
+      if (t > bestTime) { bestTime = t; bestCost = job.lastCost; }
+    }
+  });
+  return bestCost;
+}
+
+function timeAgo(date) {
+  var seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (seconds < 60) return seconds + "s ago";
+  if (seconds < 3600) return Math.floor(seconds / 60) + "m ago";
+  if (seconds < 86400) return Math.floor(seconds / 3600) + "h ago";
+  return Math.floor(seconds / 86400) + "d ago";
+}

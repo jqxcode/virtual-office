@@ -460,14 +460,15 @@ while ($keepRunning) {
 
     $output = ""
     $exitCode = 0
+    $costData = $null
     $runStart = Get-Date
     try {
-        # Build command arguments
+        # Build command arguments (--output-format json for cost/token tracking)
         $claudeArgs = @()
         if ($agentFile -and (Test-Path $agentFile)) {
-            $claudeArgs = @("--agent", $agentFile, $prompt)
+            $claudeArgs = @("--output-format", "json", "--agent", $agentFile, $prompt)
         } else {
-            $claudeArgs = @($prompt)
+            $claudeArgs = @("--output-format", "json", $prompt)
         }
 
         # Start claude process and capture PID
@@ -489,6 +490,47 @@ while ($keepRunning) {
         $errOutput = $proc.StandardError.ReadToEnd()
         $proc.WaitForExit()
         $exitCode = $proc.ExitCode
+
+        # Parse JSON output to extract result text and cost data
+        $rawOutput = $output
+        try {
+            $jsonResult = $rawOutput | ConvertFrom-Json -AsHashtable
+            if ($jsonResult -and $jsonResult.ContainsKey("result")) {
+                $output = [string]$jsonResult["result"]
+            }
+            # Extract cost/usage data
+            $costData = @{
+                costUSD = if ($jsonResult.ContainsKey("total_cost_usd")) { $jsonResult["total_cost_usd"] } else { 0 }
+                durationMs = if ($jsonResult.ContainsKey("duration_ms")) { $jsonResult["duration_ms"] } else { 0 }
+                durationApiMs = if ($jsonResult.ContainsKey("duration_api_ms")) { $jsonResult["duration_api_ms"] } else { 0 }
+                numTurns = if ($jsonResult.ContainsKey("num_turns")) { $jsonResult["num_turns"] } else { 0 }
+                sessionId = if ($jsonResult.ContainsKey("session_id")) { $jsonResult["session_id"] } else { "" }
+            }
+            if ($jsonResult.ContainsKey("usage")) {
+                $u = $jsonResult["usage"]
+                $costData["inputTokens"] = if ($u.ContainsKey("input_tokens")) { $u["input_tokens"] } else { 0 }
+                $costData["outputTokens"] = if ($u.ContainsKey("output_tokens")) { $u["output_tokens"] } else { 0 }
+                $costData["cacheCreationTokens"] = if ($u.ContainsKey("cache_creation_input_tokens")) { $u["cache_creation_input_tokens"] } else { 0 }
+                $costData["cacheReadTokens"] = if ($u.ContainsKey("cache_read_input_tokens")) { $u["cache_read_input_tokens"] } else { 0 }
+            }
+            if ($jsonResult.ContainsKey("modelUsage")) {
+                $models = $jsonResult["modelUsage"]
+                $modelName = ($models.Keys | Select-Object -First 1)
+                if ($modelName) {
+                    $m = $models[$modelName]
+                    $costData["model"] = $modelName
+                    $costData["contextWindow"] = if ($m.ContainsKey("contextWindow")) { $m["contextWindow"] } else { 0 }
+                    $totalInput = $costData["inputTokens"] + $costData["cacheCreationTokens"] + $costData["cacheReadTokens"]
+                    $totalTokens = $totalInput + $costData["outputTokens"]
+                    if ($costData["contextWindow"] -gt 0) {
+                        $costData["contextUsedPct"] = [math]::Round(($totalTokens / $costData["contextWindow"]) * 100, 1)
+                    }
+                }
+            }
+        } catch {
+            # JSON parsing failed -- use raw output as-is (e.g. CLI error before JSON)
+            Write-Host "Note: Could not parse JSON output, using raw text. Error: $_"
+        }
 
         if ($errOutput) {
             $output = $output + "`n" + $errOutput
@@ -569,8 +611,16 @@ while ($keepRunning) {
 
     $completedAction = if ($exitCode -eq 0) { "completed" } else { "failed" }
     $auditOutputFile = if ($outputFile) { $outputFile } else { "(not saved)" }
-    Write-AuditEntry -Action $completedAction -AgentName $Agent -JobName $Job -RunId $runId -Details @{ exit_code = $exitCode; output_file = $auditOutputFile; duration = $runDuration }
-    Write-Event -AgentName $Agent -JobName $Job -Event $completedAction -Details @{ run_id = $runId; exit_code = $exitCode; duration = $runDuration }
+    $auditDetails = @{ exit_code = $exitCode; output_file = $auditOutputFile; duration = $runDuration }
+    if ($costData) {
+        $auditDetails["cost"] = $costData
+    }
+    Write-AuditEntry -Action $completedAction -AgentName $Agent -JobName $Job -RunId $runId -Details $auditDetails
+    $eventDetails = @{ run_id = $runId; exit_code = $exitCode; duration = $runDuration }
+    if ($costData -and $costData.ContainsKey("costUSD")) {
+        $eventDetails["costUSD"] = $costData["costUSD"]
+    }
+    Write-Event -AgentName $Agent -JobName $Job -Event $completedAction -Details $eventDetails
 
     Write-Host "Job '$Job' for agent '$Agent' $completedAction (run: $runId, output: $auditOutputFile, duration: $runDuration)"
 
@@ -644,11 +694,15 @@ $agentLevelDetails = @{
 if ($exitCode -ne 0) {
     $agentLevelDetails["lastError"] = (Get-Date -Format "o")
 }
-Update-Dashboard -AgentName $Agent -JobName $Job -Status "idle" -Details @{
+$dashDetails = @{
     last_completed = (Get-Date -Format "o")
     runs_completed = $counter["count"]
     lastOutput     = $relOutputPath
     lastOutputTime = $outputWriteTime
-} -AgentDetails $agentLevelDetails
+}
+if ($costData) {
+    $dashDetails["lastCost"] = $costData
+}
+Update-Dashboard -AgentName $Agent -JobName $Job -Status "idle" -Details $dashDetails -AgentDetails $agentLevelDetails
 
 Write-Host "Agent '$Agent' job '$Job' is now idle."

@@ -546,6 +546,99 @@ try {
                     }
                 }
             }
+            elseif ($urlPath -eq "/api/costs") {
+                # Aggregate cost data from audit JSONL (completed/failed entries with cost field)
+                # Query params: ?days=N (default 30)
+                $AuditDir = Join-Path (Join-Path (Split-Path $UiDir -Parent) "output") "audit"
+                $daysParam = $request.QueryString["days"]
+                $days = 30
+                if ($daysParam -and [int]::TryParse($daysParam, [ref]$null)) { $days = [int]$daysParam }
+                $cutoff = [DateTime]::UtcNow.AddDays(-$days).ToString("o")
+                $entries = @()
+                if (Test-Path $AuditDir) {
+                    $auditFiles = Get-ChildItem -Path $AuditDir -Filter "*.jsonl" | Sort-Object Name
+                    foreach ($af in $auditFiles) {
+                        $auditLines = [System.IO.File]::ReadAllLines($af.FullName, [System.Text.Encoding]::UTF8)
+                        foreach ($line in $auditLines) {
+                            $trimmed = $line.Trim()
+                            if ($trimmed.Length -eq 0) { continue }
+                            # Only parse lines that contain cost data
+                            if ($trimmed -notmatch '"cost"') { continue }
+                            if ($trimmed -notmatch '"completed"' -and $trimmed -notmatch '"failed"') { continue }
+                            try {
+                                $obj = $trimmed | ConvertFrom-Json
+                                if ($obj.timestamp -ge $cutoff -and $obj.details -and $obj.details.cost) {
+                                    $c = $obj.details.cost
+                                    $entries += [PSCustomObject]@{
+                                        timestamp          = $obj.timestamp
+                                        agent              = $obj.agent
+                                        job                = $obj.job
+                                        run_id             = $obj.run_id
+                                        costUSD            = if ($c.PSObject.Properties["costUSD"]) { $c.costUSD } else { 0 }
+                                        inputTokens        = if ($c.PSObject.Properties["inputTokens"]) { $c.inputTokens } else { 0 }
+                                        outputTokens       = if ($c.PSObject.Properties["outputTokens"]) { $c.outputTokens } else { 0 }
+                                        cacheCreationTokens = if ($c.PSObject.Properties["cacheCreationTokens"]) { $c.cacheCreationTokens } else { 0 }
+                                        cacheReadTokens    = if ($c.PSObject.Properties["cacheReadTokens"]) { $c.cacheReadTokens } else { 0 }
+                                        durationMs         = if ($c.PSObject.Properties["durationMs"]) { $c.durationMs } else { 0 }
+                                        model              = if ($c.PSObject.Properties["model"]) { $c.model } else { "" }
+                                        contextUsedPct     = if ($c.PSObject.Properties["contextUsedPct"]) { $c.contextUsedPct } else { 0 }
+                                        numTurns           = if ($c.PSObject.Properties["numTurns"]) { $c.numTurns } else { 0 }
+                                        exitCode           = if ($obj.details.PSObject.Properties["exit_code"]) { $obj.details.exit_code } else { 0 }
+                                    }
+                                }
+                            } catch { }
+                        }
+                    }
+                }
+                # Build summary: per-agent totals and daily rollups
+                $agentTotals = @{}
+                $dailyRollups = @{}
+                foreach ($e in $entries) {
+                    $aKey = $e.agent
+                    if (-not $agentTotals.ContainsKey($aKey)) {
+                        $agentTotals[$aKey] = @{ costUSD = 0; runs = 0; inputTokens = 0; outputTokens = 0 }
+                    }
+                    $agentTotals[$aKey]["costUSD"] += $e.costUSD
+                    $agentTotals[$aKey]["runs"] += 1
+                    $agentTotals[$aKey]["inputTokens"] += $e.inputTokens
+                    $agentTotals[$aKey]["outputTokens"] += $e.outputTokens
+
+                    $day = $e.timestamp.Substring(0, 10)
+                    if (-not $dailyRollups.ContainsKey($day)) {
+                        $dailyRollups[$day] = @{ costUSD = 0; runs = 0 }
+                    }
+                    $dailyRollups[$day]["costUSD"] += $e.costUSD
+                    $dailyRollups[$day]["runs"] += 1
+                }
+                # Detect anomalies: jobs exceeding 2x their 7-day average cost
+                $jobAvgs = @{}
+                $anomalies = @()
+                foreach ($e in $entries) {
+                    $jKey = "$($e.agent)/$($e.job)"
+                    if (-not $jobAvgs.ContainsKey($jKey)) { $jobAvgs[$jKey] = @() }
+                    $jobAvgs[$jKey] += $e.costUSD
+                }
+                foreach ($jKey in $jobAvgs.Keys) {
+                    $costs = $jobAvgs[$jKey]
+                    if ($costs.Count -lt 2) { continue }
+                    $avg = ($costs | Measure-Object -Sum).Sum / $costs.Count
+                    $last = $costs[-1]
+                    if ($avg -gt 0 -and $last -gt ($avg * 2)) {
+                        $anomalies += [PSCustomObject]@{ job = $jKey; lastCost = $last; avgCost = [math]::Round($avg, 4); ratio = [math]::Round($last / $avg, 1) }
+                    }
+                }
+                $totalCost = ($entries | Measure-Object -Property costUSD -Sum).Sum
+                $result = [PSCustomObject]@{
+                    period     = "${days}d"
+                    totalCost  = [math]::Round($totalCost, 4)
+                    totalRuns  = $entries.Count
+                    agents     = $agentTotals
+                    daily      = $dailyRollups
+                    anomalies  = @($anomalies)
+                    entries    = @($entries)
+                }
+                Send-TextResponse $context 200 "application/json" ($result | ConvertTo-Json -Depth 10)
+            }
             elseif ($urlPath -eq "/api/reports") {
                 # Scan output/ for HTML report files, grouped by agent -> job
                 $OutputDir = Join-Path (Split-Path $UiDir -Parent) "output"
