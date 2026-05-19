@@ -263,11 +263,98 @@ A sign-off is "missing" if the field is empty/null. Features that have all four 
 
 **If CDP fails** (Edge not running, auth expired, page doesn't load): Skip this check gracefully. Output "Check 13 skipped: CDP unavailable" and continue with other checks.
 
+## Check 14: CiFX Dashboard Review (Power BI)
+
+**Goal**: Review 3 CiFX (CI-Fx end-to-end test automation) Power BI dashboards for Meeting Join area health. Flag regressions, low coverage areas, and failing tests.
+
+**Data source**: Power BI dashboards (NOT ADO). Requires Edge CDP to extract data via screenshots + Claude Vision analysis.
+
+### Dashboards
+
+1. **Coverage Management System** (Coverage Overview + Test Insights)
+   - URL: `https://msit.powerbi.com/groups/20c32c44-8c53-4170-8f86-af6bf197dad1/reports/396a474e-3593-40ed-9ce5-0cfa132cbf8b/2e0fc615bdd2e0acb735?experience=power-bi`
+   - What to look for: Test coverage % by scenario/area path, gaps in coverage for Meeting Join scenarios, newly uncovered areas
+
+2. **CI-Fx Health Dashboard** (Overview)
+   - URL: `https://msit.powerbi.com/groups/6f77e458-234c-4bd7-9a21-710c43dbb575/reports/1c6ea5bc-2607-4330-9e80-a941ebf948b1/2b99a1918f6763784949?experience=power-bi`
+   - What to look for: Overall CI-Fx pipeline health, failure trends, infrastructure issues affecting test runs
+
+3. **CI-Fx Automation** (Test Results Visualization)
+   - URL: `https://msit.powerbi.com/groups/6f77e458-234c-4bd7-9a21-710c43dbb575/reports/d3ff0862-0dfb-4846-86d7-9a6305872233/d7db79f44effd71e6996?experience=power-bi`
+   - What to look for: Individual test pass/fail rates, flaky tests, regressions in Meeting Join area paths
+
+### Area paths to focus on
+- `MSTeams\Calling Meeting Devices (CMD)\Meetings\Meeting Join\Fundamentals`
+- `MSTeams\Calling Meeting Devices (CMD)\Meetings\Notes`
+- When Mobile scenario rows appear in these dashboards, include those area paths too
+
+### Steps
+
+1. Open each dashboard URL via Edge CDP (`Target.createTarget` with `background:True`). Set viewport to 1920x1080.
+2. Wait 12 seconds for page load and auth.
+3. Take a full-page screenshot of each dashboard's default view.
+4. If the dashboard has filters for area path or scenario, apply filters for Meeting Join and Meeting Notes areas. Take another screenshot after filtering.
+5. Use Claude Vision to analyze each screenshot and extract:
+   - **Coverage dashboard**: Coverage %, uncovered scenarios, trend direction (improving/declining)
+   - **Health dashboard**: Pipeline pass rate, failure count, top failure reasons, trend
+   - **Automation dashboard**: Test pass rate, failing test names, flaky test count, regressions vs previous period
+6. Close all CDP tabs after extraction.
+
+### Health Thresholds
+
+| Metric | Healthy | Degraded | Critical |
+|--------|---------|----------|----------|
+| Test Coverage % | >= 80% | 60%-79% | < 60% |
+| Pipeline Pass Rate | >= 95% | 85%-94% | < 85% |
+| Test Pass Rate | >= 90% | 80%-89% | < 80% |
+| Flaky Test Count | 0-2 | 3-5 | > 5 |
+
+### Output
+
+7. Collect per dashboard: name, health status (healthy/degraded/critical), key metrics, list of issues found.
+8. Save screenshots to `output/scrum-master/cifx-screenshots/` (overwrite each run).
+9. **Report-only** (no auto-fix). Include in Teams post and hygiene-teams-summary.json as `check14`.
+
+**check14 JSON format**:
+```json
+{
+  "dashboards": [
+    {
+      "name": "Coverage Management System",
+      "status": "degraded",
+      "metrics": {"coveragePct": 72, "uncoveredScenarios": 5},
+      "issues": ["Meeting Join Browser coverage dropped from 85% to 72%", "No Mobile scenario coverage yet"],
+      "screenshotPath": "output/scrum-master/cifx-screenshots/coverage.png"
+    },
+    {
+      "name": "CI-Fx Health Dashboard",
+      "status": "healthy",
+      "metrics": {"pipelinePassRate": 97, "failureCount": 2},
+      "issues": [],
+      "screenshotPath": "output/scrum-master/cifx-screenshots/health.png"
+    },
+    {
+      "name": "CI-Fx Automation",
+      "status": "critical",
+      "metrics": {"testPassRate": 78, "flakyTests": 8, "regressions": 3},
+      "issues": ["8 flaky tests in Meeting Join area", "3 new regressions since last week"],
+      "screenshotPath": "output/scrum-master/cifx-screenshots/automation.png"
+    }
+  ],
+  "overallStatus": "critical",
+  "count": 3
+}
+```
+
+**Overall status**: worst status across the 3 dashboards (critical > degraded > healthy).
+
+**If CDP fails** (Edge not running, auth expired, page doesn't load): Skip this check gracefully. Output "Check 14 skipped: CDP unavailable" and continue with other checks.
+
 ---
 
 ## Teams Summary Output
 
-After all checks, write `Q:/src/personal_projects/virtual-office/output/scrum-master/hygiene-teams-summary.json` containing check2b, check4, check5, check6, check7, check8, check9, check10, check11, check12, and check13 results. The poster agent's `hygiene-teams-post` job picks this up. Only sections with items are posted; empty sections are omitted entirely.
+After all checks, write `Q:/src/personal_projects/virtual-office/output/scrum-master/hygiene-teams-summary.json` containing check2b, check4, check5, check6, check7, check8, check9, check10, check11, check12, check13, and check14 results. The poster agent's `hygiene-teams-post` job picks this up. Only sections with items are posted; empty sections are omitted entirely.
 
 ---
 
@@ -290,7 +377,7 @@ After all checks, write `Q:/src/personal_projects/virtual-office/output/scrum-ma
 
 ### Section visibility:
 
-For each check (1, 2, 2b, 3, 4, 5, 6, 7, 8, 9):
+For each check (1, 2, 2b, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14):
 - If 0 issues: replace `{{CHECKn_SECTION}}` with **empty string**
 - If issues found: replace with the full HTML block from the template comments, filling in table rows
 

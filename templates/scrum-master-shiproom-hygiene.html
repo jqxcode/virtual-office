@@ -332,6 +332,43 @@ If no issues, replace {{CHECK11_SECTION}} with empty string. -->
 </div>
 If no issues, replace {{CHECK12_SECTION}} with empty string. -->
 
+<!-- Check 13: Required Training Compliance -->
+<!-- ONLY include this section if Check 13 found issues. Omit entirely if no issues. -->
+{{CHECK13_SECTION}}
+<!-- Replace {{CHECK13_SECTION}} with the block below ONLY if issues were found:
+<div class="section">
+  <h2>Check 13: Required Training Compliance <span class="count">N flagged</span></h2>
+  <p style="color:var(--vo-text-tertiary); font-size:12px; margin-bottom:12px;">Team members with incomplete required trainings (looking 15 days ahead).</p>
+  <table>
+    <thead>
+      <tr><th>Name</th><th>Completion %</th><th>Required</th><th>Completed</th><th>Missing Courses</th></tr>
+    </thead>
+    <tbody>
+      {{CHECK13_TABLE_ROWS}}
+    </tbody>
+  </table>
+</div>
+If no issues, replace {{CHECK13_SECTION}} with empty string. -->
+
+<!-- Check 14: CiFX Dashboard Review -->
+<!-- ONLY include this section if Check 14 found issues. Omit entirely if no issues (all 3 dashboards healthy). -->
+{{CHECK14_SECTION}}
+<!-- Replace {{CHECK14_SECTION}} with the block below ONLY if issues were found:
+<div class="section">
+  <h2>Check 14: CiFX Dashboard Review <span class="count">N issues</span></h2>
+  <p style="color:var(--vo-text-tertiary); font-size:12px; margin-bottom:12px;">CI-Fx end-to-end test automation health for Meeting Join area. Reviews coverage, pipeline health, and test results.</p>
+  <table>
+    <thead>
+      <tr><th>Dashboard</th><th>Status</th><th>Key Metrics</th><th>Issues</th></tr>
+    </thead>
+    <tbody>
+      {{CHECK14_TABLE_ROWS}}
+    </tbody>
+  </table>
+</div>
+If no issues (all dashboards healthy), replace {{CHECK14_SECTION}} with empty string.
+Status badges: use badge-fixed for healthy, badge-flagged for degraded, badge-moved for critical (repurposed as attention-needed). -->
+
 <!-- Future checks: follow the same pattern.
   1. Add a {{CHECKn_SECTION}} placeholder here.
   2. Include it ONLY if the check found issues; omit entirely if clean.
