@@ -308,4 +308,4 @@ If ALL checks passed: replace `{{ALL_CLEAR_SECTION}}` with `<div class="section 
 1. Timestamped: `output/scrum-master/shiproom-hygiene-YYYYMMDD-HHmmss.html`
 2. Latest: `output/scrum-master/shiproom-hygiene-latest.html`
 
-Open latest in Edge via `open-in-edge.py` dedup script.
+Do NOT open in Edge — this job runs as a background agent. Save to disk only.
