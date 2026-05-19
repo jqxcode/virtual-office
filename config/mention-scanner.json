@@ -113,6 +113,21 @@
       "(?i)need.*info",
       "(?i)thoughts on"
     ],
+    "actionRequestPatterns": [
+      "(?i)can you (check|review|look|help|confirm|verify|update|fix|approve|investigate)",
+      "(?i)could you (check|review|look|help|confirm|verify|update|fix|approve)",
+      "(?i)please (check|review|look|help|confirm|verify|update|fix|approve|investigate|take a look)",
+      "(?i)need you to",
+      "(?i)need your (help|input|approval|review|sign-off|feedback)",
+      "(?i)waiting (on|for) you",
+      "(?i)action (needed|required|item)",
+      "(?i)follow up",
+      "(?i)let me know",
+      "(?i)when can you",
+      "(?i)by (EOD|end of day|tomorrow|Monday|Tuesday|Wednesday|Thursday|Friday)",
+      "(?i)FYI.*action",
+      "(?i)assign(ed|ing).*to you"
+    ],
     "highPriorityPatterns": [
       "(?i)P0", "(?i)P1", "(?i)sev\\s*[012]", "(?i)shiproom",
       "(?i)urgent", "(?i)blocking", "(?i)livesite", "(?i)outage"
