@@ -1,4 +1,4 @@
-#Requires -Version 7.0
+﻿#Requires -Version 7.0
 <#
 .SYNOPSIS
     Invokes a Virtual Office agent job.
@@ -344,26 +344,62 @@ try {
     Write-Host "Repair-StuckDashboard failed (non-fatal, likely file contention): $_"
 }
 
-# Step 2: Load and validate agent config
+# Diagnostic breadcrumb: append step markers to startup log so we know exactly where a crash happens
+function Write-Breadcrumb { param([string]$Step)
+    try {
+        $line = @{ ts = (Get-Date -Format "o"); agent = $Agent; job = $Job; step = $Step; pid = $PID } | ConvertTo-Json -Compress
+        Add-Content -Path $startupLogFile -Value $line -Encoding ASCII -ErrorAction SilentlyContinue
+    } catch { }
+}
+Write-Breadcrumb "step1_done"
+
+# Step 2: Load and validate agent config (retry once on parse failure -- file contention with concurrent runners)
 $agentsFile = Join-Path $CONFIG_DIR "agents.json"
 if (-not (Test-Path $agentsFile)) {
     Write-Error "Config file not found: $agentsFile"
     exit 1
 }
-$agentsConfigRaw = Get-Content -Path $agentsFile -Raw | ConvertFrom-Json -AsHashtable
+$agentsConfigRaw = $null
+for ($attempt = 1; $attempt -le 3; $attempt++) {
+    try {
+        $agentsConfigRaw = Get-Content -Path $agentsFile -Raw | ConvertFrom-Json -AsHashtable
+        break
+    } catch {
+        Write-Host "Step 2: agents.json parse attempt $attempt failed: $_"
+        if ($attempt -lt 3) { Start-Sleep -Milliseconds 500 }
+    }
+}
+if ($null -eq $agentsConfigRaw) {
+    Write-Error "Failed to parse agents.json after 3 attempts"
+    exit 1
+}
 $agentsConfig = if ($agentsConfigRaw.ContainsKey("agents")) { $agentsConfigRaw["agents"] } else { $agentsConfigRaw }
 if (-not $agentsConfig.ContainsKey($Agent)) {
     Write-Error "Agent '$Agent' not found in agents.json. Available: $($agentsConfig.Keys -join ', ')"
     exit 1
 }
+Write-Breadcrumb "step2_done"
 
-# Step 3: Load and validate job config
+# Step 3: Load and validate job config (retry once on parse failure)
 $jobsFile = Join-Path $CONFIG_DIR "jobs" "$Agent.json"
 if (-not (Test-Path $jobsFile)) {
     Write-Error "Jobs file not found: $jobsFile"
     exit 1
 }
-$jobsConfigRaw = Get-Content -Path $jobsFile -Raw | ConvertFrom-Json -AsHashtable
+$jobsConfigRaw = $null
+for ($attempt = 1; $attempt -le 3; $attempt++) {
+    try {
+        $jobsConfigRaw = Get-Content -Path $jobsFile -Raw | ConvertFrom-Json -AsHashtable
+        break
+    } catch {
+        Write-Host "Step 3: $jobsFile parse attempt $attempt failed: $_"
+        if ($attempt -lt 3) { Start-Sleep -Milliseconds 500 }
+    }
+}
+if ($null -eq $jobsConfigRaw) {
+    Write-Error "Failed to parse $jobsFile after 3 attempts"
+    exit 1
+}
 $jobsConfig = if ($jobsConfigRaw.ContainsKey("jobs")) { $jobsConfigRaw["jobs"] } else { $jobsConfigRaw }
 if (-not $jobsConfig.ContainsKey($Job)) {
     Write-Error "Job '$Job' not found in $jobsFile. Available: $($jobsConfig.Keys -join ', ')"
@@ -376,6 +412,7 @@ if (-not $prompt) {
     Write-Error "Job '$Job' has no prompt defined."
     exit 1
 }
+Write-Breadcrumb "step3_done"
 
 # Ensure state directory
 $stateDir = Ensure-StateDir -AgentName $Agent -JobName $Job
