@@ -220,48 +220,64 @@ A sign-off is "missing" if the field is empty/null. Features that have all four 
 3. Collect: ID, Title, Owner, Ring0Date, Ring4Date, Issue.
 4. **Report-only** (no auto-fix). Results included in Teams post.
 
-## Check 13: Required Training Compliance (Power BI)
+## Check 13: Upcoming Required Training Compliance by Due Date (DAX API)
 
-**Goal**: All team members must complete required trainings before their due dates. Flag anyone below 100% completion when looking 15 days ahead.
+**Goal**: Flag team members with incomplete required trainings due within the next 15 days. Uses DAX API for precise course-level data (no CDP needed).
 
-**Data source**: Power BI dashboard (NOT ADO). Requires Edge CDP to extract data.
-- URL: `https://msit.powerbi.com/groups/me/reports/c2390d89-5de8-474a-aa2d-fb29b2998d65/ReportSection607c7fe0d8afd1ba9d6f?experience=power-bi`
-- Tab: "Myself and My Directs"
+**Data source**: Power BI DAX API
+- Token: `az account get-access-token --resource https://analysis.windows.net/powerbi/api --query accessToken -o tsv`
+- Endpoint: `POST https://api.powerbi.com/v1.0/myorg/datasets/2f72a313-a17d-4ba5-b241-c4a27586d9e8/executeQueries`
+- Tables: `'Required Training'` (fact), `'Employee'` (dim), `'Courses'` (dim), `'Completion Status'` (dim)
+
+**DAX Query**:
+```dax
+EVALUATE
+VAR _cutoffKey = YEAR(TODAY() + 15) * 10000 + MONTH(TODAY() + 15) * 100 + DAY(TODAY() + 15)
+RETURN
+SELECTCOLUMNS(
+    FILTER(
+        ADDCOLUMNS(
+            'Required Training',
+            "EmployeeName", RELATED('Employee'[Employee Name]),
+            "CourseTitle", RELATED('Courses'[Course Title]),
+            "CourseLink", RELATED('Courses'[VivaDeepLink]),
+            "Status", RELATED('Completion Status'[Course Completion Status]),
+            "ReportsTo", RELATED('Employee'[Reports To Alias]),
+            "DueDateKey", 'Required Training'[CompleteByDateKey]
+        ),
+        [ReportsTo] = "qitxu" && [Status] <> "Completed" && [DueDateKey] <= _cutoffKey
+    ),
+    "Name", [EmployeeName],
+    "Course", [CourseTitle],
+    "Link", [CourseLink],
+    "DueDate", [DueDateKey],
+    "Status", [Status]
+)
+```
 
 **Steps**:
-1. Open the Power BI URL via Edge CDP (`Target.createTarget` with `background:True`). Set viewport to 1920x1080.
-2. Wait 12 seconds for page load and auth.
-3. The "Complete by Date" end-date field defaults to today. Change it to **today + 15 days** (format: M/D/YYYY). Use triple-click to select the field, then type the new date + Enter.
-4. Wait 3 seconds for the report to refresh.
-5. **Summary view**: Take a screenshot of the Summary tab. Extract: Employee Name, Required Course #, Completed #, Completion %. Flag anyone < 100%.
-6. **Detail view**: For each person below 100%, click the expand arrow (⊞) next to their name OR click the "Detail" tab to see individual courses. Extract each incomplete course:
-   - Course Title
-   - Completion Status (should be "Not Started" or "In Progress")
-   - Url (the course link from the "Url" column — this is clickable in the Power BI table)
-7. Close the CDP tab after extraction.
-8. Collect per person: Name, Completion %, list of incomplete courses with title + URL.
-9. **Report-only** (no auto-fix). Include in Teams post and hygiene-teams-summary.json as `check13`.
+1. Get PBI token via `az account get-access-token`.
+2. Run the DAX query above.
+3. Parse `DueDateKey` (YYYYMMDD integer) into readable date (e.g. 20260531 → 2026-05-31).
+4. Group results by person. For each person, list their incomplete courses with title, link, due date.
+5. If 0 rows returned, all training is complete — skip this section.
 
 **check13 JSON format**:
 ```json
 {
   "items": [
     {
-      "name": "Josh Xu",
-      "completionPct": 71,
-      "required": 7,
-      "completed": 5,
+      "name": "Brent Weatherall",
       "missing": [
-        {"title": "Course Name Here", "url": "https://..."},
-        {"title": "Another Course", "url": "https://..."}
+        {"title": "Security Foundations: Safeguarding Data", "url": "https://vivalearning.microsoft.com/...", "dueDate": "2026-05-31"}
       ]
     }
   ],
-  "count": 9
+  "count": 6
 }
 ```
 
-**If CDP fails** (Edge not running, auth expired, page doesn't load): Skip this check gracefully. Output "Check 13 skipped: CDP unavailable" and continue with other checks.
+**If DAX token fails**: Skip this check. Output "Check 13 skipped: DAX token unavailable" and continue.
 
 ## Check 14: CiFX Test Health (DAX API + ADO + CDP)
 
