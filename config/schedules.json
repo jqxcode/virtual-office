@@ -112,7 +112,13 @@
       "agent": "scrum-master",
       "job": "shiproom-hygiene-check",
       "cron": "25 7 * * 1-5",
-      "description": "Run 14 hygiene checks at 7:25am weekdays, then triggerOnComplete fires poster/post-shiproom-hygiene-check"
+      "description": "Run 15 hygiene checks at 7:25am weekdays, then triggerOnComplete fires poster/post-shiproom-hygiene-check"
+    },
+    {
+      "agent": "scrum-master",
+      "job": "shiproom-hygiene-check",
+      "cron": "50 14 * * 1-5",
+      "description": "Run 15 hygiene checks at 2:50pm weekdays, then triggerOnComplete fires poster/post-shiproom-hygiene-check"
     },
     {
       "agent": "approver",
