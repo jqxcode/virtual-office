@@ -283,6 +283,15 @@ def is_question(text: str, config: Dict[str, Any]) -> bool:
     return False
 
 
+def is_action_request(text: str, config: Dict[str, Any]) -> bool:
+    """Detect if message requests an action from Josh."""
+    patterns = config["classification"].get("actionRequestPatterns", [])
+    for pattern in patterns:
+        if re.search(pattern, text):
+            return True
+    return False
+
+
 def classify_technical(text: str, config: Dict[str, Any]) -> Dict[str, Any]:
     """Classify whether the question is technical and extract matched keywords."""
     keywords = config["classification"]["technicalKeywords"]
@@ -387,20 +396,28 @@ def scan_channels(
             if not mentions_me(body_html, body_text, config):
                 continue
 
-            # Check if it's a question
-            if not is_question(body_text, config):
-                # Still track it but mark as non-question mention
-                if verbose:
-                    sender = get_sender_name(msg)
-                    print(f"  Mention (not a question) from {sender}: {body_text[:80]}...")
-                processed_ids.add(dedup_hash)
-                continue
-
-            # Classify
+            # Classify the mention
+            has_question = is_question(body_text, config)
+            has_action = is_action_request(body_text, config)
             classification = classify_technical(body_text, config)
-            is_high_priority = check_high_priority(body_text, config)
-
+            is_high_pri = check_high_priority(body_text, config)
             sender_name = get_sender_name(msg)
+
+            # Determine tier: actionable (question or action request) vs informational
+            if has_question or has_action:
+                tier = "actionable"
+            else:
+                tier = "informational"
+
+            if verbose:
+                if tier == "actionable":
+                    tech_label = "TECHNICAL" if classification["isTechnical"] else "non-technical"
+                    q_or_a = "question" if has_question else "action-request"
+                    print(f"  ACTIONABLE ({q_or_a}) [{tech_label}] from {sender_name}: {body_text[:80]}...")
+                else:
+                    print(f"  Mention (informational) from {sender_name}: {body_text[:80]}...")
+
+            processed_ids.add(dedup_hash)
 
             result = {
                 "dedupHash": dedup_hash,
@@ -415,21 +432,14 @@ def scan_channels(
                 "timestamp": created,
                 "bodyText": body_text,
                 "bodyHtml": body_html,
+                "tier": tier,
+                "isQuestion": has_question,
+                "isActionRequest": has_action,
                 "isTechnical": classification["isTechnical"],
                 "matchedKeywords": classification["matchedKeywords"],
-                "isHighPriority": is_high_priority,
+                "isHighPriority": is_high_pri,
             }
             results.append(result)
-            processed_ids.add(dedup_hash)
-
-            if verbose:
-                tech_label = "TECHNICAL" if classification["isTechnical"] else "non-technical"
-                pri_label = " [HIGH PRIORITY]" if is_high_priority else ""
-                print(
-                    f"  MENTION: {sender_name} in {ch['channelName']}"
-                    f" [{tech_label}]{pri_label}"
-                )
-                print(f"    {body_text[:120]}...")
 
     # Update state
     if not dry_run:
@@ -510,19 +520,9 @@ def scan_chats(
 
             # For chats: check if mentions me OR if it's a direct question to me
             has_mention = mentions_me(body_html, body_text, config)
-
-            # In 1:1 chats, any question is implicitly directed at me
             is_direct_chat = chat_type == "oneOnOne"
 
             if not has_mention and not is_direct_chat:
-                # In group chats, skip if not mentioned
-                continue
-
-            if not is_question(body_text, config):
-                if verbose and has_mention:
-                    sender = get_sender_name(msg)
-                    print(f"    Mention (not a question) from {sender}: {body_text[:80]}...")
-                processed_ids.add(dedup_hash)
                 continue
 
             # Don't process my own messages
@@ -531,8 +531,25 @@ def scan_chats(
                 processed_ids.add(dedup_hash)
                 continue
 
+            # Classify
+            has_question = is_question(body_text, config)
+            has_action = is_action_request(body_text, config)
             classification = classify_technical(body_text, config)
-            is_high_priority = check_high_priority(body_text, config)
+            is_high_pri = check_high_priority(body_text, config)
+
+            if has_question or has_action:
+                tier = "actionable"
+            else:
+                tier = "informational"
+
+            if verbose:
+                if tier == "actionable":
+                    q_or_a = "question" if has_question else "action-request"
+                    print(f"    ACTIONABLE ({q_or_a}) from {sender_name}: {body_text[:80]}...")
+                else:
+                    print(f"    Mention (informational) from {sender_name}: {body_text[:80]}...")
+
+            processed_ids.add(dedup_hash)
 
             result = {
                 "dedupHash": dedup_hash,
@@ -541,7 +558,7 @@ def scan_chats(
                     "id": f"chat:{chat_id[:20]}",
                     "teamName": "Chat",
                     "channelName": chat_topic,
-                    "priority": "high" if is_high_priority else "medium",
+                    "priority": "high" if is_high_pri else "medium",
                     "chatType": chat_type,
                     "chatId": chat_id,
                 },
@@ -549,23 +566,16 @@ def scan_chats(
                 "timestamp": created,
                 "bodyText": body_text,
                 "bodyHtml": body_html,
+                "tier": tier,
+                "isQuestion": has_question,
+                "isActionRequest": has_action,
                 "isTechnical": classification["isTechnical"],
                 "matchedKeywords": classification["matchedKeywords"],
-                "isHighPriority": is_high_priority,
+                "isHighPriority": is_high_pri,
                 "isUnread": True,
                 "source": "chat",
             }
             results.append(result)
-            processed_ids.add(dedup_hash)
-
-            if verbose:
-                tech_label = "TECHNICAL" if classification["isTechnical"] else "non-technical"
-                pri_label = " [HIGH PRIORITY]" if is_high_priority else ""
-                print(
-                    f"    MENTION: {sender_name} in '{chat_topic}'"
-                    f" [{tech_label}]{pri_label}"
-                )
-                print(f"      {body_text[:120]}...")
 
     # Update state
     if not dry_run:
@@ -708,42 +718,42 @@ def main() -> None:
             )
             all_results.extend(chat_results)
 
-        # Save draft files for technical questions
+        # Save draft files for actionable technical mentions
         drafts: List[str] = []
         for mention in all_results:
-            if mention["isTechnical"]:
+            if mention.get("tier") == "actionable" and mention["isTechnical"]:
                 draft_path = save_draft(mention, config["scanner"]["outputDir"])
                 drafts.append(draft_path)
                 if args.verbose:
                     print(f"  Draft saved: {draft_path}")
 
         # Summary
-        total_mentions = len(all_results)
-        technical = sum(1 for r in all_results if r["isTechnical"])
-        high_pri = sum(1 for r in all_results if r["isHighPriority"])
+        total = len(all_results)
+        actionable = [r for r in all_results if r.get("tier") == "actionable"]
+        informational = [r for r in all_results if r.get("tier") == "informational"]
+        high_pri = sum(1 for r in all_results if r.get("isHighPriority"))
         from_channels = sum(1 for r in all_results if r.get("source") != "chat")
         from_chats = sum(1 for r in all_results if r.get("source") == "chat")
-        unread_count = sum(1 for r in all_results if r.get("isUnread"))
 
         if args.output_json:
             output = {
                 "scanTime": datetime.now(timezone.utc).isoformat(),
-                "totalMentions": total_mentions,
+                "totalMentions": total,
+                "actionable": len(actionable),
+                "informational": len(informational),
                 "fromChannels": from_channels,
                 "fromChats": from_chats,
-                "unreadChats": unread_count,
-                "technicalQuestions": technical,
                 "highPriority": high_pri,
                 "mentions": all_results,
                 "drafts": drafts,
             }
             print(json.dumps(output, indent=2, ensure_ascii=False))
         else:
-            print(f"\nScan complete: {total_mentions} mentions found")
-            print(f"  From channels: {from_channels}")
-            print(f"  From chats (unread): {from_chats}")
-            print(f"  Technical questions: {technical}")
+            print(f"\nScan complete: {total} mentions found")
+            print(f"  Actionable (questions + action requests): {len(actionable)}")
+            print(f"  Informational: {len(informational)}")
             print(f"  High priority: {high_pri}")
+            print(f"  From channels: {from_channels} | From chats: {from_chats}")
             print(f"  Draft files created: {len(drafts)}")
             if drafts:
                 for d in drafts:
