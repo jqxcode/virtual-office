@@ -15,6 +15,10 @@
           "stale_task_poll": {
             "killThresholdMinutes": 75,
             "reason": "Parent agent is polling a completed subagent task and will not recover on its own. Kill after 75 min (hangThreshold + 15 min grace) rather than waiting for the full agent kill threshold."
+          },
+          "hung-bash-subprocess": {
+            "killThresholdMinutes": 25,
+            "reason": "Bash subprocess (running ADO WIQL query via python/az CLI) has exited but the parent bash shell is stuck waiting. This is unrecoverable -- the shell will not exit on its own. Kill at 25 min, which is within the auditor agent kill threshold of 30 min."
           }
         },
         "perAgent": {
