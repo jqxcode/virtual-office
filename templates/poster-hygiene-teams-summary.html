@@ -1,4 +1,4 @@
-<!-- Teams channel message template for shiproom hygiene checks 2b, 4-12 -->
+<!-- Teams channel message template for shiproom hygiene checks 2b, 4-14 -->
 <!-- NOTE: Teams messages use basic HTML only (no CSS classes, no <style> blocks) -->
 <!-- RULE: Only include sections that have items. Omit sections with 0 items entirely. -->
 <!-- If ALL sections are empty, do NOT post at all. -->
@@ -132,4 +132,26 @@ Row: <tr><td><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit
   {{CHECK12_ROWS}}
 </table>
 Row: <tr><td><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/{id}">{id}</a></td><td>{title}</td><td><at id="{mention_id}">{owner}</at></td><td>{ring0}</td><td>{ring4}</td><td>{issue}</td></tr>
+-->
+
+{{CHECK13_SECTION}}
+<!-- Replace with EMPTY STRING if no check13 items. Otherwise:
+<p><b>Upcoming Required Training by Due Date ({{CHECK13_COUNT}})</b></p>
+<p>Team members with incomplete required trainings due within 15 days:</p>
+<table>
+  <tr><th>Name</th><th>Course</th><th>Due Date</th></tr>
+  {{CHECK13_ROWS}}
+</table>
+Row: <tr><td><at id="{mention_id}">{name}</at></td><td><a href="{url}">{title}</a></td><td>{dueDate}</td></tr>
+-->
+
+{{CHECK14_SECTION}}
+<!-- Replace with EMPTY STRING if no check14 issues. Otherwise:
+<p><b>CiFX Test Health ({{CHECK14_STATUS}})</b></p>
+<p>Meeting Join CI/test automation status (last 7 days):</p>
+<table>
+  <tr><th>Metric</th><th>Value</th><th>Status</th></tr>
+  {{CHECK14_ROWS}}
+</table>
+Row: <tr><td>{metric}</td><td>{value}</td><td>{status}</td></tr>
 -->
