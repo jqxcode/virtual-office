@@ -1,15 +1,17 @@
 """
 Teams @mention scanner for Virtual Office.
 
-Scans configured Teams channels for messages mentioning Josh Xu,
-detects questions, classifies technical vs non-technical,
+Scans configured Teams channels AND unread chats for messages mentioning
+Josh Xu, detects questions, classifies technical vs non-technical,
 and outputs structured JSON for the researcher agent to process.
 
 Usage:
-    python scan-mentions.py                  # scan all channels
+    python scan-mentions.py                  # scan channels + unread chats
     python scan-mentions.py --dry-run        # scan but don't update state
     python scan-mentions.py --verbose        # detailed output
     python scan-mentions.py --channel <id>   # scan specific channel only
+    python scan-mentions.py --channels-only  # skip chat scanning
+    python scan-mentions.py --chats-only     # skip channel scanning
 """
 from __future__ import annotations
 
@@ -153,6 +155,20 @@ class TeamsMcpClient:
                 continue
         return None
 
+    def _parse_tool_response(self, resp: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        """Extract parsed JSON from MCP tool response."""
+        if not resp:
+            return None
+        try:
+            result = resp.get("result", {})
+            content = result.get("content", [])
+            if content and isinstance(content, list):
+                text = content[0].get("text", "")
+                return json.loads(text)
+        except (json.JSONDecodeError, KeyError, IndexError):
+            pass
+        return None
+
     def list_channel_messages(
         self, team_id: str, channel_id: str, top: int = 50
     ) -> List[Dict[str, Any]]:
@@ -160,17 +176,32 @@ class TeamsMcpClient:
             "ListChannelMessages",
             {"teamId": team_id, "channelId": channel_id, "top": top},
         )
-        if not resp:
-            return []
-        try:
-            result = resp.get("result", {})
-            content = result.get("content", [])
-            if content and isinstance(content, list):
-                text = content[0].get("text", "")
-                data = json.loads(text)
-                return data.get("messages", data.get("value", []))
-        except (json.JSONDecodeError, KeyError, IndexError):
-            pass
+        data = self._parse_tool_response(resp)
+        if data:
+            return data.get("messages", data.get("value", []))
+        return []
+
+    def list_chats(self, fetch_all: bool = False) -> List[Dict[str, Any]]:
+        """List recent chats with hasUnreadMessages flag."""
+        args: Dict[str, Any] = {}
+        if fetch_all:
+            args["fetchAllPages"] = True
+        resp = self.call_tool("ListChats", args)
+        data = self._parse_tool_response(resp)
+        if data:
+            return data.get("chats", data.get("value", []))
+        return []
+
+    def list_chat_messages(
+        self, chat_id: str, top: int = 20
+    ) -> List[Dict[str, Any]]:
+        """List messages in a specific chat."""
+        resp = self.call_tool(
+            "ListChatMessages", {"chatId": chat_id, "top": top}
+        )
+        data = self._parse_tool_response(resp)
+        if data:
+            return data.get("messages", data.get("value", []))
         return []
 
     def disconnect(self) -> None:
@@ -179,6 +210,32 @@ class TeamsMcpClient:
                 self.proc.terminate()
             except Exception:
                 pass
+
+
+def get_sender_name(msg: Dict[str, Any]) -> str:
+    """Extract sender display name from a Teams message, handling various formats."""
+    from_obj = msg.get("from")
+    if not from_obj or not isinstance(from_obj, dict):
+        return "Unknown"
+    # Try user.displayName first
+    user = from_obj.get("user")
+    if user and isinstance(user, dict):
+        name = user.get("displayName", "")
+        if name:
+            return name
+    # Try application.displayName (bots, connectors)
+    app = from_obj.get("application")
+    if app and isinstance(app, dict):
+        name = app.get("displayName", "")
+        if name:
+            return name
+    # Try device
+    device = from_obj.get("device")
+    if device and isinstance(device, dict):
+        name = device.get("displayName", "")
+        if name:
+            return name
+    return "Unknown"
 
 
 def strip_html(html: str) -> str:
@@ -334,7 +391,7 @@ def scan_channels(
             if not is_question(body_text, config):
                 # Still track it but mark as non-question mention
                 if verbose:
-                    sender = msg.get("from", {}).get("user", {}).get("displayName", "Unknown")
+                    sender = get_sender_name(msg)
                     print(f"  Mention (not a question) from {sender}: {body_text[:80]}...")
                 processed_ids.add(dedup_hash)
                 continue
@@ -343,8 +400,7 @@ def scan_channels(
             classification = classify_technical(body_text, config)
             is_high_priority = check_high_priority(body_text, config)
 
-            sender_info = msg.get("from", {}).get("user", {})
-            sender_name = sender_info.get("displayName", "Unknown")
+            sender_name = get_sender_name(msg)
 
             result = {
                 "dedupHash": dedup_hash,
@@ -384,6 +440,152 @@ def scan_channels(
     return results
 
 
+def scan_chats(
+    config: Dict[str, Any],
+    state: Dict[str, Any],
+    mcp_client: Optional[TeamsMcpClient] = None,
+    dry_run: bool = False,
+    verbose: bool = False,
+) -> List[Dict[str, Any]]:
+    """Scan unread chats for mentions with questions."""
+    if mcp_client is None:
+        if verbose:
+            print("Chat scan: no MCP client, skipping")
+        return []
+
+    scanner_cfg = config["scanner"]
+    lookback = timedelta(hours=scanner_cfg["lookbackHours"])
+    cutoff = datetime.now(timezone.utc) - lookback
+    processed_ids = set(state.get("processedMessageIds", []))
+    results: List[Dict[str, Any]] = []
+
+    if verbose:
+        print("\n--- Scanning unread chats ---")
+
+    chats = mcp_client.list_chats(fetch_all=False)
+    if verbose:
+        print(f"Found {len(chats)} recent chats")
+
+    unread_chats = [c for c in chats if c.get("hasUnreadMessages", False)]
+    if verbose:
+        print(f"  Unread: {unread_chats.__len__()}")
+
+    for chat in unread_chats:
+        chat_id = chat.get("id", "")
+        chat_topic = chat.get("topic", "") or "(1:1 chat)"
+        chat_type = chat.get("chatType", "unknown")
+
+        # Check last message preview timestamp
+        preview = chat.get("lastMessagePreview", {})
+        preview_ts = preview.get("createdDateTime", "")
+        preview_time = parse_timestamp(preview_ts)
+        if preview_time and preview_time < cutoff:
+            continue
+
+        if verbose:
+            print(f"  Scanning chat: {chat_topic} [{chat_type}]")
+
+        messages = mcp_client.list_chat_messages(chat_id, top=20)
+        if verbose:
+            print(f"    {len(messages)} messages")
+
+        for msg in messages:
+            msg_id = msg.get("id", "")
+            dedup_hash = message_id_hash(chat_id, msg_id)
+
+            if dedup_hash in processed_ids:
+                continue
+
+            created = msg.get("createdDateTime", "")
+            msg_time = parse_timestamp(created)
+            if msg_time and msg_time < cutoff:
+                continue
+
+            body = msg.get("body", {})
+            body_html = body.get("content", "") if isinstance(body, dict) else str(body)
+            body_text = strip_html(body_html)
+
+            if not body_text:
+                continue
+
+            # For chats: check if mentions me OR if it's a direct question to me
+            has_mention = mentions_me(body_html, body_text, config)
+
+            # In 1:1 chats, any question is implicitly directed at me
+            is_direct_chat = chat_type == "oneOnOne"
+
+            if not has_mention and not is_direct_chat:
+                # In group chats, skip if not mentioned
+                continue
+
+            if not is_question(body_text, config):
+                if verbose and has_mention:
+                    sender = get_sender_name(msg)
+                    print(f"    Mention (not a question) from {sender}: {body_text[:80]}...")
+                processed_ids.add(dedup_hash)
+                continue
+
+            # Don't process my own messages
+            sender_name = get_sender_name(msg)
+            if sender_name == config["scanner"]["myDisplayName"]:
+                processed_ids.add(dedup_hash)
+                continue
+
+            classification = classify_technical(body_text, config)
+            is_high_priority = check_high_priority(body_text, config)
+
+            result = {
+                "dedupHash": dedup_hash,
+                "messageId": msg_id,
+                "channel": {
+                    "id": f"chat:{chat_id[:20]}",
+                    "teamName": "Chat",
+                    "channelName": chat_topic,
+                    "priority": "high" if is_high_priority else "medium",
+                    "chatType": chat_type,
+                    "chatId": chat_id,
+                },
+                "sender": sender_name,
+                "timestamp": created,
+                "bodyText": body_text,
+                "bodyHtml": body_html,
+                "isTechnical": classification["isTechnical"],
+                "matchedKeywords": classification["matchedKeywords"],
+                "isHighPriority": is_high_priority,
+                "isUnread": True,
+                "source": "chat",
+            }
+            results.append(result)
+            processed_ids.add(dedup_hash)
+
+            if verbose:
+                tech_label = "TECHNICAL" if classification["isTechnical"] else "non-technical"
+                pri_label = " [HIGH PRIORITY]" if is_high_priority else ""
+                print(
+                    f"    MENTION: {sender_name} in '{chat_topic}'"
+                    f" [{tech_label}]{pri_label}"
+                )
+                print(f"      {body_text[:120]}...")
+
+    # Update state
+    if not dry_run:
+        state["processedMessageIds"] = list(processed_ids)[-500:]
+        state["lastScan"] = datetime.now(timezone.utc).isoformat()
+        save_state(scanner_cfg["stateFile"], state)
+
+    return results
+
+
+
+# NOTE on read state:
+# - Channel messages: read state is CLIENT-SIDE only (Teams app tracks it).
+#   No Graph API to mark channels as read. Use Teams app: right-click > "Mark as read".
+# - Chat messages: Graph API supports POST /me/chats/{id}/markChatReadForUser
+#   but this is a delegated-only permission and changes the user's unread state.
+#   We intentionally do NOT mark chats as read -- the scanner should be invisible.
+#   The hasUnreadMessages flag on ListChats is used for filtering, not mutation.
+
+
 def save_draft(
     mention: Dict[str, Any], output_dir: str
 ) -> str:
@@ -406,12 +608,16 @@ def save_draft(
     if mention["isHighPriority"]:
         priority_badge = " **[HIGH PRIORITY]**"
     tech_badge = "Technical" if mention["isTechnical"] else "Non-technical"
+    source_type = mention.get("source", "channel")
+    unread_badge = " (UNREAD)" if mention.get("isUnread") else ""
+    location = f"{mention['channel']['teamName']} / {mention['channel']['channelName']}"
 
     content = f"""# Draft Answer{priority_badge}
 
 ## Question Details
 - **From**: {mention['sender']}
-- **Channel**: {mention['channel']['teamName']} / {mention['channel']['channelName']}
+- **Source**: {source_type.upper()}{unread_badge}
+- **Location**: {location}
 - **Timestamp**: {mention['timestamp']}
 - **Classification**: {tech_badge}
 - **Keywords**: {', '.join(mention['matchedKeywords']) if mention['matchedKeywords'] else 'none'}
@@ -452,6 +658,8 @@ def main() -> None:
     parser.add_argument("--dry-run", action="store_true", help="Don't update state")
     parser.add_argument("--verbose", action="store_true", help="Detailed output")
     parser.add_argument("--channel", type=str, help="Scan specific channel ID only")
+    parser.add_argument("--channels-only", action="store_true", help="Skip chat scanning")
+    parser.add_argument("--chats-only", action="store_true", help="Skip channel scanning")
     parser.add_argument(
         "--no-mcp",
         action="store_true",
@@ -475,18 +683,34 @@ def main() -> None:
             sys.exit(1)
 
     try:
-        results = scan_channels(
-            config=config,
-            state=state,
-            mcp_client=mcp_client,
-            channel_filter=args.channel,
-            dry_run=args.dry_run,
-            verbose=args.verbose,
-        )
+        all_results: List[Dict[str, Any]] = []
+
+        # Scan channels
+        if not args.chats_only:
+            channel_results = scan_channels(
+                config=config,
+                state=state,
+                mcp_client=mcp_client,
+                channel_filter=args.channel,
+                dry_run=args.dry_run,
+                verbose=args.verbose,
+            )
+            all_results.extend(channel_results)
+
+        # Scan unread chats
+        if not args.channels_only:
+            chat_results = scan_chats(
+                config=config,
+                state=state,
+                mcp_client=mcp_client,
+                dry_run=args.dry_run,
+                verbose=args.verbose,
+            )
+            all_results.extend(chat_results)
 
         # Save draft files for technical questions
         drafts: List[str] = []
-        for mention in results:
+        for mention in all_results:
             if mention["isTechnical"]:
                 draft_path = save_draft(mention, config["scanner"]["outputDir"])
                 drafts.append(draft_path)
@@ -494,22 +718,30 @@ def main() -> None:
                     print(f"  Draft saved: {draft_path}")
 
         # Summary
-        total_mentions = len(results)
-        technical = sum(1 for r in results if r["isTechnical"])
-        high_pri = sum(1 for r in results if r["isHighPriority"])
+        total_mentions = len(all_results)
+        technical = sum(1 for r in all_results if r["isTechnical"])
+        high_pri = sum(1 for r in all_results if r["isHighPriority"])
+        from_channels = sum(1 for r in all_results if r.get("source") != "chat")
+        from_chats = sum(1 for r in all_results if r.get("source") == "chat")
+        unread_count = sum(1 for r in all_results if r.get("isUnread"))
 
         if args.output_json:
             output = {
                 "scanTime": datetime.now(timezone.utc).isoformat(),
                 "totalMentions": total_mentions,
+                "fromChannels": from_channels,
+                "fromChats": from_chats,
+                "unreadChats": unread_count,
                 "technicalQuestions": technical,
                 "highPriority": high_pri,
-                "mentions": results,
+                "mentions": all_results,
                 "drafts": drafts,
             }
             print(json.dumps(output, indent=2, ensure_ascii=False))
         else:
             print(f"\nScan complete: {total_mentions} mentions found")
+            print(f"  From channels: {from_channels}")
+            print(f"  From chats (unread): {from_chats}")
             print(f"  Technical questions: {technical}")
             print(f"  High priority: {high_pri}")
             print(f"  Draft files created: {len(drafts)}")
