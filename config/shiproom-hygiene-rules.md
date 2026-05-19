@@ -354,7 +354,28 @@ A sign-off is "missing" if the field is empty/null. Features that have all four 
 
 ## Teams Summary Output
 
-After all checks, write `Q:/src/personal_projects/virtual-office/output/scrum-master/hygiene-teams-summary.json` containing check2b, check4, check5, check6, check7, check8, check9, check10, check11, check12, check13, and check14 results. The poster agent's `hygiene-teams-post` job picks this up. Only sections with items are posted; empty sections are omitted entirely.
+**CRITICAL**: Write `Q:/src/personal_projects/virtual-office/output/scrum-master/hygiene-teams-summary.json` with the **exact** top-level structure below. The poster agent reads these exact keys. Do NOT use any other structure (no `meta`, `summary`, `checks` wrapper — flat top-level keys only).
+
+```json
+{
+  "generated": "2026-05-19T07:35:00-07:00",
+  "sprint": "Sprint 206 11-May to 24-May",
+  "check2b": { "items": [...], "count": N },
+  "check4":  { "items": [...], "count": N },
+  "check5":  { "items": [...], "count": N },
+  "check6":  { "items": [...], "count": N },
+  "check7":  { "items": [...], "count": N },
+  "check8":  { "items": [...], "count": N },
+  "check9":  { "items": [...], "count": N },
+  "check10": { "items": [...], "count": N },
+  "check11": { "items": [...], "count": N },
+  "check12": { "items": [...], "count": N },
+  "check13": { "items": [...], "count": N },
+  "check14": { "dashboards": [...], "overallStatus": "...", "count": N }
+}
+```
+
+Each check key MUST exist even if empty (`{ "items": [], "count": 0 }`). The poster reads `check2b`, `check4`, ..., `check13`, `check14` directly — if these keys are missing or nested inside another object, the poster will see empty data and skip posting.
 
 ---
 
