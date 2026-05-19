@@ -1,0 +1,121 @@
+{
+  "scanner": {
+    "myDisplayName": "Josh Xu",
+    "myAliases": ["Josh", "joshxu", "qitxu"],
+    "lookbackHours": 4,
+    "maxMessagesPerChannel": 50,
+    "outputDir": "output/teams-drafts",
+    "stateFile": "state/mention-scanner-state.json"
+  },
+  "channels": [
+    {
+      "id": "mj-internal-general",
+      "teamId": "31ee74d6-0a8f-41a6-b0da-c4d9e3a1db3b",
+      "channelId": "19:xr7H9O-CNFxIlnuQQnX9X6lYh60-auooh8oeQ-UR3I81@thread.tacv2",
+      "teamName": "Meeting Join Team - Internal",
+      "channelName": "General",
+      "priority": "high"
+    },
+    {
+      "id": "mj-internal-fundamentals",
+      "teamId": "31ee74d6-0a8f-41a6-b0da-c4d9e3a1db3b",
+      "channelId": "19:effce5d9a6d04247958255c5665d77c1@thread.tacv2",
+      "teamName": "Meeting Join Team - Internal",
+      "channelName": "Meeting Join Fundamentals",
+      "priority": "high"
+    },
+    {
+      "id": "mj-internal-us",
+      "teamId": "31ee74d6-0a8f-41a6-b0da-c4d9e3a1db3b",
+      "channelId": "19:183d481e40af45d09aac7322433fc7ab@thread.tacv2",
+      "teamName": "Meeting Join Team - Internal",
+      "channelName": "Meeting US",
+      "priority": "high"
+    },
+    {
+      "id": "mj-internal-discussions",
+      "teamId": "31ee74d6-0a8f-41a6-b0da-c4d9e3a1db3b",
+      "channelId": "19:78cbc605637549fc895d0298f0da7f98@thread.tacv2",
+      "teamName": "Meeting Join Team - Internal",
+      "channelName": "Team Discussions",
+      "priority": "medium"
+    },
+    {
+      "id": "mj-internal-incidents",
+      "teamId": "31ee74d6-0a8f-41a6-b0da-c4d9e3a1db3b",
+      "channelId": "19:41cc06d0da294c94bc51bec2ad117664@thread.tacv2",
+      "teamName": "Meeting Join Team - Internal",
+      "channelName": "Major Incidents (Sev0, Sev1, Sev2)",
+      "priority": "critical"
+    },
+    {
+      "id": "cmd-meetings-join",
+      "teamId": "7cc2bcc3-969b-404a-9de4-6cd1d539eb11",
+      "channelId": "19:d5811dc5c4fb4da0845b744a407a1efa@thread.skype",
+      "teamName": "Calling/Meeting/Devices",
+      "channelName": "Team - Meetings Join",
+      "priority": "high"
+    },
+    {
+      "id": "cmd-shiproom",
+      "teamId": "7cc2bcc3-969b-404a-9de4-6cd1d539eb11",
+      "channelId": "19:336e421b851e432b8a1dc4b7a33ffa77@thread.skype",
+      "teamName": "Calling/Meeting/Devices",
+      "channelName": "Shiproom",
+      "priority": "critical"
+    },
+    {
+      "id": "cmd-meeting-notes",
+      "teamId": "7cc2bcc3-969b-404a-9de4-6cd1d539eb11",
+      "channelId": "19:6457f933260242509b10bea501cdccf0@thread.skype",
+      "teamName": "Calling/Meeting/Devices",
+      "channelName": "Feature-Meeting Agenda Notes and Tasks",
+      "priority": "high"
+    },
+    {
+      "id": "fundamentals-shiproom",
+      "teamId": "2a178485-2028-4aa1-8be3-34b35b5f5448",
+      "channelId": "19:abd59dc111584fccb34f7678e1dfdd2b@thread.skype",
+      "teamName": "Fundamentals Team",
+      "channelName": "ZShiproom",
+      "priority": "critical"
+    }
+  ],
+  "classification": {
+    "technicalKeywords": [
+      "bug", "crash", "error", "regression", "telemetry", "Kusto", "KQL",
+      "pipeline", "CI-FX", "CiFx", "ring", "flight", "feature flag",
+      "slimcore", "webrtc", "media stack", "pre-join", "lobby",
+      "meeting join", "meeting notes", "transcript", "recording",
+      "latency", "timeout", "P0", "P1", "sev0", "sev1", "sev2",
+      "ICM", "incident", "livesite", "BRB", "call quality",
+      "TMP", "teams-modular-packages", "PR", "pull request",
+      "deploy", "rollback", "ECS", "config", "experiment"
+    ],
+    "questionPatterns": [
+      "\\?",
+      "(?i)can you",
+      "(?i)could you",
+      "(?i)do you know",
+      "(?i)any idea",
+      "(?i)anyone know",
+      "(?i)what is",
+      "(?i)what's",
+      "(?i)how do",
+      "(?i)how does",
+      "(?i)why is",
+      "(?i)why does",
+      "(?i)where is",
+      "(?i)when did",
+      "(?i)is there",
+      "(?i)help with",
+      "(?i)looking for",
+      "(?i)need.*info",
+      "(?i)thoughts on"
+    ],
+    "highPriorityPatterns": [
+      "(?i)P0", "(?i)P1", "(?i)sev\\s*[012]", "(?i)shiproom",
+      "(?i)urgent", "(?i)blocking", "(?i)livesite", "(?i)outage"
+    ]
+  }
+}

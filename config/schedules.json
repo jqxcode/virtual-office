@@ -1,7 +1,7 @@
 {
   "schedules": [
     {
-      "agent": "auditor",
+      "agent": "scrum-reporter",
       "job": "TODO-sprint-progress",
       "cron": "0 7 * * 1-5",
       "description": "Sprint progress report weekday mornings at 7am"
@@ -49,7 +49,7 @@
       "description": "Memory consolidation and report at 3am daily"
     },
     {
-      "agent": "auditor",
+      "agent": "scrum-reporter",
       "job": "YTD-OOF-Summary",
       "cron": "0 6 L * *",
       "description": "YTD OOF summary report on the last day of each month at 6am"
@@ -85,7 +85,7 @@
       "description": "Daily 5W incident report at midnight"
     },
     {
-      "agent": "auditor",
+      "agent": "harness-monitor",
       "job": "resolve-bugs-cleanup",
       "cron": "30 11 * * 1",
       "description": "Auto-close stale Resolved bugs every Monday at 11:30am"
@@ -103,7 +103,7 @@
       "description": "CoreIdentity entitlement approvals at 8am daily"
     },
     {
-      "agent": "auditor",
+      "agent": "scrum-reporter",
       "job": "FFv2-daily-summary",
       "cron": "0 12 * * 1-5",
       "description": "Feature Flight V2 daily report for direct reports flights, weekdays at noon"
@@ -121,13 +121,13 @@
       "description": "Approve all pending FFv2 flights from directs daily at 9:33pm"
     },
     {
-      "agent": "auditor",
+      "agent": "harness-monitor",
       "job": "agent-harness-performance",
       "cron": "0 9 * * 0",
       "description": "Weekly harness performance metrics report every Sunday at 9am"
     },
     {
-      "agent": "auditor",
+      "agent": "harness-monitor",
       "job": "failure-review",
       "cron": "0 18 * * 1-5",
       "description": "Weekday failure review at 6pm -- generates harness improvement candidates"
@@ -143,6 +143,30 @@
       "job": "brain-weekly-maintenance",
       "cron": "0 22 * * 0",
       "description": "Weekly brain maintenance: archive sessions, compile knowledge, compress, push (Sunday 10pm)"
+    },
+    {
+      "agent": "researcher",
+      "job": "scan-mentions-and-draft",
+      "cron": "0 9 * * 1-5",
+      "description": "Teams mention scan at 9am weekdays"
+    },
+    {
+      "agent": "researcher",
+      "job": "scan-mentions-and-draft",
+      "cron": "0 12 * * 1-5",
+      "description": "Teams mention scan at noon weekdays"
+    },
+    {
+      "agent": "researcher",
+      "job": "scan-mentions-and-draft",
+      "cron": "0 15 * * 1-5",
+      "description": "Teams mention scan at 3pm weekdays"
+    },
+    {
+      "agent": "researcher",
+      "job": "scan-mentions-and-draft",
+      "cron": "0 18 * * 1-5",
+      "description": "Teams mention scan at 6pm weekdays"
     }
   ]
 }
