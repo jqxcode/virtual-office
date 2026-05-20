@@ -1,0 +1,12 @@
+{
+  "jobs": {
+    "semester-planning": {
+      "displayName": "Semester Planning",
+      "prompt": "Read Q:/src/local_skills/semester-planning.md for full instructions. Automate ADO OKR hierarchy setup for a new semester transition. This includes: (1) duplicating CMD Fundamentals Objectives under the target area path, (2) re-parenting existing KRs using REST API relation swaps, (3) updating query filters to include new work item types, (4) updating dashboard widget queries to the new iteration path. Follow all gotchas documented in the skill (relation swap for re-parenting, owner-sync-function mitigation, dashboard team context). Save summary to OneDrive semester planning folder.",
+      "requiresInput": true,
+      "inputPrompt": "What semester transition? (e.g., 'H1 to H2 for Meeting Join', 'update Fun Execution dashboard from H1 to H2')",
+      "schedule": "manual",
+      "description": "Set up ADO OKR hierarchy for new semester: duplicate Objectives, re-parent KRs, update queries and dashboards"
+    }
+  }
+}
