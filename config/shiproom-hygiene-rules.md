@@ -220,141 +220,222 @@ A sign-off is "missing" if the field is empty/null. Features that have all four 
 3. Collect: ID, Title, Owner, Ring0Date, Ring4Date, Issue.
 4. **Report-only** (no auto-fix). Results included in Teams post.
 
-## Check 13: Required Training Compliance (Power BI)
+## Check 13: Upcoming Required Training Compliance by Due Date (DAX API)
 
-**Goal**: All team members must complete required trainings before their due dates. Flag anyone below 100% completion when looking 15 days ahead.
+**Goal**: Flag team members with incomplete required trainings due within the next 15 days. Uses DAX API for precise course-level data (no CDP needed).
 
-**Data source**: Power BI dashboard (NOT ADO). Requires Edge CDP to extract data.
-- URL: `https://msit.powerbi.com/groups/me/reports/c2390d89-5de8-474a-aa2d-fb29b2998d65/ReportSection607c7fe0d8afd1ba9d6f?experience=power-bi`
-- Tab: "Myself and My Directs"
+**Data source**: Power BI DAX API
+- Token: `az account get-access-token --resource https://analysis.windows.net/powerbi/api --query accessToken -o tsv`
+- Endpoint: `POST https://api.powerbi.com/v1.0/myorg/datasets/2f72a313-a17d-4ba5-b241-c4a27586d9e8/executeQueries`
+- Tables: `'Required Training'` (fact), `'Employee'` (dim), `'Courses'` (dim), `'Completion Status'` (dim)
+
+**DAX Query**:
+```dax
+EVALUATE
+VAR _cutoffKey = YEAR(TODAY() + 15) * 10000 + MONTH(TODAY() + 15) * 100 + DAY(TODAY() + 15)
+RETURN
+SELECTCOLUMNS(
+    FILTER(
+        ADDCOLUMNS(
+            'Required Training',
+            "EmployeeName", RELATED('Employee'[Employee Name]),
+            "CourseTitle", RELATED('Courses'[Course Title]),
+            "CourseLink", RELATED('Courses'[VivaDeepLink]),
+            "Status", RELATED('Completion Status'[Course Completion Status]),
+            "ReportsTo", RELATED('Employee'[Reports To Alias]),
+            "DueDateKey", 'Required Training'[CompleteByDateKey]
+        ),
+        [ReportsTo] = "qitxu" && [Status] <> "Completed" && [DueDateKey] <= _cutoffKey
+    ),
+    "Name", [EmployeeName],
+    "Course", [CourseTitle],
+    "Link", [CourseLink],
+    "DueDate", [DueDateKey],
+    "Status", [Status]
+)
+```
 
 **Steps**:
-1. Open the Power BI URL via Edge CDP (`Target.createTarget` with `background:True`). Set viewport to 1920x1080.
-2. Wait 12 seconds for page load and auth.
-3. The "Complete by Date" end-date field defaults to today. Change it to **today + 15 days** (format: M/D/YYYY). Use triple-click to select the field, then type the new date + Enter.
-4. Wait 3 seconds for the report to refresh.
-5. **Summary view**: Take a screenshot of the Summary tab. Extract: Employee Name, Required Course #, Completed #, Completion %. Flag anyone < 100%.
-6. **Detail view**: For each person below 100%, click the expand arrow (⊞) next to their name OR click the "Detail" tab to see individual courses. Extract each incomplete course:
-   - Course Title
-   - Completion Status (should be "Not Started" or "In Progress")
-   - Url (the course link from the "Url" column — this is clickable in the Power BI table)
-7. Close the CDP tab after extraction.
-8. Collect per person: Name, Completion %, list of incomplete courses with title + URL.
-9. **Report-only** (no auto-fix). Include in Teams post and hygiene-teams-summary.json as `check13`.
+1. Get PBI token via `az account get-access-token`.
+2. Run the DAX query above.
+3. Parse `DueDateKey` (YYYYMMDD integer) into readable date (e.g. 20260531 → 2026-05-31).
+4. Group results by person. For each person, list their incomplete courses with title, link, due date.
+5. If 0 rows returned, all training is complete — skip this section.
 
 **check13 JSON format**:
 ```json
 {
   "items": [
     {
-      "name": "Josh Xu",
-      "completionPct": 71,
-      "required": 7,
-      "completed": 5,
+      "name": "Brent Weatherall",
       "missing": [
-        {"title": "Course Name Here", "url": "https://..."},
-        {"title": "Another Course", "url": "https://..."}
+        {"title": "Security Foundations: Safeguarding Data", "url": "https://vivalearning.microsoft.com/...", "dueDate": "2026-05-31"}
       ]
     }
   ],
-  "count": 9
+  "count": 6
 }
 ```
 
-**If CDP fails** (Edge not running, auth expired, page doesn't load): Skip this check gracefully. Output "Check 13 skipped: CDP unavailable" and continue with other checks.
+**If DAX token fails**: Skip this check. Output "Check 13 skipped: DAX token unavailable" and continue.
 
-## Check 14: CiFX Dashboard Review (Power BI)
+## Check 14: CiFX Test Health (DAX API + ADO + CDP)
 
-**Goal**: Review 3 CiFX (CI-Fx end-to-end test automation) Power BI dashboards for Meeting Join area health. Flag regressions, low coverage areas, and failing tests.
+**Goal**: Monitor CiFX end-to-end test automation health for Meeting Join Fundamentals and Notes areas. Two data sources: DAX API for precise test metrics, ADO for flaky threshold bugs, and CDP screenshots for Coverage/Health dashboards (no DAX permission).
 
-**Data source**: Power BI dashboards (NOT ADO). Requires Edge CDP to extract data via screenshots + Claude Vision analysis.
+### Data Sources
 
-### Dashboards
+**A. DAX REST API** (CI-Fx test results — precise numbers):
+- Token: `az account get-access-token --resource https://analysis.windows.net/powerbi/api --query accessToken -o tsv`
+- Endpoint: `POST https://api.powerbi.com/v1.0/myorg/groups/6f77e458-234c-4bd7-9a21-710c43dbb575/datasets/64f4d901-8372-485e-98e0-5a0820443d4b/executeQueries`
+- Table: `TestResults` with columns: TESTNAME, RESULT, DateOnly, Ring, Experience_T, Cloud, SuiteName, TestPass, TestFail, TestError, Total, EXCEPTION, FrootLink
 
-1. **Coverage Management System** (Coverage Overview + Test Insights)
-   - URL: `https://msit.powerbi.com/groups/20c32c44-8c53-4170-8f86-af6bf197dad1/reports/396a474e-3593-40ed-9ce5-0cfa132cbf8b/2e0fc615bdd2e0acb735?experience=power-bi`
-   - What to look for: Test coverage % by scenario/area path, gaps in coverage for Meeting Join scenarios, newly uncovered areas
+**B. ADO Work Item Search** (flaky threshold bugs):
+- Search for tag `cifx-jailed-tests-above-threshold` under both area paths
+- Check for non-Closed bugs
 
-2. **CI-Fx Health Dashboard** (Overview)
-   - URL: `https://msit.powerbi.com/groups/6f77e458-234c-4bd7-9a21-710c43dbb575/reports/1c6ea5bc-2607-4330-9e80-a941ebf948b1/2b99a1918f6763784949?experience=power-bi`
-   - What to look for: Overall CI-Fx pipeline health, failure trends, infrastructure issues affecting test runs
+**C. CDP Screenshots** (Coverage + CI-Fx Health dashboards — no DAX Build permission):
+- Coverage: `https://msit.powerbi.com/groups/20c32c44-8c53-4170-8f86-af6bf197dad1/reports/396a474e-3593-40ed-9ce5-0cfa132cbf8b/2e0fc615bdd2e0acb735?experience=power-bi`
+- CI-Fx Health: `https://msit.powerbi.com/groups/6f77e458-234c-4bd7-9a21-710c43dbb575/reports/1c6ea5bc-2607-4330-9e80-a941ebf948b1/2b99a1918f6763784949?experience=power-bi`
 
-3. **CI-Fx Automation** (Test Results Visualization)
-   - URL: `https://msit.powerbi.com/groups/6f77e458-234c-4bd7-9a21-710c43dbb575/reports/d3ff0862-0dfb-4846-86d7-9a6305872233/d7db79f44effd71e6996?experience=power-bi`
-   - What to look for: Individual test pass/fail rates, flaky tests, regressions in Meeting Join area paths
-
-### Area paths to focus on
+### Area paths to monitor
 - `MSTeams\Calling Meeting Devices (CMD)\Meetings\Meeting Join\Fundamentals`
 - `MSTeams\Calling Meeting Devices (CMD)\Meetings\Notes`
-- When Mobile scenario rows appear in these dashboards, include those area paths too
+
+### IMPORTANT: TESTNAME filtering
+
+The TestResults table has **no AreaPath column**. Filter by TESTNAME patterns using `CONTAINSSTRING`:
+
+**Include** (Meeting Join scenarios):
+- `"Meeting join"`, `"Meeting rejoin"`, `"Bvt join"`, `"Anonymous Join"`, `"prejoin"`, `"Pre Join"`, `"Scheduled meeting join"`, `"peek meeting join"`, `"E2EE meeting join"`, `"Started Notification"`, `"Join Meeting"`, `"Join Launcher"`
+
+**Exclude** (not Meeting Join Fundamentals/Notes area):
+- `"Townhall"`, `"Broadcast"`, `"Webinar"`, `"MTMA Sign-in"`, `"Call History"`, `"Streaming Attendee"`, `"Doppler"`, `"SLA lock"`, `"cifx_testsets"`, `"Immersive"`, `"Production Studio"`, `"Breakout room"`
 
 ### Steps
 
-1. Open each dashboard URL via Edge CDP (`Target.createTarget` with `background:True`). Set viewport to 1920x1080.
-2. Wait 12 seconds for page load and auth.
-3. Take a full-page screenshot of each dashboard's default view.
-4. If the dashboard has filters for area path or scenario, apply filters for Meeting Join and Meeting Notes areas. Take another screenshot after filtering.
-5. Use Claude Vision to analyze each screenshot and extract:
-   - **Coverage dashboard**: Coverage %, uncovered scenarios, trend direction (improving/declining)
-   - **Health dashboard**: Pipeline pass rate, failure count, top failure reasons, trend
-   - **Automation dashboard**: Test pass rate, failing test names, flaky test count, regressions vs previous period
-6. Close all CDP tabs after extraction.
+**Part A — DAX Queries (last 7 days):**
+
+1. Get PBI token via `az account get-access-token`.
+2. Run DAX: **Overall Meeting Join pass rate** (summary of included TESTNAME patterns, excluding the Exclude list).
+3. Run DAX: **Top 20 failing tests** — `GROUPBY` on TESTNAME, sort by Fail descending.
+4. Run DAX: **Daily trend** — `GROUPBY` on DateOnly.
+5. Run DAX: **By Ring** — `GROUPBY` on Ring.
+6. Run DAX: **Completely broken tests** (0% pass rate, >= 10 runs).
+7. Run DAX: **Top exceptions** — `GROUPBY` on EXCEPTION where RESULT = "Failed".
+
+DAX pattern for filtered queries:
+```dax
+EVALUATE
+VAR _filtered = FILTER(TestResults,
+    TestResults[DateOnly] >= DATE(<year>, <month>, <day>) &&
+    (CONTAINSSTRING(TestResults[TESTNAME], "Meeting join") || ... ) &&
+    NOT(CONTAINSSTRING(TestResults[TESTNAME], "Townhall")) && ...
+)
+RETURN GROUPBY(_filtered, TestResults[TESTNAME],
+    "Runs", SUMX(CURRENTGROUP(), TestResults[Total]),
+    "Pass", SUMX(CURRENTGROUP(), TestResults[TestPass]),
+    "Fail", SUMX(CURRENTGROUP(), TestResults[TestFail])
+)
+```
+
+**Part B — ADO Flaky Bug Check:**
+
+8. Search ADO for non-Closed bugs with tag `cifx-jailed-tests-above-threshold` under:
+   - `MSTeams\Calling Meeting Devices (CMD)\Meetings\Meeting Join\Fundamentals`
+   - `MSTeams\Calling Meeting Devices (CMD)\Meetings\Notes`
+9. If any open bugs found, include Bug ID, Title, AssignedTo, jailed %, and state in report.
+
+**Part C — CDP Screenshots (Coverage + Health):**
+
+10. Open Coverage dashboard and CI-Fx Health dashboard via Edge CDP (background tab, 1920x1080 viewport).
+11. Wait 15 seconds. Take screenshot. Close tab.
+12. Use Claude Vision to extract: Coverage overall %, CI-Fx pass rate gauges, jail rate trends.
+13. Save screenshots to `output/scrum-master/cifx-screenshots/`.
+14. **Do NOT attempt to interact with Power BI slicers** — CDP keyDown/insertText does not trigger Power BI internal filtering. Screenshot default view only.
 
 ### Health Thresholds
 
 | Metric | Healthy | Degraded | Critical |
 |--------|---------|----------|----------|
-| Test Coverage % | >= 80% | 60%-79% | < 60% |
-| Pipeline Pass Rate | >= 95% | 85%-94% | < 85% |
-| Test Pass Rate | >= 90% | 80%-89% | < 80% |
-| Flaky Test Count | 0-2 | 3-5 | > 5 |
+| Meeting Join Pass Rate (DAX) | >= 85% | 75%-84% | < 75% |
+| Broken Tests (0% pass) | 0 | 1-3 | > 3 |
+| Open Flaky Threshold Bugs | 0 | 1 | > 1 |
+| Overall CI-Fx Pass Rate (CDP) | >= 85% | 80%-84% | < 80% |
+| CI-Fx Jail Rate (CDP) | < 5% | 5%-10% | > 10% |
 
 ### Output
 
-7. Collect per dashboard: name, health status (healthy/degraded/critical), key metrics, list of issues found.
-8. Save screenshots to `output/scrum-master/cifx-screenshots/` (overwrite each run).
-9. **Report-only** (no auto-fix). Include in Teams post and hygiene-teams-summary.json as `check14`.
+15. Collect: DAX metrics, ADO bug status, CDP screenshot analysis.
+16. **Report-only** (no auto-fix). Include in Teams post and hygiene-teams-summary.json as `check14`.
 
 **check14 JSON format**:
 ```json
 {
-  "dashboards": [
-    {
-      "name": "Coverage Management System",
-      "status": "degraded",
-      "metrics": {"coveragePct": 72, "uncoveredScenarios": 5},
-      "issues": ["Meeting Join Browser coverage dropped from 85% to 72%", "No Mobile scenario coverage yet"],
-      "screenshotPath": "output/scrum-master/cifx-screenshots/coverage.png"
-    },
-    {
-      "name": "CI-Fx Health Dashboard",
-      "status": "healthy",
-      "metrics": {"pipelinePassRate": 97, "failureCount": 2},
-      "issues": [],
-      "screenshotPath": "output/scrum-master/cifx-screenshots/health.png"
-    },
-    {
-      "name": "CI-Fx Automation",
-      "status": "critical",
-      "metrics": {"testPassRate": 78, "flakyTests": 8, "regressions": 3},
-      "issues": ["8 flaky tests in Meeting Join area", "3 new regressions since last week"],
-      "screenshotPath": "output/scrum-master/cifx-screenshots/automation.png"
-    }
-  ],
-  "overallStatus": "critical",
-  "count": 3
+  "dax": {
+    "passRate": 78.0,
+    "totalRuns": 380990,
+    "passed": 297250,
+    "failed": 56231,
+    "brokenTests": ["test name 1", "test name 2"],
+    "topFailures": [
+      {"name": "2P: Meeting join from Started Notification (c2-c2)", "runs": 6953, "fail": 1996, "passRate": 64.4}
+    ],
+    "topExceptions": [
+      {"exception": "Requesting APM accounts failed", "count": 10537}
+    ],
+    "dailyTrend": [
+      {"date": "2026-05-12", "passRate": 69.3},
+      {"date": "2026-05-13", "passRate": 78.4}
+    ]
+  },
+  "ado": {
+    "openFlakyBugs": [],
+    "fundamentalsStatus": "healthy",
+    "notesStatus": "healthy"
+  },
+  "cdp": {
+    "coverageOverallPct": 93.01,
+    "cifxPassRate": 85.85,
+    "cifxJailRate": 13.76,
+    "screenshots": ["output/scrum-master/cifx-screenshots/coverage.png", "output/scrum-master/cifx-screenshots/health.png"]
+  },
+  "overallStatus": "degraded",
+  "count": 1
 }
 ```
 
-**Overall status**: worst status across the 3 dashboards (critical > degraded > healthy).
+**Overall status**: worst of (DAX pass rate threshold, open flaky bugs, CDP metrics).
 
-**If CDP fails** (Edge not running, auth expired, page doesn't load): Skip this check gracefully. Output "Check 14 skipped: CDP unavailable" and continue with other checks.
+**If DAX token fails**: Fall back to CDP-only for all 3 dashboards. Output "DAX unavailable, using CDP screenshots only."
+**If CDP fails**: Skip CDP portion. Output "CDP unavailable, DAX data only."
 
 ---
 
 ## Teams Summary Output
 
-After all checks, write `Q:/src/personal_projects/virtual-office/output/scrum-master/hygiene-teams-summary.json` containing check2b, check4, check5, check6, check7, check8, check9, check10, check11, check12, check13, and check14 results. The poster agent's `hygiene-teams-post` job picks this up. Only sections with items are posted; empty sections are omitted entirely.
+**CRITICAL**: Write `Q:/src/personal_projects/virtual-office/output/scrum-master/hygiene-teams-summary.json` with the **exact** top-level structure below. The poster agent reads these exact keys. Do NOT use any other structure (no `meta`, `summary`, `checks` wrapper — flat top-level keys only).
+
+```json
+{
+  "generated": "2026-05-19T07:35:00-07:00",
+  "sprint": "Sprint 206 11-May to 24-May",
+  "check2b": { "items": [...], "count": N },
+  "check4":  { "items": [...], "count": N },
+  "check5":  { "items": [...], "count": N },
+  "check6":  { "items": [...], "count": N },
+  "check7":  { "items": [...], "count": N },
+  "check8":  { "items": [...], "count": N },
+  "check9":  { "items": [...], "count": N },
+  "check10": { "items": [...], "count": N },
+  "check11": { "items": [...], "count": N },
+  "check12": { "items": [...], "count": N },
+  "check13": { "items": [...], "count": N },
+  "check14": { "dashboards": [...], "overallStatus": "...", "count": N }
+}
+```
+
+Each check key MUST exist even if empty (`{ "items": [], "count": 0 }`). The poster reads `check2b`, `check4`, ..., `check13`, `check14` directly — if these keys are missing or nested inside another object, the poster will see empty data and skip posting.
 
 ---
 
