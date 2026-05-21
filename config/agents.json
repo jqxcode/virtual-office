@@ -29,7 +29,23 @@
       "displayName": "Auditor",
       "icon": "",
       "agentFile": "~/.claude/agents/auditor.md",
-      "description": "Consolidates memories, generates sprint progress reports, compares run results, audits permissions, and generates daily HTML reports",
+      "description": "Consolidates memories, audits permissions, audits report templates, and checks agent brain health",
+      "staleLockTimeoutMinutes": 120,
+      "group": "Other Agents"
+    },
+    "scrum-reporter": {
+      "displayName": "Scrum Reporter",
+      "icon": "",
+      "agentFile": "~/.claude/agents/scrum-reporter.md",
+      "description": "Generates sprint progress reports, OOF summaries, and Feature Flight daily reports for CMD Meeting Join and Meeting Notes teams",
+      "staleLockTimeoutMinutes": 150,
+      "group": "Work Agents"
+    },
+    "harness-monitor": {
+      "displayName": "Harness Monitor",
+      "icon": "",
+      "agentFile": "~/.claude/agents/harness-monitor.md",
+      "description": "Monitors agent harness health -- performance metrics, failure patterns, and stale bug cleanup",
       "staleLockTimeoutMinutes": 120,
       "group": "Other Agents"
     },
@@ -71,6 +87,30 @@
       "agentFile": "~/.claude/agents/approver.md",
       "description": "Manual approval agent for web-based approval workflows (FFv2 flights, etc.)",
       "staleLockTimeoutMinutes": 30,
+      "group": "Work Agents"
+    },
+    "connector": {
+      "displayName": "Connector",
+      "icon": "",
+      "agentFile": "~/.claude/agents/connector.md",
+      "description": "Connects to bank and CC portals via Chrome CDP to download tax docs, transactions, and account data",
+      "staleLockTimeoutMinutes": 120,
+      "group": "Other Agents"
+    },
+    "accountant": {
+      "displayName": "Accountant",
+      "icon": "",
+      "agentFile": "~/.claude/agents/accountant.md",
+      "description": "Tax return preparation, bookkeeping review, and QBO management for Oakley Management LLC and related entities",
+      "staleLockTimeoutMinutes": 200,
+      "group": "Other Agents"
+    },
+    "mManager": {
+      "displayName": "mManager",
+      "icon": "",
+      "agentFile": "~/.claude/agents/mManager.md",
+      "description": "Microsoft management agent for Connect performance reviews, team feedback, semester planning, and EM operational tasks",
+      "staleLockTimeoutMinutes": 120,
       "group": "Work Agents"
     }
   }
