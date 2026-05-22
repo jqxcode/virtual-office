@@ -1,0 +1,20 @@
+{
+  "jobs": {
+    "connect-CC": {
+      "displayName": "Connect CC / Bank",
+      "prompt": "Read ${LOCAL_SKILLS}/connect-CC.md for full instructions. Then execute the user's request using Chrome CDP on port 9223. Find each bank's authenticated tab by domain, navigate to the relevant section, and download/extract the requested data. Never close the browser. Never open files in Edge. Save all output to the configured directories and report results.",
+      "requiresInput": true,
+      "inputPrompt": "What do you want to do? (e.g., 'download 2025 tax documents from all banks', 'pull transactions from Capital One')",
+      "schedule": "manual",
+      "description": "Connect to CC/bank portals via Chrome CDP to download tax docs, transactions, and account data"
+    },
+    "personal-VM": {
+      "displayName": "Personal Azure VM",
+      "prompt": "Read ${LOCAL_SKILLS}/personal-vm.md for full instructions. Then execute the user's request. CRITICAL: always switch to subscription dccd7bf2-f1a6-4514-874c-812f0e2b19ec before any az CLI operation, and switch back to MSFT-Provisioning-01[Prod] after. For SSH, use key ~/.ssh/id_rsa_jpn0001 with -o PreferredAuthentications=publickey. Report results clearly.",
+      "requiresInput": true,
+      "inputPrompt": "What do you want to do? (e.g., 'start JPN0001', 'check disk space', 'how much have I spent this month')",
+      "schedule": "manual",
+      "description": "Manage personal Azure VMs -- start, stop, SSH, expand disk, query costs, run remote commands"
+    }
+  }
+}

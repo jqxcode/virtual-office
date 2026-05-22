@@ -414,7 +414,7 @@ RETURN GROUPBY(_filtered, TestResults[TESTNAME],
 
 ## Teams Summary Output
 
-**CRITICAL**: Write `Q:/src/personal_projects/virtual-office/output/scrum-master/hygiene-teams-summary.json` with the **exact** top-level structure below. The poster agent reads these exact keys. Do NOT use any other structure (no `meta`, `summary`, `checks` wrapper — flat top-level keys only).
+**CRITICAL**: Write `${REPO_PERSONAL}/virtual-office/output/scrum-master/hygiene-teams-summary.json` with the **exact** top-level structure below. The poster agent reads these exact keys. Do NOT use any other structure (no `meta`, `summary`, `checks` wrapper — flat top-level keys only).
 
 ```json
 {
@@ -441,7 +441,7 @@ Each check key MUST exist even if empty (`{ "items": [], "count": 0 }`). The pos
 
 ## HTML Report Output Rules
 
-- **Template**: `Q:/src/personal_projects/virtual-office/templates/scrum-master-shiproom-hygiene.html`
+- **Template**: `${REPO_PERSONAL}/virtual-office/templates/scrum-master-shiproom-hygiene.html`
 - Read the template, replace `{{PLACEHOLDER}}` values. Do NOT redesign layout/colors/sections.
 
 ### Placeholder rules:
