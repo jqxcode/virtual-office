@@ -1,9 +1,12 @@
-param(
+﻿param(
     [string]$Id,
     [switch]$List
 )
 
-$wishFile = "Q:\src\personal_projects\virtual-office\state\wish-list.json"
+# Resolve paths via constants so this script works on any machine regardless of drive letter
+. (Join-Path $PSScriptRoot "constants.ps1")
+
+$wishFile = Join-Path $STATE_DIR "wish-list.json"
 
 if (-not (Test-Path $wishFile)) {
     Write-Error "Wish list not found at $wishFile"
@@ -58,7 +61,7 @@ Next Steps:
 $nextSteps
 Notes: $($wish.notes)
 
-Wish list file: Q:/src/personal_projects/virtual-office/state/wish-list.json
+Wish list file: $($wishFile -replace '\\', '/')
 Wish ID: $($wish.id)
 
 When we make progress, update the wish-list.json with new status and next steps.
