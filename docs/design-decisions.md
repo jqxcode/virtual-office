@@ -51,7 +51,7 @@ The two-tier threshold (hang vs. kill) provides graduated response:
 ```
 scrum-master:  hang=60min   kill=120min
 bug-killer:    hang=90min   kill=180min
-emailer:       hang=30min   kill=60min
+pEmailer:      hang=30min   kill=60min
 auditor:       hang=20min   kill=30min
 poster:        hang=15min   kill=30min
 hang-scout:    excluded (cannot detect its own hangs)

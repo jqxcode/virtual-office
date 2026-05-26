@@ -75,7 +75,7 @@ which requires administrator privileges. See design-decisions.md for rationale.
 | scrum-master | Scrum Master | Work Agents | Sprint progress, ADO autopilot, bug autopilot runs | 120 |
 | bug-killer | Bug Killer | Work Agents | Scans repos for open issues, creates fix PRs, maintains open PRs | 180 |
 | poster | Poster | Work Agents | Posts daily Bug-AutoPilot summary to Teams channel | 30 |
-| emailer | Emailer | Other Agents | Manages Gmail inboxes -- scan, classify, digest (portal: localhost:8402) | 60 |
+| pEmailer | pEmailer | Other Agents | Manages Gmail inboxes -- scan, classify, digest (portal: localhost:8402) | 60 |
 | auditor | Auditor | Other Agents | Memory consolidation, sprint progress, compare-runs, OOF summary, report audit | 120 |
 | hang-scout | Hang Scout | Other Agents | Hung job detection, py-spy diagnosis, daily 5W incident report | 15 |
 
@@ -104,7 +104,7 @@ which requires administrator privileges. See design-decisions.md for rationale.
 | open-pr-maintenance | Hourly at :03 | Resolve merge conflicts + address review comments on all open PRs |
 | daily-summary | 1:30am daily | Aggregates all bug-killer activity from past 24h into single report, opens in Edge "Daily" tab group |
 
-### emailer
+### pEmailer
 
 | Job | Schedule | Description |
 |-----|----------|-------------|
@@ -159,7 +159,7 @@ hangDetection:
   perAgent:
     scrum-master:  hang=60  kill=120
     bug-killer:    hang=90  kill=180
-    emailer:       hang=30  kill=60
+    pEmailer:      hang=30  kill=60
     auditor:       hang=20  kill=30
     poster:        hang=15  kill=30
 ```

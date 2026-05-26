@@ -1,0 +1,10 @@
+{
+  "jobs": {
+    "scan-all-mailboxes": {
+      "prompt": "IMPORTANT: Before generating any report, read and follow ALL rules in ${REPO_PERSONAL}/virtual-office/config/report-rules.md. Scan all enabled Gmail mailboxes for new emails. Run from ${REPO_PERSONAL}/gmail-checker/: python -m src --scan-all --reprocess. After the scan completes: If no meaningful work was done (no new emails found across all mailboxes), do NOT generate an HTML report -- just output 'Email scan: no new emails across N mailboxes.' (replacing N with the actual count) and exit. Only generate a full report when at least one new email was found in any mailbox. You MUST use the fixed template at ${REPO_PERSONAL}/virtual-office/templates/pEmailer-scan.html. Read the template file, then replace all {{PLACEHOLDER}} values with actual data. Replace {{VO_SUBTITLE}} with: Agent: pEmailer | Job: scan-all-mailboxes | Start: <PST timestamp when job started> | Complete: <PST timestamp when report is generated>. Replace {{MAILBOX_CARDS}} with one card block per mailbox containing: mailbox name, email address, message counts by category (auto-delete, review, keep, rollup), and actions executed. Save the report to ${REPO_PERSONAL}/virtual-office/output/pEmailer/scan-YYYYMMDD-HHMMSS.html (using local time, zero-padded) and also as scan-latest.html in the same directory.",
+      "maxRuns": 0,
+      "saveOutput": true,
+      "description": "Scans all Gmail mailboxes, classifies emails, generates daily digest"
+    }
+  }
+}

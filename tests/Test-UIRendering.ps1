@@ -1,4 +1,4 @@
-#Requires -Version 7.0
+﻿#Requires -Version 7.0
 # Test-UIRendering.ps1 -- Structural validation of UI rendering (tooltip/card clipping)
 # Run: pwsh -File tests/Test-UIRendering.ps1
 
@@ -686,9 +686,9 @@ if (-not (Test-Path $AppJsFile)) {
 }
 
 # ========================================
-# TC85: agents.json emailer has portalUrl
+# TC85: agents.json pEmailer has portalUrl
 # ========================================
-Write-Host "`nTC85: agents.json emailer has portalUrl" -ForegroundColor Cyan
+Write-Host "`nTC85: agents.json pEmailer has portalUrl" -ForegroundColor Cyan
 
 $AgentsJsonFileTC85 = Join-Path $ProjectRoot "config/agents.json"
 if (-not (Test-Path $AgentsJsonFileTC85)) {
@@ -696,9 +696,9 @@ if (-not (Test-Path $AgentsJsonFileTC85)) {
     $script:Failed++
 } else {
     $AgentsJsonTC85 = Get-Content -Path $AgentsJsonFileTC85 -Raw | ConvertFrom-Json
-    $emailerAgent = $AgentsJsonTC85.agents.emailer
+    $emailerAgent = $AgentsJsonTC85.agents.pEmailer
     $hasPortalUrlField = $null -ne $emailerAgent.portalUrl -and $emailerAgent.portalUrl -ne ""
-    Assert-True $hasPortalUrlField "emailer agent in agents.json has a non-empty portalUrl field"
+    Assert-True $hasPortalUrlField "pEmailer agent in agents.json has a non-empty portalUrl field"
 
     # Verify scrum-master does NOT have portalUrl
     $scrumMasterAgent = $AgentsJsonTC85.agents."scrum-master"

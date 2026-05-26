@@ -16,10 +16,10 @@
       "staleLockTimeoutMinutes": 180,
       "group": "Work Agents"
     },
-    "emailer": {
-      "displayName": "Emailer",
+    "pEmailer": {
+      "displayName": "pEmailer",
       "icon": "",
-      "agentFile": "~/.claude/agents/emailer.md",
+      "agentFile": "~/.claude/agents/pEmailer.md",
       "description": "Manages Gmail inboxes - scans, classifies, generates digests across multiple mailboxes",
       "staleLockTimeoutMinutes": 60,
       "group": "Other Agents",

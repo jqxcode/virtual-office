@@ -30,7 +30,7 @@
             "hangThresholdMinutes": 90,
             "killThresholdMinutes": 180
           },
-          "emailer": {
+          "pEmailer": {
             "hangThresholdMinutes": 30,
             "killThresholdMinutes": 60
           },
@@ -69,6 +69,14 @@
         "trendAlertPercent": 20,
         "slowestBugsCount": 5
       }
+    },
+    "azure-openai-metrics": {
+      "displayName": "Azure OpenAI Metrics Report",
+      "prompt": "IMPORTANT: Before generating any report, read and follow ALL rules in ${REPO_PERSONAL}/virtual-office/config/report-rules.md. Generate the Azure OpenAI usage metrics report. Read the full skill doc at ${LOCAL_SKILLS}/azure-openai-metrics.md and follow the procedure exactly. Pull last 24h metrics (TotalCalls, TotalErrors, BlockedCalls, Ratelimit, ClientErrors, ServerErrors) for both resources (chn0001-openai in Japan East, openai-eastus in East US) using az monitor metrics list. Also pull 7-day cost data via az costmanagement query. Generate a self-contained HTML report using the Stripe design system from ${SRC_ROOT}/DESIGN.md with summary tiles, hourly usage tables, CSS bar charts, cost breakdown, alerts section, and recommendations. Save to output/hang-scout/azure-openai-metrics-YYYY-MM-DD.html. CRITICAL: Switch to subscription dccd7bf2-f1a6-4514-874c-812f0e2b19ec before any az command, and switch back to MSFT-Provisioning-01[Prod] after. IMPORTANT: Your output MUST use ASCII-only characters.",
+      "maxRuns": 0,
+      "saveOutput": true,
+      "description": "Pulls Azure OpenAI usage metrics and cost data, generates daily HTML dashboard report",
+      "schedule": "daily"
     }
   }
 }

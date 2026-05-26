@@ -10,7 +10,7 @@ var CONFIG = {
 var AGENT_COLORS = {
   "scrum-master": "#3b82f6",   // blue
   "bug-killer": "#ef4444",     // red
-  "emailer": "#22c55e",        // green
+  "pEmailer": "#22c55e",       // green
   "auditor": "#a855f7",        // purple
   "poster": "#f59e0b",         // amber
   "hang-scout": "#06b6d4"      // cyan
@@ -20,7 +20,8 @@ var AGENT_COLORS = {
 // Maps old/renamed agent names to their current canonical names
 var LEGACY_AGENT_NAMES = {
   "memo-checker": "auditor",
-  "checker": "auditor"
+  "checker": "auditor",
+  "emailer": "pEmailer"
 };
 
 function canonicalAgentName(name) {

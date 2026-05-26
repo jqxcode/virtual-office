@@ -27,7 +27,7 @@ AUDIT_DIR = PROJECT_ROOT / "output" / "audit"
 AGENT_COLORS = {
     "scrum-master": "#3b82f6",   # --vo-status-info
     "bug-killer": "#ef4444",     # --vo-status-error
-    "emailer": "#22c55e",        # --vo-status-success
+    "pEmailer": "#22c55e",       # --vo-status-success
     "auditor": "#a855f7",        # purple (consistent with app.js)
     "poster": "#f59e0b",         # --vo-status-warning
     "hang-scout": "#06b6d4",     # cyan

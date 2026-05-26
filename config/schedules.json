@@ -37,7 +37,7 @@
       "description": "Bug killer daily activity summary at 1:30am"
     },
     {
-      "agent": "emailer",
+      "agent": "pEmailer",
       "job": "scan-all-mailboxes",
       "cron": "0 7 * * *",
       "description": "Gmail scan all mailboxes at 7am daily"
