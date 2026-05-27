@@ -1,5 +1,38 @@
 # Shiproom Hygiene Check — Rules & Check Definitions
 
+## SAFETY POLICY (read first — mandatory)
+
+**Background**: On 2026-05-22 a buggy run of this skill auto-moved 1446 work items across the MSTeams project (iOS, Teams Rooms, Telemetry, Web, ...) because the LLM regenerated a Check 3 WIQL without an area-path filter. The mutations have been reverted but the failure mode is permanent — LLM-generated WIQL is untrustworthy.
+
+**The skill IS allowed to mutate items (PATCH state, iteration, relations)**, but ONLY under all of the following conditions. If any condition fails, the check MUST fall back to comment-only.
+
+### Hard rules — apply to every mutating check (1, 2, 3, 5, 6)
+
+1. **WIQL must include the area filter literally**: `[System.AreaPath] UNDER '<allowed-area>'`. Before issuing any WIQL whose results will lead to PATCH, the script MUST assert the WIQL string contains `[System.AreaPath] UNDER`. If absent, abort the check and log an audit event.
+
+2. **Per-item area re-check before PATCH**: After fetching each candidate item, the script MUST verify `item.fields["System.AreaPath"].startswith(<allowed-area>)` immediately before any PATCH call. If false, skip and log.
+
+3. **Allowed area list** (computed at runtime; see "Allowed areas by date" below). The check MUST use this list verbatim — no other path may be substituted.
+
+4. **Per-run mutation cap**: 50 PATCH calls. If a run would exceed 50, stop after the 50th and log a `cap_reached` event. (Sanity check — a healthy day touches < 20 items; 50+ is a red flag.)
+
+5. **Dry-run preview**: Every mutating check MUST log every planned PATCH (id, current values, planned new values) to `output/scrum-master/hygiene-patch-plan-<timestamp>.jsonl` BEFORE executing, so an audit reviewer can reconstruct exactly what changed.
+
+6. **Audit trail**: After every PATCH, append `{id, check, before, after, timestamp}` to `output/scrum-master/hygiene-mutations-<YYYY-MM-DD>.jsonl`.
+
+### Allowed areas by date
+
+Compute today's date at runtime; pick the matching set:
+
+- **Before 2026-06-01** (today < 2026-06-01):
+  - `MSTeams\Calling Meeting Devices (CMD)\Meetings\Meeting Join\Fundamentals`
+  - `MSTeams\Calling Meeting Devices (CMD)\Meetings\Notes`
+- **On or after 2026-06-01** (today >= 2026-06-01):
+  - `MSTeams\Calling Meeting Devices (CMD)\Meetings\Meeting Join\Fundamentals`
+  - (Notes is dropped — Notes team handles its own hygiene from then on.)
+
+Comment-only checks (4, 7-14) follow the same area list.
+
 ## Scope
 
 - **Areas** (run every check against BOTH):
@@ -27,18 +60,20 @@
 
 **Goal**: Tasks should be parented under User Stories or Features, never under other Tasks.
 
-1. WIQL link query per area:
+**Action policy: PATCH allowed under the Hard Rules in the safety policy.**
+
+1. WIQL link query — run ONCE per area in the allowed-areas list. The query MUST include `[Source].[System.AreaPath] UNDER '<allowed-area>'`:
    ```
    SELECT [System.Id], [System.Title], [System.WorkItemType]
    FROM workitemLinks
    WHERE ([Source].[System.WorkItemType] = 'Task'
-     AND [Source].[System.AreaPath] UNDER '<area-path>')
+     AND [Source].[System.AreaPath] UNDER '<allowed-area>')
      AND ([System.Links.LinkType] = 'System.LinkTypes.Hierarchy-Reverse')
      AND ([Target].[System.WorkItemType] = 'Task')
    MODE (MustContain)
    ```
 2. For each child→parent Task pair:
-   a. GET child with `$expand=relations`, find parent relation index
+   a. GET child with `$expand=relations`. **Re-verify** `child.fields["System.AreaPath"]` starts with the allowed-area string; skip if not.
    b. PATCH remove parent link (`op: remove, path: /relations/{idx}`)
    c. PATCH add Related link to former parent
    d. Comment @mentioning owner: "The parent link on this task was changed to a Related link. Tasks should not be parented under another Task; use a User Story or Feature as the parent instead."
@@ -47,8 +82,19 @@
 
 **Goal**: Resolved items should be Closed, not left hanging.
 
-1. WIQL per area: `WHERE [System.State] = 'Resolved' AND [System.AreaPath] UNDER '<area>'`
-2. PATCH state to Closed, add comment: "Item should be closed instead of left Resolved. If there are any questions, reach out to Josh Xu (qitxu@microsoft.com)."
+**Action policy: PATCH allowed under the Hard Rules in the safety policy.**
+
+1. WIQL per area — run ONCE per area in the allowed-areas list. The query MUST include `[System.AreaPath] UNDER '<allowed-area>'`:
+   ```
+   SELECT [System.Id], [System.Title], [System.State], [System.AreaPath]
+   FROM workitems
+   WHERE [System.State] = 'Resolved'
+     AND [System.AreaPath] UNDER '<allowed-area>'
+   ```
+2. For each result:
+   a. GET item. **Re-verify** `item.fields["System.AreaPath"]` starts with the allowed-area string before PATCH; skip and audit-log if not.
+   b. PATCH `System.State` → `Closed`.
+   c. Comment @mentioning owner: "This item was Resolved and has been auto-closed by shiproom hygiene. If this was premature, reopen and move to a more accurate state. Questions: reach out to Josh Xu (qitxu@microsoft.com)."
 
 ## Check 2b: Blocked Features
 
@@ -62,17 +108,27 @@
    ```
 2. Comment @mentioning owner: "This Feature is in Blocked state. Please update with a reason or unblock if the blocker is resolved."
 
-## Check 3: Move Non-Closed Items from Previous Sprint
+## Check 3: Non-Closed Items from Previous Sprint
 
-**Goal**: All items in the completed sprint should be Closed. Leftovers move to current sprint.
+**Goal**: All items in the completed sprint should be Closed. Surface leftovers to their owners or roll them into the current sprint.
 
-**Grace period (5 days)**: During the first 5 days of a new sprint, do NOT auto-move items. Instead, comment @mention the owner to remind them to close out or move their work. After the grace period, auto-move.
+**Action policy: PATCH allowed under the Hard Rules in the safety policy.**
 
-1. Get current iteration (timeframe=current) and previous iteration (the one immediately before by finishDate).
-2. Calculate days since previous sprint ended (use the current sprint's startDate). If <= 5 days, set `grace_period = true`.
-3. WIQL: `WHERE [System.State] <> 'Closed' AND [System.State] <> 'Removed' AND [System.IterationPath] = '<previous>'`
-4. If `grace_period` is true: **comment @mention owner** — do NOT PATCH iteration. Add comment: "This item is still in Sprint {prev}. Please close it or move to Sprint {current} within {days_remaining} days, or it will be auto-moved." Include "(grace period — X days remaining)" in the summary.
-5. If `grace_period` is false: PATCH iteration to current sprint, add comment explaining the move.
+**Grace period**: During the first 5 days of a new sprint (i.e., `(today - current_sprint.startDate).days < 5`), set `grace_period = true` and do NOT PATCH — comment only. Owners get a few days to triage leftovers themselves before the bot auto-moves them.
+
+1. Get current iteration (timeframe=current) and previous iteration (the one immediately before by finishDate). Compute `grace_period` from current iteration startDate.
+2. WIQL per allowed-area — run ONCE per area. The query MUST literally contain `[System.AreaPath] UNDER '<allowed-area>'`:
+   ```
+   SELECT [System.Id], [System.Title], [System.State], [System.IterationPath], [System.AreaPath]
+   FROM workitems
+   WHERE [System.State] <> 'Closed' AND [System.State] <> 'Removed'
+     AND [System.IterationPath] = '<previous>'
+     AND [System.AreaPath] UNDER '<allowed-area>'
+   ```
+3. For each item:
+   a. GET item. **Re-verify** `item.fields["System.AreaPath"]` starts with the allowed-area string before PATCH; skip and audit-log if not.
+   b. If `grace_period == true`: comment @owner "This item is still in Sprint {prev} but not closed. Please close it or move it to a more appropriate sprint." Do NOT PATCH.
+   c. Else (grace period over): PATCH `System.IterationPath` → current sprint, then comment @owner "This item was left over from Sprint {prev} and has been auto-moved to the current sprint ({current}). Please close it or reassign if no longer relevant."
 
 ## Check 4: Current Sprint Tasks — Estimates and Parent
 
@@ -87,12 +143,29 @@
 
 **Goal**: Active bugs should not sit in old or default iterations.
 
-1. WIQL: `WHERE [System.WorkItemType] = 'Bug' AND [System.State] <> 'Closed' AND [System.State] <> 'Removed' AND [System.IterationPath] <> '<current>'`
-2. PATCH iteration to current sprint, add comment.
+**Action policy: PATCH allowed under the Hard Rules in the safety policy.**
+
+1. WIQL per allowed-area — run ONCE per area. The query MUST literally contain `[System.AreaPath] UNDER '<allowed-area>'`:
+   ```
+   SELECT [System.Id], [System.Title], [System.State], [System.IterationPath], [System.AreaPath]
+   FROM workitems
+   WHERE [System.WorkItemType] = 'Bug'
+     AND [System.State] <> 'Closed' AND [System.State] <> 'Removed'
+     AND [System.IterationPath] <> '<current>'
+     AND [System.AreaPath] UNDER '<allowed-area>'
+   ```
+2. For each result:
+   a. GET item. **Re-verify** `item.fields["System.AreaPath"]` starts with the allowed-area string before PATCH; skip and audit-log if not.
+   b. PATCH `System.IterationPath` → current sprint.
+   c. Comment @mention owner: "This Bug was open but not in the current sprint, and has been auto-moved to {current}. Please close it if it's no longer active, or reassign if it needs different handling."
 
 ## Check 6: Stale Tasks from Past Sprints
 
-**Goal**: Non-closed tasks with an assignee stuck in **past** sprints (sprints that have already ended) need owner review.
+**Goal**: Non-closed tasks with an assignee stuck in **past** sprints (sprints that have already ended) need owner review or auto-rollover into the current sprint.
+
+**Action policy: PATCH allowed under the Hard Rules in the safety policy.**
+
+**Grace period**: During the first 5 days of a new sprint (`(today - current_sprint.startDate).days < 5`), set `grace_period = true` and do NOT PATCH — comment only. Owners get a few days to triage stale tasks themselves before the bot auto-moves them.
 
 **Critical scope rule**: Only flag tasks whose sprint has already ended (finishDate < today). Tasks in the current sprint or ANY future sprint are intentionally scheduled there — do NOT touch them.
 
@@ -100,24 +173,26 @@
 - **Backlog items**: Only target tasks in actual sprint iterations (path must contain "Sprint" and be `UNDER <current_semester>`). Items at root/backlog iteration paths are not stale — they're just backlog.
 - **Future sprints**: Tasks in sprints that haven't ended yet are NOT stale. The owner scheduled them there intentionally.
 
-**Grace period (5 days)**: Same as Check 3. During the first 5 days of the current sprint, do NOT auto-move tasks from the previous sprint. Instead, comment @mention the owner. After grace period, auto-move to current sprint.
-
-1. Get all iterations under `<current_semester>` with their start/finish dates. Identify current sprint and previous sprint.
-2. Calculate days since current sprint started. If <= 5 days, set `grace_period = true`.
-3. WIQL:
+1. Get all iterations under `<current_semester>` with their start/finish dates. Identify current sprint and previous sprint. Compute `grace_period` from current iteration startDate.
+2. WIQL per allowed-area — run ONCE per area. The query MUST literally contain `[System.AreaPath] UNDER '<allowed-area>'`:
    ```
+   SELECT [System.Id], [System.Title], [System.State], [System.IterationPath], [System.AssignedTo], [System.AreaPath]
+   FROM workitems
    WHERE [System.WorkItemType] = 'Task'
      AND [System.State] <> 'Closed'
      AND [System.State] <> 'Removed'
      AND [System.IterationPath] UNDER '<current_semester>'
      AND [System.AssignedTo] <> ''
+     AND [System.AreaPath] UNDER '<allowed-area>'
    ```
-4. For each result:
+3. For each result:
    a. Skip if iteration path doesn't contain "Sprint" (backlog).
    b. **Skip if the task's sprint finishDate >= today** — it's in a current or future sprint, not stale.
-   c. Only tasks in sprints that have already ended proceed to step 5/6.
-5. If in previous sprint and `grace_period` is true: **comment @mention owner** — do NOT PATCH. Add comment: "This task is still in Sprint {prev}. Please close or move within {days_remaining} days, or it will be auto-moved."
-6. If `grace_period` is false or item is from an older sprint (not just previous): PATCH to current sprint, comment @owner asking to review.
+   c. Only tasks in sprints that have already ended proceed to step 4.
+4. For each stale task:
+   a. GET item. **Re-verify** `item.fields["System.AreaPath"]` starts with the allowed-area string before PATCH; skip and audit-log if not.
+   b. If `grace_period == true`: comment @owner "This Task is still in Sprint {prev_or_older}, which has already ended. Please close it or move it to an active sprint." Do NOT PATCH.
+   c. Else (grace period over): PATCH `System.IterationPath` → current sprint, then comment @owner "This Task was stuck in Sprint {prev_or_older} (already ended) and has been auto-moved to the current sprint ({current}). Please close it or reassign if no longer relevant."
 
 ## Check 7: Proposed Bugs > 24 Hours
 
