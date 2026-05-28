@@ -37,6 +37,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
 import ssl
 import subprocess
 import sys
@@ -85,6 +86,18 @@ AREA_FILTER_LINK_TOKEN = "[Source].[System.AreaPath] UNDER"
 
 
 _ssl_ctx = ssl.create_default_context()
+
+
+# ---------------------------------------------------------------------------
+# Azure CLI command resolution
+#
+# On Windows, `az` is a CMD shim (`az.cmd`). Python's subprocess does NOT
+# consult PATHEXT when shell=False, so a bare "az" arg fails with
+# [WinError 2]. Resolve the absolute path up-front via shutil.which, with
+# an "az.cmd" fallback on Windows. This caused the 2026-05-28 08:45
+# scheduled run to abort with WinError 2 before any check executed.
+# ---------------------------------------------------------------------------
+AZ_CMD = shutil.which("az") or ("az.cmd" if os.name == "nt" else "az")
 
 
 # ---------------------------------------------------------------------------
@@ -351,7 +364,7 @@ def get_ado_token():
     # type: () -> str
     return subprocess.check_output(
         [
-            "az", "account", "get-access-token",
+            AZ_CMD, "account", "get-access-token",
             "--resource", "499b84ac-1321-427f-aa17-267ca6975798",
             "--query", "accessToken", "-o", "tsv",
         ],
@@ -363,7 +376,7 @@ def get_pbi_token():
     # type: () -> str
     return subprocess.check_output(
         [
-            "az", "account", "get-access-token",
+            AZ_CMD, "account", "get-access-token",
             "--resource", "https://analysis.windows.net/powerbi/api",
             "--query", "accessToken", "-o", "tsv",
         ],

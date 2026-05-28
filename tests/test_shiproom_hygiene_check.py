@@ -180,6 +180,29 @@ class TestComputeSemester(unittest.TestCase):
 # ---------------------------------------------------------------------------
 
 
+class TestAzCommandResolution(unittest.TestCase):
+    """Regression: Windows az.cmd resolution (2026-05-28 WinError 2 incident).
+
+    The pinned hygiene runner shells out to `az account get-access-token`
+    via subprocess with shell=False. On Windows, `az` is `az.cmd` and
+    Python does NOT consult PATHEXT when shell=False, so a bare "az"
+    arg fails with [WinError 2]. We resolve via shutil.which up-front.
+    """
+
+    def test_az_cmd_is_resolvable(self):
+        self.assertIsNotNone(
+            shc.AZ_CMD,
+            msg="AZ_CMD must resolve to a non-None path; install Azure CLI on the host.",
+        )
+
+    def test_az_cmd_ends_with_az_or_az_cmd(self):
+        cmd = (shc.AZ_CMD or "").lower()
+        self.assertTrue(
+            cmd.endswith("az") or cmd.endswith("az.cmd") or cmd.endswith("az.exe"),
+            msg="AZ_CMD should end with az / az.cmd / az.exe; got {0!r}".format(shc.AZ_CMD),
+        )
+
+
 class TestMutationCap(unittest.TestCase):
     def _make_controller(self, cap, dry_run=True):
         tmp = tempfile.mkdtemp(prefix="shc-test-")
