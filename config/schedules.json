@@ -43,6 +43,12 @@
       "description": "Gmail scan all mailboxes at 7am daily"
     },
     {
+      "agent": "pEmailer",
+      "job": "email-inbox-summary-generate",
+      "cron": "0 6 * * *",
+      "description": "Email inbox summary GENERATE sub-flow (rescan + 9 HTMLs + index link) at 6am daily, 1hr before scan-all-mailboxes"
+    },
+    {
       "agent": "auditor",
       "job": "consolidate-agent-memories",
       "cron": "0 3 * * *",
@@ -89,12 +95,6 @@
       "job": "resolve-bugs-cleanup",
       "cron": "30 11 * * 1",
       "description": "Auto-close stale Resolved bugs every Monday at 11:30am"
-    },
-    {
-      "agent": "poster",
-      "job": "BAP-Perf-Analysis-posting",
-      "cron": "0 21 * * *",
-      "description": "Bug Autopilot Performance Analysis post to Teams at 9pm daily"
     },
     {
       "agent": "approver",
