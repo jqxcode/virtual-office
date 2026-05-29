@@ -72,12 +72,22 @@ function Write-AuditEntry {
         system_version = $SYSTEM_VERSION
         details        = $Details
     } | ConvertTo-Json -Compress
-    # Use FileStream with exclusive lock to prevent concurrent write corruption
+    # Use FileStream with exclusive lock to prevent concurrent write corruption.
+    # Retry on IOException to survive concurrent runners colliding on the same
+    # audit file within milliseconds (2026-05-29 12:00 silent-crash incident).
     $line = $entry + [Environment]::NewLine
     $bytes = [System.Text.Encoding]::UTF8.GetBytes($line)
     $fs = $null
+    for ($attempt = 1; $attempt -le 10; $attempt++) {
+        try {
+            $fs = [System.IO.FileStream]::new($monthFile, [System.IO.FileMode]::Append, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
+            break
+        } catch [System.IO.IOException] {
+            if ($attempt -eq 10) { throw }
+            Start-Sleep -Milliseconds (20 * $attempt)
+        }
+    }
     try {
-        $fs = [System.IO.FileStream]::new($monthFile, [System.IO.FileMode]::Append, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
         $fs.Write($bytes, 0, $bytes.Length)
         $fs.Flush()
     } finally {
@@ -103,12 +113,22 @@ function Write-Event {
         event     = $Event
         details   = $Details
     } | ConvertTo-Json -Compress
-    # Use FileStream with exclusive lock to prevent concurrent write corruption
+    # Use FileStream with exclusive lock to prevent concurrent write corruption.
+    # Retry on IOException to survive concurrent runners colliding on the same
+    # events file within milliseconds (2026-05-29 12:00 silent-crash incident).
     $line = $entry + [Environment]::NewLine
     $bytes = [System.Text.Encoding]::UTF8.GetBytes($line)
     $fs = $null
+    for ($attempt = 1; $attempt -le 10; $attempt++) {
+        try {
+            $fs = [System.IO.FileStream]::new($EVENTS_FILE, [System.IO.FileMode]::Append, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
+            break
+        } catch [System.IO.IOException] {
+            if ($attempt -eq 10) { throw }
+            Start-Sleep -Milliseconds (20 * $attempt)
+        }
+    }
     try {
-        $fs = [System.IO.FileStream]::new($EVENTS_FILE, [System.IO.FileMode]::Append, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
         $fs.Write($bytes, 0, $bytes.Length)
         $fs.Flush()
     } finally {
