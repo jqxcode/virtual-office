@@ -15,7 +15,12 @@ param(
     [string]$Agent,
 
     [Parameter(Mandatory)]
-    [string]$Job
+    [string]$Job,
+
+    # Optional caller-supplied args. Substituted into job prompt wherever
+    # the literal string "{{EXTRA_ARGS}}" appears. Empty string when omitted.
+    [Parameter(Mandatory=$false)]
+    [string]$ExtraArgs = ""
 )
 
 Set-StrictMode -Version Latest
@@ -412,6 +417,7 @@ if (-not $prompt) {
     Write-Error "Job '$Job' has no prompt defined."
     exit 1
 }
+$prompt = $prompt.Replace("{{EXTRA_ARGS}}", $ExtraArgs)
 Write-Breadcrumb "step3_done"
 
 # Ensure state directory
@@ -745,12 +751,14 @@ while ($keepRunning) {
                 Set-QueueDepth -QueueFile $otherQueueFile -Depth $otherDepth
                 Write-Host "Draining queued job '$otherJobName' for agent '$Agent' (remaining: $otherDepth)."
 
-                # Switch to the queued job: reload its config and prompt
+                # Switch to the queued job: reload its config and prompt.
+                # Queue-drained jobs never carry caller ExtraArgs (the original
+                # invocation may have had any), so substitute with empty string.
                 $otherJobDef = $jobsConfig[$otherJobName]
                 if ($otherJobDef) {
                     $Job = $otherJobName
                     $jobDef = $otherJobDef
-                    $prompt = $otherJobDef["prompt"]
+                    $prompt = ([string]$otherJobDef["prompt"]).Replace("{{EXTRA_ARGS}}", "")
                     $stateDir = Ensure-StateDir -AgentName $Agent -JobName $Job
                     $queueFile = Join-Path $stateDir "queue"
                     $counterFile = Join-Path $stateDir "counter.json"
