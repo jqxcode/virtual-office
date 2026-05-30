@@ -15,7 +15,12 @@ param(
     [string]$Agent,
 
     [Parameter(Mandatory)]
-    [string]$Job
+    [string]$Job,
+
+    # Optional caller-supplied args. Substituted into job prompt wherever
+    # the literal string "{{EXTRA_ARGS}}" appears. Empty string when omitted.
+    [Parameter(Mandatory=$false)]
+    [string]$ExtraArgs = ""
 )
 
 Set-StrictMode -Version Latest
@@ -67,12 +72,22 @@ function Write-AuditEntry {
         system_version = $SYSTEM_VERSION
         details        = $Details
     } | ConvertTo-Json -Compress
-    # Use FileStream with exclusive lock to prevent concurrent write corruption
+    # Use FileStream with exclusive lock to prevent concurrent write corruption.
+    # Retry on IOException to survive concurrent runners colliding on the same
+    # audit file within milliseconds (2026-05-29 12:00 silent-crash incident).
     $line = $entry + [Environment]::NewLine
     $bytes = [System.Text.Encoding]::UTF8.GetBytes($line)
     $fs = $null
+    for ($attempt = 1; $attempt -le 10; $attempt++) {
+        try {
+            $fs = [System.IO.FileStream]::new($monthFile, [System.IO.FileMode]::Append, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
+            break
+        } catch [System.IO.IOException] {
+            if ($attempt -eq 10) { throw }
+            Start-Sleep -Milliseconds (20 * $attempt)
+        }
+    }
     try {
-        $fs = [System.IO.FileStream]::new($monthFile, [System.IO.FileMode]::Append, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
         $fs.Write($bytes, 0, $bytes.Length)
         $fs.Flush()
     } finally {
@@ -98,12 +113,22 @@ function Write-Event {
         event     = $Event
         details   = $Details
     } | ConvertTo-Json -Compress
-    # Use FileStream with exclusive lock to prevent concurrent write corruption
+    # Use FileStream with exclusive lock to prevent concurrent write corruption.
+    # Retry on IOException to survive concurrent runners colliding on the same
+    # events file within milliseconds (2026-05-29 12:00 silent-crash incident).
     $line = $entry + [Environment]::NewLine
     $bytes = [System.Text.Encoding]::UTF8.GetBytes($line)
     $fs = $null
+    for ($attempt = 1; $attempt -le 10; $attempt++) {
+        try {
+            $fs = [System.IO.FileStream]::new($EVENTS_FILE, [System.IO.FileMode]::Append, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
+            break
+        } catch [System.IO.IOException] {
+            if ($attempt -eq 10) { throw }
+            Start-Sleep -Milliseconds (20 * $attempt)
+        }
+    }
     try {
-        $fs = [System.IO.FileStream]::new($EVENTS_FILE, [System.IO.FileMode]::Append, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
         $fs.Write($bytes, 0, $bytes.Length)
         $fs.Flush()
     } finally {
@@ -190,6 +215,104 @@ function Write-ErrorEntry {
     }
     $line = $entry | ConvertTo-Json -Compress
     Add-Content -Path $ERRORS_FILE -Value $line -Encoding ASCII
+}
+
+function Stop-RunProcessTree {
+    <#
+    .SYNOPSIS
+        Kill a runaway PID and all of its descendants.
+    .DESCRIPTION
+        Used by stale-lock TTL enforcement so a process whose logical lock has
+        been cleared is actually terminated -- not left alive to keep burning
+        money and racing the next invocation.
+        Returns a hashtable with keys:
+          killed       -- $true if any process was actually terminated
+          already_gone -- $true if the PID was not alive at the time we looked
+          pids_killed  -- array of integer PIDs that were terminated
+          errors       -- array of string error messages (non-fatal)
+        The function never throws -- TTL enforcement is best-effort cleanup,
+        not a critical-path operation.
+    #>
+    param(
+        [Parameter(Mandatory)]
+        [int]$RootPid
+    )
+    $result = @{
+        killed       = $false
+        already_gone = $false
+        pids_killed  = @()
+        errors       = @()
+    }
+
+    # 1) Verify the root is still alive. If not, we still want to report
+    #    success so callers can write a `force_killed` event with
+    #    reason="already_exited" -- the test treats that as proof the TTL
+    #    sweep actually ran.
+    $rootAlive = $false
+    try {
+        $proc = Get-Process -Id $RootPid -ErrorAction SilentlyContinue
+        if ($null -ne $proc) {
+            $rootAlive = $true
+        }
+    } catch {
+        $result.errors += "Get-Process(root) failed: $_"
+    }
+
+    if (-not $rootAlive) {
+        $result.already_gone = $true
+        return $result
+    }
+
+    # 2) Collect descendants via CIM (Win32_Process.ParentProcessId). Walk
+    #    the tree breadth-first so we kill leaves before parents -- killing a
+    #    parent first sometimes leaves zombie children re-parented to init.
+    $toKill = @($RootPid)
+    $queue = New-Object System.Collections.Generic.Queue[int]
+    $queue.Enqueue($RootPid)
+    $seen = @{ $RootPid = $true }
+
+    while ($queue.Count -gt 0) {
+        $parent = $queue.Dequeue()
+        try {
+            $children = Get-CimInstance -ClassName Win32_Process -Filter "ParentProcessId=$parent" -ErrorAction SilentlyContinue
+            foreach ($child in $children) {
+                $childPid = [int]$child.ProcessId
+                if (-not $seen.ContainsKey($childPid)) {
+                    $seen[$childPid] = $true
+                    $toKill += $childPid
+                    $queue.Enqueue($childPid)
+                }
+            }
+        } catch {
+            $result.errors += "Get-CimInstance(parent=$parent) failed: $_"
+        }
+    }
+
+    # Reverse so children die before parents.
+    [array]::Reverse($toKill)
+
+    foreach ($p in $toKill) {
+        try {
+            $alive = Get-Process -Id $p -ErrorAction SilentlyContinue
+            if ($null -eq $alive) { continue }
+            Stop-Process -Id $p -Force -ErrorAction Stop
+            $result.pids_killed += $p
+            $result.killed = $true
+        } catch {
+            $result.errors += "Stop-Process(pid=$p) failed: $_"
+            # Fall back to taskkill /F /T as a belt-and-suspenders measure.
+            try {
+                & taskkill.exe /F /T /PID $p 2>$null | Out-Null
+                if ($LASTEXITCODE -eq 0) {
+                    $result.pids_killed += $p
+                    $result.killed = $true
+                }
+            } catch {
+                $result.errors += "taskkill(pid=$p) failed: $_"
+            }
+        }
+    }
+    return $result
 }
 
 function Repair-StuckDashboard {
@@ -412,6 +535,7 @@ if (-not $prompt) {
     Write-Error "Job '$Job' has no prompt defined."
     exit 1
 }
+$prompt = $prompt.Replace("{{EXTRA_ARGS}}", $ExtraArgs)
 Write-Breadcrumb "step3_done"
 
 # Ensure state directory
@@ -437,28 +561,99 @@ if (Test-Path $lockFile) {
         $lockContent = Get-Content -Path $lockFile -Raw -ErrorAction SilentlyContinue
         $lockAge = $null
         $lockedByJob = "unknown"
+        $lockedByPid = $null
+        $lockedByRunId = ""
         try {
             $parsed = $lockContent.Trim() | ConvertFrom-Json
             $lockTime = [DateTime]::Parse($parsed.ts)
             $lockAge = (Get-Date) - $lockTime
             $lockedByJob = $parsed.job
+            # PID and run_id are best-effort -- older lock files (pre-PID era)
+            # may not have them. The kill-on-TTL step below handles both cases.
+            try { $lockedByPid = [int]$parsed.pid } catch { }
+            try { $lockedByRunId = [string]$parsed.run_id } catch { }
         } catch {
             $lockAge = [TimeSpan]::FromMinutes($staleLockTimeout + 1)
         }
 
         if ($lockAge -and $lockAge.TotalMinutes -gt $staleLockTimeout) {
-            # Stale lock -- force clear
+            # Stale lock -- force clear AND kill the underlying process tree.
+            # Just deleting the lock file leaves the runaway process alive,
+            # which is the exact bug that produced the 5/26-5/28 333-350 min
+            # bug-killer runs (see tests/test_lock_ttl_enforcement.py).
             Remove-Item -Path $lockFile -Force
+            $lockAgeMin = [math]::Round($lockAge.TotalMinutes)
             Write-Event -AgentName $Agent -JobName $Job -Event "stale_lock_cleared" -Details @{
                 locked_by_job = $lockedByJob
-                lock_age_minutes = [math]::Round($lockAge.TotalMinutes)
+                lock_age_minutes = $lockAgeMin
                 timeout_minutes = $staleLockTimeout
             }
             Write-AuditEntry -Action "stale_lock_cleared" -AgentName $Agent -JobName $Job -RunId "N/A" -Details @{
                 locked_by_job = $lockedByJob
-                lock_age_minutes = [math]::Round($lockAge.TotalMinutes)
+                lock_age_minutes = $lockAgeMin
             }
-            Write-Host "Stale lock cleared for '$Agent' (was held by '$lockedByJob', age: $([math]::Round($lockAge.TotalMinutes))m, timeout: ${staleLockTimeout}m)."
+            Write-Host "Stale lock cleared for '$Agent' (was held by '$lockedByJob', age: ${lockAgeMin}m, timeout: ${staleLockTimeout}m)."
+
+            # TTL enforcement: kill the process whose lock we just cleared.
+            # Emit kill_initiated and force_killed events so the lock-TTL
+            # invariant test (tests/test_lock_ttl_enforcement.py) sees that
+            # we actually shut the runaway process down, not just deleted
+            # the logical lock.
+            if ($null -ne $lockedByPid -and $lockedByPid -gt 0) {
+                $killReason = "ttl_exceeded duration=${lockAgeMin}min ttl=${staleLockTimeout}min"
+                Write-Event -AgentName $Agent -JobName $lockedByJob -Event "kill_initiated" -Details @{
+                    run_id = $lockedByRunId
+                    pid = $lockedByPid
+                    lock_age_minutes = $lockAgeMin
+                    timeout_minutes = $staleLockTimeout
+                    reason = $killReason
+                }
+                Write-AuditEntry -Action "kill_initiated" -AgentName $Agent -JobName $lockedByJob -RunId $lockedByRunId -Details @{
+                    pid = $lockedByPid
+                    reason = $killReason
+                }
+                Write-Host "kill_initiated: agent='$Agent' job='$lockedByJob' pid=$lockedByPid reason='$killReason'"
+
+                $killResult = Stop-RunProcessTree -RootPid $lockedByPid
+
+                $forceReason = if ($killResult.already_gone) {
+                    "already_exited"
+                } else {
+                    $killReason
+                }
+                Write-Event -AgentName $Agent -JobName $lockedByJob -Event "force_killed" -Details @{
+                    run_id = $lockedByRunId
+                    pid = $lockedByPid
+                    pids_killed = $killResult.pids_killed
+                    already_gone = $killResult.already_gone
+                    reason = $forceReason
+                    errors = $killResult.errors
+                }
+                Write-AuditEntry -Action "force_killed" -AgentName $Agent -JobName $lockedByJob -RunId $lockedByRunId -Details @{
+                    pid = $lockedByPid
+                    pids_killed = $killResult.pids_killed
+                    already_gone = $killResult.already_gone
+                    reason = $forceReason
+                }
+                Write-Host "force_killed: agent='$Agent' job='$lockedByJob' pid=$lockedByPid already_gone=$($killResult.already_gone) pids_killed=$($killResult.pids_killed -join ',')"
+            } else {
+                # No PID recorded on the lock -- still emit force_killed with
+                # reason=no_pid so the TTL invariant test can see the sweep
+                # ran. Pre-PID-era lock files are the only path that hits
+                # this branch.
+                Write-Event -AgentName $Agent -JobName $lockedByJob -Event "force_killed" -Details @{
+                    run_id = $lockedByRunId
+                    pid = 0
+                    already_gone = $true
+                    reason = "no_pid_in_lock ttl_exceeded duration=${lockAgeMin}min ttl=${staleLockTimeout}min"
+                }
+                Write-AuditEntry -Action "force_killed" -AgentName $Agent -JobName $lockedByJob -RunId $lockedByRunId -Details @{
+                    pid = 0
+                    already_gone = $true
+                    reason = "no_pid_in_lock"
+                }
+                Write-Host "force_killed (no pid in lock): agent='$Agent' job='$lockedByJob'"
+            }
         } else {
             $lockHandled = $true
         }
@@ -509,10 +704,14 @@ while ($keepRunning) {
     # Step 6: Generate run_id
     $runId = -join ((1..8) | ForEach-Object { "{0:x}" -f (Get-Random -Maximum 16) })
 
-    # Step 7: Write audit/event/dashboard for start
-    Write-AuditEntry -Action "started" -AgentName $Agent -JobName $Job -RunId $runId
-    Write-Event -AgentName $Agent -JobName $Job -Event "started" -Details @{ run_id = $runId }
-    Update-Dashboard -AgentName $Agent -JobName $Job -Status "running" -Details @{ run_id = $runId; started = (Get-Date -Format "o") }
+    # Step 7: Write audit/event/dashboard for start.
+    # Include the runner's own PID on the started event so hang-scout / TTL
+    # enforcement can correlate run_id -> process even if the lock file has
+    # already been cleared. The claude child PID is recorded separately on
+    # the lock file once the child is spawned in step 8.
+    Write-AuditEntry -Action "started" -AgentName $Agent -JobName $Job -RunId $runId -Details @{ runner_pid = $PID }
+    Write-Event -AgentName $Agent -JobName $Job -Event "started" -Details @{ run_id = $runId; runner_pid = $PID }
+    Update-Dashboard -AgentName $Agent -JobName $Job -Status "running" -Details @{ run_id = $runId; runner_pid = $PID; started = (Get-Date -Format "o") }
 
     # Step 8: Invoke claude
     $agentDef = $agentsConfig[$Agent]
@@ -745,12 +944,14 @@ while ($keepRunning) {
                 Set-QueueDepth -QueueFile $otherQueueFile -Depth $otherDepth
                 Write-Host "Draining queued job '$otherJobName' for agent '$Agent' (remaining: $otherDepth)."
 
-                # Switch to the queued job: reload its config and prompt
+                # Switch to the queued job: reload its config and prompt.
+                # Queue-drained jobs never carry caller ExtraArgs (the original
+                # invocation may have had any), so substitute with empty string.
                 $otherJobDef = $jobsConfig[$otherJobName]
                 if ($otherJobDef) {
                     $Job = $otherJobName
                     $jobDef = $otherJobDef
-                    $prompt = $otherJobDef["prompt"]
+                    $prompt = ([string]$otherJobDef["prompt"]).Replace("{{EXTRA_ARGS}}", "")
                     $stateDir = Ensure-StateDir -AgentName $Agent -JobName $Job
                     $queueFile = Join-Path $stateDir "queue"
                     $counterFile = Join-Path $stateDir "counter.json"

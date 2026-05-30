@@ -7,6 +7,38 @@
       "inputPrompt": "What semester transition? (e.g., 'H1 to H2 for Meeting Join', 'update Fun Execution dashboard from H1 to H2')",
       "schedule": "manual",
       "description": "Set up ADO OKR hierarchy for new semester: duplicate Objectives, re-parent KRs, update queries and dashboards"
+    },
+    "microsoft-connect-writing-distill-voice": {
+      "displayName": "Connect: Distill Prior Manager Voice",
+      "prompt": "Read ${REPO_PERSONAL}/virtual-office/skills/microsoft-connect-writing.md sections 1-2 for full instructions. Distill the prior manager's voice/style for one direct report using the Nuwa-Skill 6-parallel-subagent method on N historical Connect manager comments. Pull historical comments via CDP from msconnect.microsoft.com/viewhistory and v2.msconnect.microsoft.com/historyrag, launch 6 parallel subagents (opener / pivots / vocabulary / grammar / standing KRs / closer), apply the 3-layer verification matrix (frequency + co-occurrence + counter-evidence), and save the frozen mental model + voice template + standing KRs to OneDrive: 1-MSTeamsFiles/0-EM/connect/{YYYY-MM-DD}/{report}_all_manager_comments.md.",
+      "requiresInput": true,
+      "inputPrompt": "Which direct report? (full name)",
+      "schedule": "manual",
+      "description": "Distill prior manager's voice from N historical Connects via Nuwa 6-subagent method"
+    },
+    "microsoft-connect-writing-draft": {
+      "displayName": "Connect: Draft Manager Comments",
+      "prompt": "Read ${REPO_PERSONAL}/virtual-office/skills/microsoft-connect-writing.md sections 1-4 for full instructions. Draft Past + Future manager comments for one direct report. Step 1: read the current form state via CDP (port 9223) on v2.msconnect.microsoft.com/manager/{pernr} - never draft without reading first. Step 2: pull the prior cycle's Future from viewhistory and run gap analysis (Met / Partially / Missed / Carried-forward). Step 3: apply the distilled voice template if one exists at OneDrive {report}_all_manager_comments.md (otherwise use the Madhu-style structure: 6-paragraph Past with consolidated achievement + However + opportunities-to-deepen; Future with KR scaffolding). Step 4: tone-calibrate for performer level (SWE 2 floor / Senior typical / Principal multiplier). Step 5: save the draft to local scratch C:/src/tmp/connect-{report}/draft.md - DO NOT push yet.",
+      "requiresInput": true,
+      "inputPrompt": "Which direct report and cycle? (e.g., 'Rachita Bansal, May 2026')",
+      "schedule": "manual",
+      "description": "Draft Past + Future manager comments with gap analysis, distilled voice, and performer-level tone calibration"
+    },
+    "microsoft-connect-writing-push": {
+      "displayName": "Connect: Push Manager Comments",
+      "prompt": "Read ${REPO_PERSONAL}/virtual-office/skills/microsoft-connect-writing.md sections 1, 5, and 6 for full instructions. Push the prepared draft from C:/src/tmp/connect-{report}/ to the Connect form via Edge CDP on port 9223. Use the push script template: fresh Edge process per push (kill msedge first to avoid React state desync), navigate to v2.msconnect.microsoft.com/manager/{pernr}, wait for textboxes to mount, write Past (index 0) and/or Future (index 1) via innerHTML + InputEvent + ChangeEvent + blur, click Save as draft, wait 30s, then verify via fresh WebSocket reconnect + reread with content marker checks (not just length). If markers fail, retry once with fresh Edge - do not retry on the same tab. If <2 textboxes after 80s, report status-locked (form moved off In-Review).",
+      "requiresInput": true,
+      "inputPrompt": "Which direct report, and push Past / Future / Both?",
+      "schedule": "manual",
+      "description": "Push prepared Past/Future draft via Edge CDP with fresh-Edge-per-push pattern and content-marker verification"
+    },
+    "microsoft-connect-writing-suggest-krs": {
+      "displayName": "Connect: Suggest KRs for Report",
+      "prompt": "Read ${REPO_PERSONAL}/virtual-office/skills/microsoft-connect-writing.md section 4 for full instructions. Generate per-IC KR scaffolding for one direct report. Inputs: (a) the manager's standing KRs (from distilled voice file if available, or Naveen's standing requirements as fallback), (b) the report's level and current scope. Apply the EM-to-IC translation matrix (ambiguous->quantitative, centralized->distributed), produce the standard 8-KR list (reliability / hygiene / feature ownership / predictability / throughput / innovation / design discipline / AI adoption) calibrated to performer level (SWE 2 floor, Senior typical, Principal multiplier with 3 extra KRs for architecture/mentor/partner-review). Output as <ul><li> HTML ready for direct paste into Future innerHTML.",
+      "requiresInput": true,
+      "inputPrompt": "Which direct report and target level? (e.g., 'Rachita Bansal, SWE 2'; 'Raimond Sinivee, Principal')",
+      "schedule": "manual",
+      "description": "Generate per-IC KR list translated from manager standing KRs with performer-level calibration"
     }
   }
 }

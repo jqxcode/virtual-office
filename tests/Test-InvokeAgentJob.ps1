@@ -1,4 +1,4 @@
-#Requires -Version 7.0
+﻿#Requires -Version 7.0
 # Test-InvokeAgentJob.ps1 -- Tests for the core Invoke-AgentJob runner logic
 # Run: pwsh -File tests/Test-InvokeAgentJob.ps1
 
@@ -606,6 +606,92 @@ try {
         Assert-True $false "Counter file should exist after run"
     }
 } finally {
+    Remove-TestRoot -Root $root
+}
+
+# ========================================
+# TC79: Write-AuditEntry retries when audit file is held FileShare::None by a concurrent writer
+# ========================================
+# Regression: 2026-05-29 12:00 PT scrum-reporter/FFv2-daily-summary silent crash.
+# Two scheduled jobs hit Write-AuditEntry on the same audit file within the same
+# millisecond. The pre-fix code opened the FileStream once with FileShare::None and
+# let any IOException propagate uncaught, killing the runner before any audit entry,
+# event, or dashboard write landed. Post-fix the function retries 10 x 20ms.
+Write-Host "`nTC79: Write-AuditEntry retries on FileShare contention" -ForegroundColor Cyan
+$blockingStream = $null
+$root = New-TestRoot
+try {
+    Write-TestConstants -Root $root
+
+    # Extract the production Write-AuditEntry function from the real runner so the
+    # test exercises the actual deployed retry logic (not the inline test stub).
+    $realRunner = (Resolve-Path (Join-Path $PSScriptRoot ".." "runner" "Invoke-AgentJob.ps1")).Path
+    $runnerContent = Get-Content -Path $realRunner -Raw
+    $startIdx = $runnerContent.IndexOf("function Write-AuditEntry {")
+    $endIdx = $runnerContent.IndexOf("function Write-Event")
+    if ($startIdx -lt 0 -or $endIdx -le $startIdx) {
+        Assert-True $false "Could not extract Write-AuditEntry from production runner"
+    } else {
+        $writeAuditEntryFn = $runnerContent.Substring($startIdx, $endIdx - $startIdx).TrimEnd()
+
+        # Pre-create the month audit file
+        $auditDir = Join-Path $root "output/audit"
+        New-Item -ItemType Directory -Path $auditDir -Force | Out-Null
+        $monthFile = Join-Path $auditDir ("$(Get-Date -Format 'yyyy-MM').jsonl")
+        Set-Content -Path $monthFile -Value "" -Encoding UTF8
+
+        # Acquire an exclusive FileShare::None handle from the test process.
+        # This is exactly the contention shape that killed the 12:00 run -- the loser
+        # of the race would have hit this same IOException with no retry.
+        $blockingStream = [System.IO.FileStream]::new(
+            $monthFile,
+            [System.IO.FileMode]::Append,
+            [System.IO.FileAccess]::Write,
+            [System.IO.FileShare]::None
+        )
+
+        # Child script: imports the extracted Write-AuditEntry and calls it once with
+        # the same StrictMode / ErrorActionPreference as production.
+        $childScript = Join-Path $root "tc79-child.ps1"
+        $auditDirFwd = ($auditDir -replace '\\','/')
+        $childContent = @"
+Set-StrictMode -Version Latest
+`$ErrorActionPreference = 'Stop'
+`$AUDIT_DIR = '$auditDirFwd'
+`$SYSTEM_VERSION = '0.0.0-tc79'
+$writeAuditEntryFn
+Write-AuditEntry -Action 'started' -AgentName 'tc79-child' -JobName 'tc79-job' -RunId 'tc79-run'
+"@
+        Set-Content -Path $childScript -Value $childContent -Encoding UTF8
+
+        $childOut = Join-Path $root "tc79-child.out"
+        $childErr = Join-Path $root "tc79-child.err"
+        $proc = Start-Process pwsh `
+            -ArgumentList @("-NoProfile", "-File", $childScript) `
+            -PassThru -NoNewWindow `
+            -RedirectStandardOutput $childOut `
+            -RedirectStandardError $childErr
+
+        # Hold lock 200ms (well within child's 10 x 20ms = 1100ms retry budget),
+        # then release. Without the retry loop in production code the child would
+        # have already thrown by now and exited non-zero.
+        Start-Sleep -Milliseconds 200
+        $blockingStream.Close()
+        $blockingStream = $null
+
+        if (-not $proc.WaitForExit(5000)) {
+            try { $proc.Kill() } catch {}
+            Assert-True $false "Child writer did not finish within 5s"
+        } else {
+            Assert-True ($proc.ExitCode -eq 0) "Child writer exits 0 after retry succeeds (exit code: $($proc.ExitCode))"
+
+            $audit = Get-Content -Path $monthFile -Raw
+            Assert-True ($audit -match '"agent":"tc79-child"') "Child agent name appears in audit log after retry"
+            Assert-True ($audit -match '"action":"started"') "Child action appears in audit log after retry"
+        }
+    }
+} finally {
+    if ($blockingStream) { try { $blockingStream.Close() } catch {} }
     Remove-TestRoot -Root $root
 }
 
