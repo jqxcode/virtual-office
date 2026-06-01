@@ -22,7 +22,7 @@
       "agentFile": "~/.claude/agents/pEmailer.md",
       "description": "Manages Gmail inboxes - scans, classifies, generates digests across multiple mailboxes",
       "staleLockTimeoutMinutes": 60,
-      "group": "Other Agents",
+      "group": "Personal Agents",
       "portalUrl": "http://localhost:8402/"
     },
     "mAuditor": {
@@ -97,13 +97,13 @@
       "staleLockTimeoutMinutes": 120,
       "group": "Personal Agents"
     },
-    "accountant": {
-      "displayName": "Accountant",
+    "oAccountant": {
+      "displayName": "oAccountant",
       "icon": "",
-      "agentFile": "~/.claude/agents/accountant.md",
+      "agentFile": "~/.claude/agents/oAccountant.md",
       "description": "Tax return preparation, bookkeeping review, and QBO management for Oakley Management LLC and related entities",
       "staleLockTimeoutMinutes": 200,
-      "group": "Other Agents"
+      "group": "Oakley Agents"
     },
     "mManager": {
       "displayName": "mManager",

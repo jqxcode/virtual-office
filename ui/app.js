@@ -21,8 +21,8 @@ var AGENT_COLORS = {
 var LEGACY_AGENT_NAMES = {
   "memo-checker": "mAuditor",
   "checker": "mAuditor",
-  "emailer": "pEmailer"
-,
+  "emailer": "pEmailer",
+  "accountant": "oAccountant",
   "scrum-master": "mScrumMaster",
   "bug-killer": "pBugKiller",
   "scrum-reporter": "mScrumReporter",
@@ -33,7 +33,8 @@ var LEGACY_AGENT_NAMES = {
   "researcher": "pResearcher",
   "approver": "mApprover",
   "connector": "pConnector",
-  "auditor": "mAuditor"};
+  "auditor": "mAuditor"
+};
 
 function canonicalAgentName(name) {
   return LEGACY_AGENT_NAMES[name] || name;
@@ -1198,14 +1199,18 @@ function renderAgentTabs(agents) {
 
   var groups = {};
   var groupOrder = [];
+  var preferredOrder = ["Work Agents", "Personal Agents", "Oakley Agents"];
   Object.keys(agents).forEach(function(name) {
     var group = getAgentGroup(name);
     if (!groups[group]) {
       groups[group] = [];
-      groupOrder.push(group);
     }
     groups[group].push(name);
   });
+
+  // Sort groups by preferred order, then alphabetical for any unknown groups
+  preferredOrder.forEach(function(g) { if (groups[g]) groupOrder.push(g); });
+  Object.keys(groups).forEach(function(g) { if (groupOrder.indexOf(g) === -1) groupOrder.push(g); });
 
   if (!activeGroup || !groups[activeGroup]) activeGroup = groupOrder[0];
 
@@ -3632,8 +3637,8 @@ function renderOfficeTab() {
     if (!groups[g]) groups[g] = [];
     groups[g].push(name);
   });
-  // Render Work Agents first, then Other Agents
-  var groupOrder = ["Work Agents", "Other Agents"];
+  // Render groups in preferred order
+  var groupOrder = ["Work Agents", "Personal Agents", "Oakley Agents"];
   Object.keys(groups).forEach(function(g) { if (groupOrder.indexOf(g) === -1) groupOrder.push(g); });
   groupOrder.forEach(function(groupName) {
     var members = groups[groupName];
