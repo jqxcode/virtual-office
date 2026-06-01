@@ -26,15 +26,15 @@ function Assert-True {
 # ========================================
 
 # Agent-to-report-type mapping. Each agent lists the report prefixes it may produce.
-# poster has no reports (posts to Teams, not local HTML).
+# mPoster has no reports (posts to Teams, not local HTML).
 $script:AgentReportTypes = @{
-    "bug-killer"   = @("daily-summary", "pr-maintenance", "open-pr-maintenance", "scan", "merge-conflicts")
-    "hang-scout"   = @("daily-report", "incident")
-    "auditor"      = @("failure-review", "sprint-progress")
-    "scrum-master" = @("sprint-progress", "shiproom-hygiene", "comparison", "run-summaries")
-    "poster"       = @()
+    "pBugKiller"   = @("daily-summary", "pr-maintenance", "open-pr-maintenance", "scan", "merge-conflicts")
+    "pHangScout"   = @("daily-report", "incident")
+    "mAuditor"      = @("failure-review", "sprint-progress")
+    "mScrumMaster" = @("sprint-progress", "shiproom-hygiene", "comparison", "run-summaries")
+    "mPoster"       = @()
     "pEmailer"     = @("scan-all-mailboxes", "digest")
-    "dreamer"      = @("wish")
+    "pDreamer"      = @("wish")
 }
 
 function Test-ReportPathBelongsToAgent {
@@ -42,11 +42,11 @@ function Test-ReportPathBelongsToAgent {
     .SYNOPSIS
         Validates that an output_file path is a legitimate report for the given agent and job.
     .PARAMETER AgentName
-        The agent name (e.g. "bug-killer").
+        The agent name (e.g. "pBugKiller").
     .PARAMETER JobName
         The job name (e.g. "daily-scan").
     .PARAMETER OutputFile
-        The output_file path from the audit log (e.g. "output/bug-killer/daily-summary-20260401.html").
+        The output_file path from the audit log (e.g. "output/pBugKiller/daily-summary-20260401.html").
     .OUTPUTS
         [bool] $true if the path passes all validation checks, $false otherwise.
     #>
@@ -64,8 +64,8 @@ function Test-ReportPathBelongsToAgent {
     # Normalize path separators to forward slashes
     $normalized = $OutputFile.Replace("\", "/")
 
-    # Rule 1: poster should have no report file
-    if ($AgentName -eq "poster") {
+    # Rule 1: mPoster should have no report file
+    if ($AgentName -eq "mPoster") {
         return $false
     }
 
@@ -108,56 +108,56 @@ function Test-ReportPathBelongsToAgent {
 Write-Host "`nTC1: Report path must contain agent name in directory" -ForegroundColor Cyan
 
 # Valid paths
-Assert-True (Test-ReportPathBelongsToAgent -AgentName "bug-killer" -JobName "daily-scan" `
-    -OutputFile "output/bug-killer/daily-summary-20260401.html") `
-    "Valid: output/bug-killer/daily-summary-20260401.html contains /bug-killer/"
+Assert-True (Test-ReportPathBelongsToAgent -AgentName "pBugKiller" -JobName "daily-scan" `
+    -OutputFile "output/pBugKiller/daily-summary-20260401.html") `
+    "Valid: output/pBugKiller/daily-summary-20260401.html contains /pBugKiller/"
 
-Assert-True (Test-ReportPathBelongsToAgent -AgentName "auditor" -JobName "sprint-review" `
-    -OutputFile "output/auditor/sprint-progress-20260401.html") `
-    "Valid: output/auditor/sprint-progress-20260401.html contains /auditor/"
+Assert-True (Test-ReportPathBelongsToAgent -AgentName "mAuditor" -JobName "sprint-review" `
+    -OutputFile "output/mAuditor/sprint-progress-20260401.html") `
+    "Valid: output/mAuditor/sprint-progress-20260401.html contains /mAuditor/"
 
-Assert-True (Test-ReportPathBelongsToAgent -AgentName "hang-scout" -JobName "daily" `
-    -OutputFile "output/hang-scout/daily-report-20260401.html") `
-    "Valid: output/hang-scout/daily-report-20260401.html contains /hang-scout/"
+Assert-True (Test-ReportPathBelongsToAgent -AgentName "pHangScout" -JobName "daily" `
+    -OutputFile "output/pHangScout/daily-report-20260401.html") `
+    "Valid: output/pHangScout/daily-report-20260401.html contains /pHangScout/"
 
 # Invalid paths -- file sitting in parent output/ dir without agent subdir
-Assert-True (-not (Test-ReportPathBelongsToAgent -AgentName "bug-killer" -JobName "daily-scan" `
+Assert-True (-not (Test-ReportPathBelongsToAgent -AgentName "pBugKiller" -JobName "daily-scan" `
     -OutputFile "output/sprint-progress-latest.html")) `
-    "Invalid: output/sprint-progress-latest.html has no /bug-killer/ directory"
+    "Invalid: output/sprint-progress-latest.html has no /pBugKiller/ directory"
 
-Assert-True (-not (Test-ReportPathBelongsToAgent -AgentName "bug-killer" -JobName "daily-scan" `
+Assert-True (-not (Test-ReportPathBelongsToAgent -AgentName "pBugKiller" -JobName "daily-scan" `
     -OutputFile "output/daily-summary-20260401.html")) `
-    "Invalid: output/daily-summary-20260401.html has no /bug-killer/ directory"
+    "Invalid: output/daily-summary-20260401.html has no /pBugKiller/ directory"
 
 # Wrong agent directory
-Assert-True (-not (Test-ReportPathBelongsToAgent -AgentName "bug-killer" -JobName "daily-scan" `
-    -OutputFile "output/auditor/daily-summary-20260401.html")) `
-    "Invalid: output/auditor/daily-summary-20260401.html is wrong agent dir for bug-killer"
+Assert-True (-not (Test-ReportPathBelongsToAgent -AgentName "pBugKiller" -JobName "daily-scan" `
+    -OutputFile "output/mAuditor/daily-summary-20260401.html")) `
+    "Invalid: output/mAuditor/daily-summary-20260401.html is wrong agent dir for pBugKiller"
 
 # ========================================
 # TC2: Report path must not be a -latest.html file
 # ========================================
 Write-Host "`nTC2: Report path must not be a -latest.html file (symlink pointers, not real outputs)" -ForegroundColor Cyan
 
-Assert-True (-not (Test-ReportPathBelongsToAgent -AgentName "bug-killer" -JobName "daily-scan" `
-    -OutputFile "output/bug-killer/daily-summary-latest.html")) `
+Assert-True (-not (Test-ReportPathBelongsToAgent -AgentName "pBugKiller" -JobName "daily-scan" `
+    -OutputFile "output/pBugKiller/daily-summary-latest.html")) `
     "Invalid: daily-summary-latest.html is a symlink pointer, not a dated report"
 
-Assert-True (-not (Test-ReportPathBelongsToAgent -AgentName "auditor" -JobName "sprint-review" `
-    -OutputFile "output/auditor/sprint-progress-latest.html")) `
+Assert-True (-not (Test-ReportPathBelongsToAgent -AgentName "mAuditor" -JobName "sprint-review" `
+    -OutputFile "output/mAuditor/sprint-progress-latest.html")) `
     "Invalid: sprint-progress-latest.html is a symlink pointer"
 
-Assert-True (-not (Test-ReportPathBelongsToAgent -AgentName "scrum-master" -JobName "shiproom" `
-    -OutputFile "output/scrum-master/shiproom-hygiene-latest.html")) `
+Assert-True (-not (Test-ReportPathBelongsToAgent -AgentName "mScrumMaster" -JobName "shiproom" `
+    -OutputFile "output/mScrumMaster/shiproom-hygiene-latest.html")) `
     "Invalid: shiproom-hygiene-latest.html is a symlink pointer"
 
 # Dated files should pass
-Assert-True (Test-ReportPathBelongsToAgent -AgentName "bug-killer" -JobName "daily-scan" `
-    -OutputFile "output/bug-killer/daily-summary-20260401.html") `
+Assert-True (Test-ReportPathBelongsToAgent -AgentName "pBugKiller" -JobName "daily-scan" `
+    -OutputFile "output/pBugKiller/daily-summary-20260401.html") `
     "Valid: daily-summary-20260401.html is a dated report"
 
-Assert-True (Test-ReportPathBelongsToAgent -AgentName "scrum-master" -JobName "shiproom" `
-    -OutputFile "output/scrum-master/shiproom-hygiene-2026-04-01.html") `
+Assert-True (Test-ReportPathBelongsToAgent -AgentName "mScrumMaster" -JobName "shiproom" `
+    -OutputFile "output/mScrumMaster/shiproom-hygiene-2026-04-01.html") `
     "Valid: shiproom-hygiene-2026-04-01.html is a dated report"
 
 # ========================================
@@ -165,50 +165,50 @@ Assert-True (Test-ReportPathBelongsToAgent -AgentName "scrum-master" -JobName "s
 # ========================================
 Write-Host "`nTC3: Report file type matches agent's allowed report types" -ForegroundColor Cyan
 
-# bug-killer valid types
-Assert-True (Test-ReportPathBelongsToAgent -AgentName "bug-killer" -JobName "scan" `
-    -OutputFile "output/bug-killer/scan-20260401.html") `
-    "Valid: bug-killer can produce 'scan' reports"
+# pBugKiller valid types
+Assert-True (Test-ReportPathBelongsToAgent -AgentName "pBugKiller" -JobName "scan" `
+    -OutputFile "output/pBugKiller/scan-20260401.html") `
+    "Valid: pBugKiller can produce 'scan' reports"
 
-Assert-True (Test-ReportPathBelongsToAgent -AgentName "bug-killer" -JobName "pr-maint" `
-    -OutputFile "output/bug-killer/pr-maintenance-20260401.html") `
-    "Valid: bug-killer can produce 'pr-maintenance' reports"
+Assert-True (Test-ReportPathBelongsToAgent -AgentName "pBugKiller" -JobName "pr-maint" `
+    -OutputFile "output/pBugKiller/pr-maintenance-20260401.html") `
+    "Valid: pBugKiller can produce 'pr-maintenance' reports"
 
-Assert-True (Test-ReportPathBelongsToAgent -AgentName "bug-killer" -JobName "merge" `
-    -OutputFile "output/bug-killer/merge-conflicts-20260401.html") `
-    "Valid: bug-killer can produce 'merge-conflicts' reports"
+Assert-True (Test-ReportPathBelongsToAgent -AgentName "pBugKiller" -JobName "merge" `
+    -OutputFile "output/pBugKiller/merge-conflicts-20260401.html") `
+    "Valid: pBugKiller can produce 'merge-conflicts' reports"
 
-# bug-killer invalid type
-Assert-True (-not (Test-ReportPathBelongsToAgent -AgentName "bug-killer" -JobName "daily-scan" `
-    -OutputFile "output/bug-killer/sprint-progress-20260401.html")) `
-    "Invalid: bug-killer cannot produce 'sprint-progress' reports"
+# pBugKiller invalid type
+Assert-True (-not (Test-ReportPathBelongsToAgent -AgentName "pBugKiller" -JobName "daily-scan" `
+    -OutputFile "output/pBugKiller/sprint-progress-20260401.html")) `
+    "Invalid: pBugKiller cannot produce 'sprint-progress' reports"
 
-# hang-scout valid/invalid
-Assert-True (Test-ReportPathBelongsToAgent -AgentName "hang-scout" -JobName "daily" `
-    -OutputFile "output/hang-scout/incident-20260401.html") `
-    "Valid: hang-scout can produce 'incident' reports"
+# pHangScout valid/invalid
+Assert-True (Test-ReportPathBelongsToAgent -AgentName "pHangScout" -JobName "daily" `
+    -OutputFile "output/pHangScout/incident-20260401.html") `
+    "Valid: pHangScout can produce 'incident' reports"
 
-Assert-True (-not (Test-ReportPathBelongsToAgent -AgentName "hang-scout" -JobName "daily" `
-    -OutputFile "output/hang-scout/daily-summary-20260401.html")) `
-    "Invalid: hang-scout cannot produce 'daily-summary' reports"
+Assert-True (-not (Test-ReportPathBelongsToAgent -AgentName "pHangScout" -JobName "daily" `
+    -OutputFile "output/pHangScout/daily-summary-20260401.html")) `
+    "Invalid: pHangScout cannot produce 'daily-summary' reports"
 
-# scrum-master valid types
-Assert-True (Test-ReportPathBelongsToAgent -AgentName "scrum-master" -JobName "compare" `
-    -OutputFile "output/scrum-master/comparison-20260401.html") `
-    "Valid: scrum-master can produce 'comparison' reports"
+# mScrumMaster valid types
+Assert-True (Test-ReportPathBelongsToAgent -AgentName "mScrumMaster" -JobName "compare" `
+    -OutputFile "output/mScrumMaster/comparison-20260401.html") `
+    "Valid: mScrumMaster can produce 'comparison' reports"
 
-Assert-True (Test-ReportPathBelongsToAgent -AgentName "scrum-master" -JobName "summaries" `
-    -OutputFile "output/scrum-master/run-summaries-20260401.html") `
-    "Valid: scrum-master can produce 'run-summaries' reports"
+Assert-True (Test-ReportPathBelongsToAgent -AgentName "mScrumMaster" -JobName "summaries" `
+    -OutputFile "output/mScrumMaster/run-summaries-20260401.html") `
+    "Valid: mScrumMaster can produce 'run-summaries' reports"
 
-# poster should have NO reports
-Assert-True (-not (Test-ReportPathBelongsToAgent -AgentName "poster" -JobName "daily-post" `
-    -OutputFile "output/poster/daily-summary-20260401.html")) `
-    "Invalid: poster should never have a report file (posts to Teams)"
+# mPoster should have NO reports
+Assert-True (-not (Test-ReportPathBelongsToAgent -AgentName "mPoster" -JobName "daily-post" `
+    -OutputFile "output/mPoster/daily-summary-20260401.html")) `
+    "Invalid: mPoster should never have a report file (posts to Teams)"
 
-Assert-True (-not (Test-ReportPathBelongsToAgent -AgentName "poster" -JobName "daily-post" `
-    -OutputFile "output/poster/anything-20260401.html")) `
-    "Invalid: poster should never have any report file"
+Assert-True (-not (Test-ReportPathBelongsToAgent -AgentName "mPoster" -JobName "daily-post" `
+    -OutputFile "output/mPoster/anything-20260401.html")) `
+    "Invalid: mPoster should never have any report file"
 
 # pEmailer valid types
 Assert-True (Test-ReportPathBelongsToAgent -AgentName "pEmailer" -JobName "scan" `
@@ -219,14 +219,14 @@ Assert-True (Test-ReportPathBelongsToAgent -AgentName "pEmailer" -JobName "diges
     -OutputFile "output/pEmailer/digest-20260401.html") `
     "Valid: pEmailer can produce 'digest' reports"
 
-# dreamer valid type
-Assert-True (Test-ReportPathBelongsToAgent -AgentName "dreamer" -JobName "wish-gen" `
-    -OutputFile "output/dreamer/wish-20260401.html") `
-    "Valid: dreamer can produce 'wish' reports"
+# pDreamer valid type
+Assert-True (Test-ReportPathBelongsToAgent -AgentName "pDreamer" -JobName "wish-gen" `
+    -OutputFile "output/pDreamer/wish-20260401.html") `
+    "Valid: pDreamer can produce 'wish' reports"
 
-Assert-True (-not (Test-ReportPathBelongsToAgent -AgentName "dreamer" -JobName "wish-gen" `
-    -OutputFile "output/dreamer/daily-summary-20260401.html")) `
-    "Invalid: dreamer cannot produce 'daily-summary' reports"
+Assert-True (-not (Test-ReportPathBelongsToAgent -AgentName "pDreamer" -JobName "wish-gen" `
+    -OutputFile "output/pDreamer/daily-summary-20260401.html")) `
+    "Invalid: pDreamer cannot produce 'daily-summary' reports"
 
 # ========================================
 # TC4: Report date must be within 1 day of audit timestamp
@@ -280,37 +280,37 @@ function Test-ReportDateWithinRange {
 
 # Same day
 Assert-True (Test-ReportDateWithinRange `
-    -OutputFile "output/bug-killer/daily-summary-20260401.html" `
+    -OutputFile "output/pBugKiller/daily-summary-20260401.html" `
     -AuditTimestamp ([datetime]"2026-04-01T08:30:00")) `
     "Valid: report date 20260401 matches audit date 2026-04-01"
 
 # Next day (job ran at 11pm, report stamped next day after midnight)
 Assert-True (Test-ReportDateWithinRange `
-    -OutputFile "output/bug-killer/daily-summary-20260402.html" `
+    -OutputFile "output/pBugKiller/daily-summary-20260402.html" `
     -AuditTimestamp ([datetime]"2026-04-01T23:45:00")) `
     "Valid: report date 20260402 is within 1 day of audit 2026-04-01T23:45"
 
 # YYYY-MM-DD format
 Assert-True (Test-ReportDateWithinRange `
-    -OutputFile "output/scrum-master/shiproom-hygiene-2026-04-01.html" `
+    -OutputFile "output/mScrumMaster/shiproom-hygiene-2026-04-01.html" `
     -AuditTimestamp ([datetime]"2026-04-01T05:00:00")) `
     "Valid: YYYY-MM-DD format date matches audit timestamp"
 
 # Too far apart -- 3 days off
 Assert-True (-not (Test-ReportDateWithinRange `
-    -OutputFile "output/bug-killer/daily-summary-20260401.html" `
+    -OutputFile "output/pBugKiller/daily-summary-20260401.html" `
     -AuditTimestamp ([datetime]"2026-04-04T08:30:00"))) `
     "Invalid: report date 20260401 is 3 days from audit date 2026-04-04"
 
 # No date in filename
 Assert-True (-not (Test-ReportDateWithinRange `
-    -OutputFile "output/bug-killer/daily-summary-latest.html" `
+    -OutputFile "output/pBugKiller/daily-summary-latest.html" `
     -AuditTimestamp ([datetime]"2026-04-01T08:30:00"))) `
     "Invalid: no date found in filename 'daily-summary-latest.html'"
 
 # Previous day (job ran early morning, report from yesterday's data)
 Assert-True (Test-ReportDateWithinRange `
-    -OutputFile "output/auditor/failure-review-20260331.html" `
+    -OutputFile "output/mAuditor/failure-review-20260331.html" `
     -AuditTimestamp ([datetime]"2026-04-01T00:15:00")) `
     "Valid: report date 20260331 is within 1 day of audit 2026-04-01T00:15"
 
@@ -320,28 +320,28 @@ Assert-True (Test-ReportDateWithinRange `
 Write-Host "`nTC5: Test-ReportPathBelongsToAgent function validates correctly across edge cases" -ForegroundColor Cyan
 
 # Backslash path separators (Windows)
-Assert-True (Test-ReportPathBelongsToAgent -AgentName "bug-killer" -JobName "daily-scan" `
-    -OutputFile "output\bug-killer\daily-summary-20260401.html") `
+Assert-True (Test-ReportPathBelongsToAgent -AgentName "pBugKiller" -JobName "daily-scan" `
+    -OutputFile "output\pBugKiller\daily-summary-20260401.html") `
     "Valid: backslash paths are normalized correctly"
 
 # Agent name as first directory (relative path without output/ prefix)
-Assert-True (Test-ReportPathBelongsToAgent -AgentName "bug-killer" -JobName "daily-scan" `
-    -OutputFile "bug-killer/daily-summary-20260401.html") `
-    "Valid: relative path bug-killer/daily-summary-20260401.html accepted"
+Assert-True (Test-ReportPathBelongsToAgent -AgentName "pBugKiller" -JobName "daily-scan" `
+    -OutputFile "pBugKiller/daily-summary-20260401.html") `
+    "Valid: relative path pBugKiller/daily-summary-20260401.html accepted"
 
 # Full absolute path
-Assert-True (Test-ReportPathBelongsToAgent -AgentName "auditor" -JobName "sprint-review" `
-    -OutputFile "Q:/src/personal_projects/virtual-office/output/auditor/sprint-progress-20260401.html") `
-    "Valid: full absolute path with /auditor/ directory accepted"
+Assert-True (Test-ReportPathBelongsToAgent -AgentName "mAuditor" -JobName "sprint-review" `
+    -OutputFile "Q:/src/personal_projects/virtual-office/output/mAuditor/sprint-progress-20260401.html") `
+    "Valid: full absolute path with /mAuditor/ directory accepted"
 
 # Empty-ish edge cases
-Assert-True (-not (Test-ReportPathBelongsToAgent -AgentName "bug-killer" -JobName "daily-scan" `
+Assert-True (-not (Test-ReportPathBelongsToAgent -AgentName "pBugKiller" -JobName "daily-scan" `
     -OutputFile "")) `
     "Invalid: empty string path rejected"
 
-Assert-True (-not (Test-ReportPathBelongsToAgent -AgentName "bug-killer" -JobName "daily-scan" `
-    -OutputFile "output/bug-killer-extra/daily-summary-20260401.html")) `
-    "Invalid: partial agent name match 'bug-killer-extra' rejected for 'bug-killer'"
+Assert-True (-not (Test-ReportPathBelongsToAgent -AgentName "pBugKiller" -JobName "daily-scan" `
+    -OutputFile "output/pBugKiller-extra/daily-summary-20260401.html")) `
+    "Invalid: partial agent name match 'pBugKiller-extra' rejected for 'pBugKiller'"
 
 # --- Summary ---
 Write-Host "`n========================================" -ForegroundColor White

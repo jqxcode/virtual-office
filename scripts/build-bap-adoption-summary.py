@@ -8,7 +8,7 @@ Only reports metrics provably attributable to BAP:
   - Triage Duration: how fast BAP triages (BAP comment - CreatedDate)
 
 Usage:
-    python scripts/build-bap-adoption-summary.py [--output Q:/src/tmp/poster-daily.json]
+    python scripts/build-bap-adoption-summary.py [--output Q:/src/tmp/mPoster-daily.json]
                                                   [--test]
 
 Output: JSON file with keys: subject, body_html, pr_reply_html, metrics
@@ -37,7 +37,7 @@ PROJECT = "MSTeams"
 QUERY_ID = "cf42325a-4ac0-4420-9d0e-c460ff45f5c2"
 BASE_URL = f"https://{ORG}.visualstudio.com/{PROJECT}"
 API_VER = "api-version=7.1"
-TEMPLATE_PATH = Path(__file__).parent.parent / "templates" / "poster-bug-autopilot-adoption-daily-summary.html"
+TEMPLATE_PATH = Path(__file__).parent.parent / "templates" / "mPoster-bug-autopilot-adoption-daily-summary.html"
 
 # ADO resource ID for az token
 ADO_RESOURCE = "499b84ac-1321-427f-aa17-267ca6975798"
@@ -614,7 +614,7 @@ def build_pr_reply(
 # ---------------------------------------------------------------------------
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--output", default="Q:/src/tmp/poster-daily.json")
+    parser.add_argument("--output", default="Q:/src/tmp/mPoster-daily.json")
     parser.add_argument("--test", action="store_true", help="Add [TEST] prefix to subject")
     args = parser.parse_args()
 

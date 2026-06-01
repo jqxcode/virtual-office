@@ -75,41 +75,41 @@ Write-Host "`nTC2: open-pr-maintenance exists and resolve-merge-conflicts/review
 
 $scheduledJobs = $schedules | ForEach-Object { "$($_["agent"])/$($_["job"])" }
 
-$hasOpenPrMaintenance = $scheduledJobs -contains "bug-killer/open-pr-maintenance"
-Assert-True $hasOpenPrMaintenance "bug-killer/open-pr-maintenance exists in schedules"
+$hasOpenPrMaintenance = $scheduledJobs -contains "pBugKiller/open-pr-maintenance"
+Assert-True $hasOpenPrMaintenance "pBugKiller/open-pr-maintenance exists in schedules"
 
-$hasResolveMergeConflicts = $scheduledJobs -contains "bug-killer/resolve-merge-conflicts"
-Assert-True (-not $hasResolveMergeConflicts) "bug-killer/resolve-merge-conflicts does NOT exist in schedules"
+$hasResolveMergeConflicts = $scheduledJobs -contains "pBugKiller/resolve-merge-conflicts"
+Assert-True (-not $hasResolveMergeConflicts) "pBugKiller/resolve-merge-conflicts does NOT exist in schedules"
 
-$hasReviewPrComments = $scheduledJobs -contains "bug-killer/review-pr-comments"
-Assert-True (-not $hasReviewPrComments) "bug-killer/review-pr-comments does NOT exist in schedules"
+$hasReviewPrComments = $scheduledJobs -contains "pBugKiller/review-pr-comments"
+Assert-True (-not $hasReviewPrComments) "pBugKiller/review-pr-comments does NOT exist in schedules"
 
 # ========================================
 # TC3: daily-summary is scheduled at 1:30am
 # ========================================
 Write-Host "`nTC3: daily-summary is scheduled at 1:30am (cron '30 1 * * *')" -ForegroundColor Cyan
 
-$dailySummaryEntries = $schedules | Where-Object { $_["agent"] -eq "bug-killer" -and $_["job"] -eq "daily-summary" }
+$dailySummaryEntries = $schedules | Where-Object { $_["agent"] -eq "pBugKiller" -and $_["job"] -eq "daily-summary" }
 $dailySummaryCount = @($dailySummaryEntries).Count
-Assert-True ($dailySummaryCount -ge 1) "bug-killer/daily-summary has at least one schedule entry"
+Assert-True ($dailySummaryCount -ge 1) "pBugKiller/daily-summary has at least one schedule entry"
 
 if ($dailySummaryCount -ge 1) {
     $cron = @($dailySummaryEntries)[0]["cron"]
-    Assert-True ($cron -eq "30 1 * * *") "bug-killer/daily-summary cron is '30 1 * * *' (got: '$cron')"
+    Assert-True ($cron -eq "30 1 * * *") "pBugKiller/daily-summary cron is '30 1 * * *' (got: '$cron')"
 }
 
 # ========================================
-# TC4: hang-scout detect-hang is scheduled hourly at :45
+# TC4: pHangScout detect-hang is scheduled hourly at :45
 # ========================================
-Write-Host "`nTC4: hang-scout detect-hang is scheduled hourly at :45" -ForegroundColor Cyan
+Write-Host "`nTC4: pHangScout detect-hang is scheduled hourly at :45" -ForegroundColor Cyan
 
-$detectHangEntries = $schedules | Where-Object { $_["agent"] -eq "hang-scout" -and $_["job"] -eq "detect-hang" }
+$detectHangEntries = $schedules | Where-Object { $_["agent"] -eq "pHangScout" -and $_["job"] -eq "detect-hang" }
 $detectHangCount = @($detectHangEntries).Count
-Assert-True ($detectHangCount -ge 1) "hang-scout/detect-hang has at least one schedule entry"
+Assert-True ($detectHangCount -ge 1) "pHangScout/detect-hang has at least one schedule entry"
 
 if ($detectHangCount -ge 1) {
     $cron = @($detectHangEntries)[0]["cron"]
-    Assert-True ($cron -eq "45 * * * *") "hang-scout/detect-hang cron is '45 * * * *' (got: '$cron')"
+    Assert-True ($cron -eq "45 * * * *") "pHangScout/detect-hang cron is '45 * * * *' (got: '$cron')"
 }
 
 # --- Summary ---

@@ -6,7 +6,7 @@
     Creates a one-time scheduled task that fires after a configurable delay,
     and logs the registration to events.jsonl and the monthly audit log.
 .PARAMETER Agent
-    The agent name (e.g. scrum-master).
+    The agent name (e.g. mScrumMaster).
 .PARAMETER Job
     The job name (e.g. dry-run-bug-autopilot).
 .PARAMETER DelayMinutes

@@ -10,7 +10,7 @@
 
 ## Task Scheduler VO- Prefix
 
-**Decision**: All scheduled tasks are prefixed with `VO-` (e.g., `VO-scrum-master-ado-status-update`).
+**Decision**: All scheduled tasks are prefixed with `VO-` (e.g., `VO-mScrumMaster-ado-status-update`).
 
 **Why**: The original prefix `VirtualOffice-` was too verbose. `VO-` is short, unique enough to avoid collisions with other scheduled tasks, and makes `Get-ScheduledTask -TaskName "VO-*"` queries fast and unambiguous. All existing tasks were renamed in a single migration.
 
@@ -31,9 +31,9 @@
 
 **Why**: As the job count grew, short generic names became ambiguous. `detect` could mean anything; `detect-hang` is self-documenting. `bug-autopilot` was ambiguous once `bug-autopilot-notes` was added for Meeting Notes. `consolidate` did not indicate the scope (memories vs. reports vs. data).
 
-## Agent Rename: memo-checker -> checker -> auditor
+## Agent Rename: memo-checker -> checker -> mAuditor
 
-**Decision**: Renamed `memo-checker` to `checker`, then to `auditor` with displayName "Auditor".
+**Decision**: Renamed `memo-checker` to `checker`, then to `mAuditor` with displayName "Auditor".
 
 **Why**: The agent's scope expanded beyond memory/memo checking to include sprint progress reporting, cross-run comparison, report template auditing, and logical conflict detection in memory dedup. The name "memo-checker" was misleadingly narrow. "Auditor" reflects the agent's role as a general-purpose validation, auditing, and reporting agent.
 
@@ -49,19 +49,19 @@ The two-tier threshold (hang vs. kill) provides graduated response:
 
 **Configuration**:
 ```
-scrum-master:  hang=60min   kill=120min
-bug-killer:    hang=90min   kill=180min
+mScrumMaster:  hang=60min   kill=120min
+pBugKiller:    hang=90min   kill=180min
 pEmailer:      hang=30min   kill=60min
-auditor:       hang=20min   kill=30min
-poster:        hang=15min   kill=30min
-hang-scout:    excluded (cannot detect its own hangs)
+mAuditor:       hang=20min   kill=30min
+mPoster:        hang=15min   kill=30min
+pHangScout:    excluded (cannot detect its own hangs)
 ```
 
 **Trade-off**: Per-agent config adds complexity. Could have used a multiplier on each agent's `staleLockTimeoutMinutes` instead. Explicit thresholds were chosen because the relationship between "stale lock" (a runner concern) and "hung process" (a diagnostic concern) is not always linear.
 
 ## Hang Detection: py-spy Stack Capture
 
-**Decision**: When a hung process is detected, hang-scout captures Python stack traces using py-spy for any Python processes in the tree.
+**Decision**: When a hung process is detected, pHangScout captures Python stack traces using py-spy for any Python processes in the tree.
 
 **Why**: Many Claude CLI operations spawn Python subprocesses (pip, ADO scripts, bug-autopilot). The most common hang root cause is a Python process blocked on I/O or stuck in a loop. py-spy can attach to a running Python process without interrupting it and produce a stack trace, which is invaluable for root cause analysis.
 
@@ -69,13 +69,13 @@ hang-scout:    excluded (cannot detect its own hangs)
 
 **Decision**: Hang-scout maintains a known patterns database and files GitHub issues for new/unknown hang patterns.
 
-**Why**: Recurring hangs from the same root cause should not generate duplicate noise. The patterns DB allows hang-scout to classify incidents and only escalate genuinely new failure modes. GitHub issues provide a persistent, searchable record that integrates with existing bug tracking workflows.
+**Why**: Recurring hangs from the same root cause should not generate duplicate noise. The patterns DB allows pHangScout to classify incidents and only escalate genuinely new failure modes. GitHub issues provide a persistent, searchable record that integrates with existing bug tracking workflows.
 
 ## Bug-Killer: All Issue Types
 
 **Decision**: The scan-and-fix job scans for all issue types (bugs, feature requests, enhancements) rather than bugs only.
 
-**Why**: The original "bug-killer" name implied bugs only, but many repos had actionable enhancements and feature requests that the agent could implement. Limiting to bugs left useful work on the table. The agent's name remains "bug-killer" for continuity, but its scope now covers all open issues.
+**Why**: The original "pBugKiller" name implied bugs only, but many repos had actionable enhancements and feature requests that the agent could implement. Limiting to bugs left useful work on the table. The agent's name remains "pBugKiller" for continuity, but its scope now covers all open issues.
 
 ## Bug-Killer: New Repo Discovery
 
@@ -93,7 +93,7 @@ hang-scout:    excluded (cannot detect its own hangs)
 
 **Decision**: All HTML reports include a standard subtitle with Agent, Job, Start, and Complete timestamps.
 
-**Why**: With multiple agents generating reports on overlapping schedules, provenance tracking is essential. The subtitle answers "which agent produced this, for which job, and when" at a glance. The auditor's consolidate-agent-memories job includes a report template audit that verifies all agent files and job configs enforce this standard.
+**Why**: With multiple agents generating reports on overlapping schedules, provenance tracking is essential. The subtitle answers "which agent produced this, for which job, and when" at a glance. The mAuditor's consolidate-agent-memories job includes a report template audit that verifies all agent files and job configs enforce this standard.
 
 ## Auditor: Report Template Audit
 
@@ -193,7 +193,7 @@ hang-scout:    excluded (cannot detect its own hangs)
 ### D18: V2 replaces V1 filter model with per-tab filters
 **Decision**: V1 had a single Event Log tab with agent/type/time filters applied to all events. V2 splits filtering into context-specific controls: HISTORY has agent/job/result/time filters, SCHEDULE has an agent filter. Each filter set is tuned to its tab's data.
 **Why**: A single global filter bar forces users to mentally map generic filters to specific contexts. Per-tab filters use domain-specific vocabulary (e.g., "result" in HISTORY means success/failure, which does not apply to SCHEDULE).
-**Trade-off**: Filter state is not shared across tabs. This is intentional -- filtering HISTORY by "bug-killer" should not affect SCHEDULE view.
+**Trade-off**: Filter state is not shared across tabs. This is intentional -- filtering HISTORY by "pBugKiller" should not affect SCHEDULE view.
 
 ### No new state files for V2
 **Decision**: V2 tabs read exclusively from existing data sources: dashboard.json (live status), events.jsonl (history), config/agents.json (identity), config/jobs/*.json (job definitions), config/schedules.json (timing). No new state files are introduced.

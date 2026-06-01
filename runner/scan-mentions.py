@@ -3,7 +3,7 @@ Teams @mention scanner for Virtual Office.
 
 Scans configured Teams channels AND unread chats for messages mentioning
 Josh Xu, detects questions, classifies technical vs non-technical,
-and outputs structured JSON for the researcher agent to process.
+and outputs structured JSON for the pResearcher agent to process.
 
 Usage:
     python scan-mentions.py                  # scan channels + unread chats
@@ -223,7 +223,7 @@ def get_sender_name(msg: Dict[str, Any]) -> str:
         name = user.get("displayName", "")
         if name:
             return name
-    # Try application.displayName (bots, connectors)
+    # Try application.displayName (bots, pConnectors)
     app = from_obj.get("application")
     if app and isinstance(app, dict):
         name = app.get("displayName", "")

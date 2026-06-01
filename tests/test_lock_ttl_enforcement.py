@@ -4,7 +4,7 @@ Background
 ==========
 
 Virtual Office uses per-agent lock files to guarantee single-writer
-semantics. The runner (runner/Invoke-AgentJob.ps1) and the hang-scout
+semantics. The runner (runner/Invoke-AgentJob.ps1) and the pHangScout
 agent both look for "stale" locks held past
 ``staleLockTimeoutMinutes`` and emit a ``stale_lock_cleared`` event
 when they delete the LOGICAL lock file.
@@ -18,7 +18,7 @@ modes appear in the wild:
 2. A NEW invocation of the same job sees the cleared lock and
    queues / starts a second copy, racing the first.
 
-Observed on 5/26-5/28 for ``bug-killer`` (TTL = 180 min):
+Observed on 5/26-5/28 for ``pBugKiller`` (TTL = 180 min):
 
    2026-05-26  daily-summary           21014s (350 min)
    2026-05-27  open-pr-maintenance     19981s (333 min)
@@ -33,7 +33,7 @@ This test fails when ANY (started, completed) pair in the last 14
 days exceeded its configured TTL without a matching kill event. It
 intentionally fails today so the gap is visible.
 
-Fixing hang-scout is a separate task -- this test only EXPOSES the
+Fixing pHangScout is a separate task -- this test only EXPOSES the
 missing behavior.
 """
 from __future__ import annotations
@@ -316,7 +316,7 @@ class TestLockTtlEnforcement(unittest.TestCase):
             table = format_markdown_table(rows)
             msg = (
                 "{0} run(s) exceeded their lock TTL but were never "
-                "killed (last {1} days). hang-scout cleared the "
+                "killed (last {1} days). pHangScout cleared the "
                 "logical lock but the process kept running. The "
                 "right behavior is to kill the PID AND write a "
                 "kill_initiated / force_killed event.\n\n{2}"

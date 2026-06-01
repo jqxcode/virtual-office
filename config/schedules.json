@@ -1,37 +1,37 @@
 {
   "schedules": [
     {
-      "agent": "scrum-reporter",
+      "agent": "mScrumReporter",
       "job": "TODO-sprint-progress",
       "cron": "0 7 * * 1-5",
       "description": "Sprint progress report weekday mornings at 7am"
     },
     {
-      "agent": "bug-killer",
+      "agent": "pBugKiller",
       "job": "scan-and-fix",
       "cron": "0 10 * * *",
       "description": "Bug killer scan at 10am daily"
     },
     {
-      "agent": "bug-killer",
+      "agent": "pBugKiller",
       "job": "scan-and-fix",
       "cron": "0 22 * * *",
       "description": "Bug killer scan at 10pm daily"
     },
     {
-      "agent": "bug-killer",
+      "agent": "pBugKiller",
       "job": "open-pr-maintenance",
       "cron": "3 * * * *",
       "description": "Open PR maintenance (merge conflicts + review comments) hourly at :03"
     },
     {
-      "agent": "auditor",
+      "agent": "mAuditor",
       "job": "teams-posting-audit",
       "cron": "0 6 * * 1",
       "description": "Teams posting permission audit every Monday at 6am"
     },
     {
-      "agent": "bug-killer",
+      "agent": "pBugKiller",
       "job": "daily-summary",
       "cron": "30 1 * * *",
       "description": "Bug killer daily activity summary at 1:30am"
@@ -49,127 +49,127 @@
       "description": "Email inbox summary GENERATE sub-flow (rescan + 9 HTMLs + index link) at 6am daily, 1hr before scan-all-mailboxes"
     },
     {
-      "agent": "auditor",
+      "agent": "mAuditor",
       "job": "consolidate-agent-memories",
       "cron": "0 3 * * *",
       "description": "Memory consolidation and report at 3am daily"
     },
     {
-      "agent": "scrum-reporter",
+      "agent": "mScrumReporter",
       "job": "YTD-OOF-Summary",
       "cron": "0 6 L * *",
       "description": "YTD OOF summary report on the last day of each month at 6am"
     },
     {
-      "agent": "poster",
+      "agent": "mPoster",
       "job": "ICM-daily-summary-Notes",
       "cron": "30 12 * * 1-5",
       "description": "Notes customer ICM daily summary to Teams at 12:30pm weekdays"
     },
     {
-      "agent": "poster",
+      "agent": "mPoster",
       "job": "ICM-daily-summary-Join",
       "cron": "0 9 * * 1-5",
       "description": "Meeting Join customer ICM daily summary to Teams at 9am weekdays"
     },
     {
-      "agent": "poster",
+      "agent": "mPoster",
       "job": "Bug-Autopilot-Adoption-daily-summary",
       "cron": "30 7 * * *",
       "description": "Bug-AutoPilot daily summary post to Teams at 7:30am"
     },
     {
-      "agent": "hang-scout",
+      "agent": "pHangScout",
       "job": "detect-hang",
       "cron": "45 * * * *",
       "description": "Hang detection scan every hour at :45"
     },
     {
-      "agent": "hang-scout",
+      "agent": "pHangScout",
       "job": "daily-report",
       "cron": "0 0 * * *",
       "description": "Daily 5W incident report at midnight"
     },
     {
-      "agent": "harness-monitor",
+      "agent": "pHarnessMonitor",
       "job": "resolve-bugs-cleanup",
       "cron": "30 11 * * 1",
       "description": "Auto-close stale Resolved bugs every Monday at 11:30am"
     },
     {
-      "agent": "approver",
+      "agent": "mApprover",
       "job": "approve-CoreIdentity",
       "cron": "0 8 * * *",
       "description": "CoreIdentity entitlement approvals at 8am daily"
     },
     {
-      "agent": "scrum-reporter",
+      "agent": "mScrumReporter",
       "job": "FFv2-daily-summary",
       "cron": "0 12 * * 1-5",
       "description": "Feature Flight V2 daily report for direct reports flights, weekdays at noon"
     },
     {
-      "agent": "scrum-master",
+      "agent": "mScrumMaster",
       "job": "shiproom-hygiene-check",
       "cron": "45 8 * * 1-5",
       "description": "Run 15 hygiene checks at 8:45am weekdays, then triggerOnComplete fires poster/post-shiproom-hygiene-check"
     },
     {
-      "agent": "scrum-master",
+      "agent": "mScrumMaster",
       "job": "shiproom-hygiene-check",
       "cron": "50 14 * * 1-5",
       "description": "Run 15 hygiene checks at 2:50pm weekdays, then triggerOnComplete fires poster/post-shiproom-hygiene-check"
     },
     {
-      "agent": "approver",
+      "agent": "mApprover",
       "job": "approve-FFv2",
       "cron": "33 21 * * *",
       "description": "Approve all pending FFv2 flights from directs daily at 9:33pm"
     },
     {
-      "agent": "harness-monitor",
+      "agent": "pHarnessMonitor",
       "job": "agent-harness-performance",
       "cron": "0 9 * * 0",
       "description": "Weekly harness performance metrics report every Sunday at 9am"
     },
     {
-      "agent": "harness-monitor",
+      "agent": "pHarnessMonitor",
       "job": "failure-review",
       "cron": "0 18 * * 1-5",
       "description": "Weekday failure review at 6pm -- generates harness improvement candidates"
     },
     {
-      "agent": "auditor",
+      "agent": "mAuditor",
       "job": "agent-brain-health-check",
       "cron": "0 14 * * 6",
       "description": "Agent Brain ecosystem health check every Saturday at 2pm"
     },
     {
-      "agent": "auditor",
+      "agent": "mAuditor",
       "job": "brain-weekly-maintenance",
       "cron": "0 22 * * 0",
       "description": "Weekly brain maintenance: archive sessions, compile knowledge, compress, push (Sunday 10pm)"
     },
     {
-      "agent": "researcher",
+      "agent": "pResearcher",
       "job": "scan-mentions-and-draft",
       "cron": "0 9 * * 1-5",
       "description": "Teams mention scan at 9am weekdays"
     },
     {
-      "agent": "researcher",
+      "agent": "pResearcher",
       "job": "scan-mentions-and-draft",
       "cron": "0 12 * * 1-5",
       "description": "Teams mention scan at noon weekdays"
     },
     {
-      "agent": "researcher",
+      "agent": "pResearcher",
       "job": "scan-mentions-and-draft",
       "cron": "0 15 * * 1-5",
       "description": "Teams mention scan at 3pm weekdays"
     },
     {
-      "agent": "researcher",
+      "agent": "pResearcher",
       "job": "scan-mentions-and-draft",
       "cron": "0 18 * * 1-5",
       "description": "Teams mention scan at 6pm weekdays"

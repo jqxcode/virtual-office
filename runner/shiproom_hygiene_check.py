@@ -13,9 +13,9 @@ config/shiproom-hygiene-rules.md:
      verifies this at runtime; a missing filter aborts the check.
   2. Per-item area_path_allowed() re-check before EVERY PATCH.
   3. Per-run mutation cap (default 50 PATCH calls).
-  4. Plan log (output/scrum-master/hygiene-patch-plan-<ts>.jsonl) is
+  4. Plan log (output/mScrumMaster/hygiene-patch-plan-<ts>.jsonl) is
      written BEFORE the mutation executes.
-  5. Audit log (output/scrum-master/hygiene-mutations-<YYYY-MM-DD>.jsonl)
+  5. Audit log (output/mScrumMaster/hygiene-mutations-<YYYY-MM-DD>.jsonl)
      records every executed PATCH.
   6. Allowed areas computed at runtime: Notes is dropped on/after
      2026-06-01 (compute_allowed_areas()).
@@ -25,12 +25,12 @@ CLI:
 
 The script never opens HTML in a browser. It writes:
 
-    output/scrum-master/shiproom-hygiene-YYYYMMDD-HHmmss.html
-    output/scrum-master/shiproom-hygiene-latest.html
-    output/scrum-master/hygiene-teams-summary.json
-    output/scrum-master/hygiene-full-results.json
-    output/scrum-master/hygiene-patch-plan-<ts>.jsonl
-    output/scrum-master/hygiene-mutations-<YYYY-MM-DD>.jsonl
+    output/mScrumMaster/shiproom-hygiene-YYYYMMDD-HHmmss.html
+    output/mScrumMaster/shiproom-hygiene-latest.html
+    output/mScrumMaster/hygiene-teams-summary.json
+    output/mScrumMaster/hygiene-full-results.json
+    output/mScrumMaster/hygiene-patch-plan-<ts>.jsonl
+    output/mScrumMaster/hygiene-mutations-<YYYY-MM-DD>.jsonl
 """
 from __future__ import annotations
 
@@ -73,8 +73,8 @@ NOTES_CUTOFF = date(2026, 6, 1)
 PST = timezone(timedelta(hours=-7))
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUTPUT_DIR = os.path.join(REPO_ROOT, "output", "scrum-master")
-TEMPLATE_PATH = os.path.join(REPO_ROOT, "templates", "scrum-master-shiproom-hygiene.html")
+OUTPUT_DIR = os.path.join(REPO_ROOT, "output", "mScrumMaster")
+TEMPLATE_PATH = os.path.join(REPO_ROOT, "templates", "mScrumMaster-shiproom-hygiene.html")
 
 # Mutating check IDs (referenced by safety policy)
 MUTATING_CHECKS = {"1", "2", "3", "5", "6"}

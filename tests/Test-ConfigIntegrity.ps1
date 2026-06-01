@@ -149,7 +149,7 @@ foreach ($agentName in ($agents.Keys | Sort-Object)) {
 # ========================================
 # TC8: No legacy agent names in schedules
 # ========================================
-Write-Host "`nTC8: No legacy agent names in schedules (memo-checker/checker should be auditor)" -ForegroundColor Cyan
+Write-Host "`nTC8: No legacy agent names in schedules (memo-checker/checker should be mAuditor)" -ForegroundColor Cyan
 
 $legacyNames = @("memo-checker", "checker")
 $hasLegacy = $false

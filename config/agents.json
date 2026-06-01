@@ -1,20 +1,20 @@
 {
   "agents": {
-    "scrum-master": {
-      "displayName": "Scrum Master",
+    "mScrumMaster": {
+      "displayName": "mScrumMaster",
       "icon": "",
-      "agentFile": "~/.claude/agents/scrum-master.md",
+      "agentFile": "~/.claude/agents/mScrumMaster.md",
       "description": "Generates sprint progress reports and standup summaries for CMD - Meeting Join (US)",
       "staleLockTimeoutMinutes": 90,
       "group": "Work Agents"
     },
-    "bug-killer": {
-      "displayName": "Bug Killer",
+    "pBugKiller": {
+      "displayName": "pBugKiller",
       "icon": "",
-      "agentFile": "~/.claude/agents/bug-killer.md",
+      "agentFile": "~/.claude/agents/pBugKiller.md",
       "description": "Scans assigned repos for open bugs, analyzes root causes, and submits PR fixes",
       "staleLockTimeoutMinutes": 180,
-      "group": "Work Agents"
+      "group": "Personal Agents"
     },
     "pEmailer": {
       "displayName": "pEmailer",
@@ -25,77 +25,77 @@
       "group": "Other Agents",
       "portalUrl": "http://localhost:8402/"
     },
-    "auditor": {
-      "displayName": "Auditor",
+    "mAuditor": {
+      "displayName": "mAuditor",
       "icon": "",
-      "agentFile": "~/.claude/agents/auditor.md",
+      "agentFile": "~/.claude/agents/mAuditor.md",
       "description": "Consolidates memories, audits permissions, audits report templates, and checks agent brain health",
       "staleLockTimeoutMinutes": 120,
-      "group": "Other Agents"
+      "group": "Work Agents"
     },
-    "scrum-reporter": {
-      "displayName": "Scrum Reporter",
+    "mScrumReporter": {
+      "displayName": "mScrumReporter",
       "icon": "",
-      "agentFile": "~/.claude/agents/scrum-reporter.md",
+      "agentFile": "~/.claude/agents/mScrumReporter.md",
       "description": "Generates sprint progress reports, OOF summaries, and Feature Flight daily reports for CMD Meeting Join and Meeting Notes teams",
       "staleLockTimeoutMinutes": 150,
       "group": "Work Agents"
     },
-    "harness-monitor": {
-      "displayName": "Harness Monitor",
+    "pHarnessMonitor": {
+      "displayName": "pHarnessMonitor",
       "icon": "",
-      "agentFile": "~/.claude/agents/harness-monitor.md",
+      "agentFile": "~/.claude/agents/pHarnessMonitor.md",
       "description": "Monitors agent harness health -- performance metrics, failure patterns, and stale bug cleanup",
       "staleLockTimeoutMinutes": 120,
-      "group": "Other Agents"
+      "group": "Personal Agents"
     },
-    "poster": {
-      "displayName": "Poster",
+    "mPoster": {
+      "displayName": "mPoster",
       "icon": "",
-      "agentFile": "~/.claude/agents/poster.md",
+      "agentFile": "~/.claude/agents/mPoster.md",
       "description": "Posts daily Bug-AutoPilot summary to Teams Bug-Autopilot channel from ADO query data",
       "staleLockTimeoutMinutes": 30,
       "group": "Work Agents"
     },
-    "hang-scout": {
-      "displayName": "Hang Scout",
+    "pHangScout": {
+      "displayName": "pHangScout",
       "icon": "",
-      "agentFile": "~/.claude/agents/hang-scout.md",
+      "agentFile": "~/.claude/agents/pHangScout.md",
       "description": "Detects hung agent jobs, diagnoses via process tree and py-spy, kills if safe, files issues for new patterns",
       "staleLockTimeoutMinutes": 15,
-      "group": "Other Agents"
+      "group": "Personal Agents"
     },
-    "dreamer": {
-      "displayName": "Dreamer",
+    "pDreamer": {
+      "displayName": "pDreamer",
       "icon": "",
-      "agentFile": "~/.claude/agents/dreamer.md",
+      "agentFile": "~/.claude/agents/pDreamer.md",
       "description": "Tracks ideas, visions, and wish-list items - inventories dreams, plans next steps, and resumes explorations",
       "staleLockTimeoutMinutes": 30,
-      "group": "Other Agents"
+      "group": "Personal Agents"
     },
-    "researcher": {
-      "displayName": "Researcher",
+    "pResearcher": {
+      "displayName": "pResearcher",
       "icon": "",
-      "agentFile": "~/.claude/agents/researcher.md",
+      "agentFile": "~/.claude/agents/pResearcher.md",
       "description": "Deep research agent - combines log analysis, code tracing, Kusto telemetry, Edge CDP scraping, Graph API lookups, ADO operations, and Agency Teams messaging to investigate complex issues end-to-end",
       "staleLockTimeoutMinutes": 180,
-      "group": "Work Agents"
+      "group": "Personal Agents"
     },
-    "approver": {
-      "displayName": "Approver",
+    "mApprover": {
+      "displayName": "mApprover",
       "icon": "",
-      "agentFile": "~/.claude/agents/approver.md",
+      "agentFile": "~/.claude/agents/mApprover.md",
       "description": "Manual approval agent for web-based approval workflows (FFv2 flights, etc.)",
       "staleLockTimeoutMinutes": 30,
       "group": "Work Agents"
     },
-    "connector": {
-      "displayName": "Connector",
+    "pConnector": {
+      "displayName": "pConnector",
       "icon": "",
-      "agentFile": "~/.claude/agents/connector.md",
+      "agentFile": "~/.claude/agents/pConnector.md",
       "description": "Connects to bank and CC portals via Chrome CDP to download tax docs, transactions, and account data",
       "staleLockTimeoutMinutes": 120,
-      "group": "Other Agents"
+      "group": "Personal Agents"
     },
     "accountant": {
       "displayName": "Accountant",

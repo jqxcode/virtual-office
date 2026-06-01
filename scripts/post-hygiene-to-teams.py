@@ -1,6 +1,6 @@
 """Post hygiene summary to Teams with proper @mentions.
 
-Reads poster-hygiene-teams.json, re-indexes mentions to ensure unique
+Reads mPoster-hygiene-teams.json, re-indexes mentions to ensure unique
 incrementing IDs, posts via Python requests (only method that preserves
 mentions correctly), saves response.
 """
@@ -12,9 +12,9 @@ import sys
 
 sys.stdout.reconfigure(encoding="utf-8")
 
-PAYLOAD_IN = "Q:/src/tmp/poster-hygiene-teams.json"
-PAYLOAD_OUT = "Q:/src/tmp/poster-hygiene-teams-final.json"
-RESPONSE_OUT = "Q:/src/tmp/poster-hygiene-teams-response.json"
+PAYLOAD_IN = "Q:/src/tmp/mPoster-hygiene-teams.json"
+PAYLOAD_OUT = "Q:/src/tmp/mPoster-hygiene-teams-final.json"
+RESPONSE_OUT = "Q:/src/tmp/mPoster-hygiene-teams-response.json"
 TEAM_ID = "31ee74d6-0a8f-41a6-b0da-c4d9e3a1db3b"
 CHANNEL_ID = "19:183d481e40af45d09aac7322433fc7ab@thread.tacv2"
 

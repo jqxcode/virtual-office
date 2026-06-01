@@ -31,14 +31,14 @@ OUTPUT_DIR = PROJECT_ROOT / "output"
 
 # Agent -> allowed report filename prefixes
 AGENT_REPORT_TYPES: Dict[str, List[str]] = {
-    "bug-killer": ["daily-summary", "pr-maintenance", "open-pr-maintenance", "scan", "merge-conflicts"],
-    "hang-scout": ["daily-report", "incident"],
-    "auditor": ["failure-review", "sprint-progress", "TODO-sprint-progress"],
-    "scrum-master": ["sprint-progress", "shiproom-hygiene", "comparison", "run-summaries", "run-", "meeting-notes", "ado-status"],
-    "poster": [],  # poster posts to Teams, no local HTML reports
+    "pBugKiller": ["daily-summary", "pr-maintenance", "open-pr-maintenance", "scan", "merge-conflicts"],
+    "pHangScout": ["daily-report", "incident"],
+    "mAuditor": ["failure-review", "sprint-progress", "TODO-sprint-progress"],
+    "mScrumMaster": ["sprint-progress", "shiproom-hygiene", "comparison", "run-summaries", "run-", "meeting-notes", "ado-status"],
+    "mPoster": [],  # mPoster posts to Teams, no local HTML reports
     "pEmailer": ["scan-all-mailboxes", "digest"],
-    "dreamer": ["wish"],
-    "researcher": [],
+    "pDreamer": ["wish"],
+    "pResearcher": [],
 }
 
 

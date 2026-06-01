@@ -125,8 +125,8 @@ try {
 # ========================================
 Write-Host "`nTC19: Task name generation" -ForegroundColor Cyan
 
-$taskName1 = Get-TaskName -Agent "scrum-master" -Job "sprint-progress"
-Assert-True ($taskName1 -eq "VirtualOffice-scrum-master-sprint-progress") "Task name: scrum-master/sprint-progress"
+$taskName1 = Get-TaskName -Agent "mScrumMaster" -Job "sprint-progress"
+Assert-True ($taskName1 -eq "VirtualOffice-mScrumMaster-sprint-progress") "Task name: mScrumMaster/sprint-progress"
 
 $taskName2 = Get-TaskName -Agent "my-agent" -Job "daily-report"
 Assert-True ($taskName2 -eq "VirtualOffice-my-agent-daily-report") "Task name: my-agent/daily-report"
@@ -143,19 +143,19 @@ Assert-True ($taskName1.StartsWith("VirtualOffice-")) "Task name starts with Vir
 Write-Host "`nTC19b: Duplicate cron entries get unique task names" -ForegroundColor Cyan
 
 $duplicateEntries = @(
-    @{ agent = "scrum-master"; job = "dry-run-ado-status-update"; cron = "0 9 * * *" }
-    @{ agent = "scrum-master"; job = "dry-run-ado-status-update"; cron = "0 21 * * *" }
-    @{ agent = "bug-killer";   job = "scan-and-fix";              cron = "0 10 * * *" }
-    @{ agent = "bug-killer";   job = "scan-and-fix";              cron = "0 22 * * *" }
-    @{ agent = "scrum-master"; job = "sprint-progress";           cron = "0 7 * * 1-5" }
+    @{ agent = "mScrumMaster"; job = "dry-run-ado-status-update"; cron = "0 9 * * *" }
+    @{ agent = "mScrumMaster"; job = "dry-run-ado-status-update"; cron = "0 21 * * *" }
+    @{ agent = "pBugKiller";   job = "scan-and-fix";              cron = "0 10 * * *" }
+    @{ agent = "pBugKiller";   job = "scan-and-fix";              cron = "0 22 * * *" }
+    @{ agent = "mScrumMaster"; job = "sprint-progress";           cron = "0 7 * * 1-5" }
 )
 $names = Get-DedupedTaskNames -Entries $duplicateEntries
 
-Assert-True ($names[0] -eq "VirtualOffice-scrum-master-dry-run-ado-status-update") "First occurrence keeps base task name"
-Assert-True ($names[1] -eq "VirtualOffice-scrum-master-dry-run-ado-status-update-2") "Second occurrence gets -2 suffix"
-Assert-True ($names[2] -eq "VirtualOffice-bug-killer-scan-and-fix") "First occurrence (different agent+job) keeps base task name"
-Assert-True ($names[3] -eq "VirtualOffice-bug-killer-scan-and-fix-2") "Second occurrence gets -2 suffix"
-Assert-True ($names[4] -eq "VirtualOffice-scrum-master-sprint-progress") "Unique entry keeps base task name"
+Assert-True ($names[0] -eq "VirtualOffice-mScrumMaster-dry-run-ado-status-update") "First occurrence keeps base task name"
+Assert-True ($names[1] -eq "VirtualOffice-mScrumMaster-dry-run-ado-status-update-2") "Second occurrence gets -2 suffix"
+Assert-True ($names[2] -eq "VirtualOffice-pBugKiller-scan-and-fix") "First occurrence (different agent+job) keeps base task name"
+Assert-True ($names[3] -eq "VirtualOffice-pBugKiller-scan-and-fix-2") "Second occurrence gets -2 suffix"
+Assert-True ($names[4] -eq "VirtualOffice-mScrumMaster-sprint-progress") "Unique entry keeps base task name"
 Assert-True (($names | Sort-Object -Unique).Count -eq $names.Count) "All generated task names are unique"
 
 # ========================================
@@ -202,13 +202,13 @@ try {
     $nowIso = Get-Date -Format "o"
     $eventEntry = @{
         ts            = $nowIso
-        agent         = "scrum-master"
+        agent         = "mScrumMaster"
         job           = "sprint-progress"
         event         = "schedule_registered"
         details       = @{
             cron        = "*/15 * * * *"
-            taskName    = "VirtualOffice-scrum-master-sprint-progress"
-            description = "Virtual Office: scrum-master / sprint-progress"
+            taskName    = "VirtualOffice-mScrumMaster-sprint-progress"
+            description = "Virtual Office: mScrumMaster / sprint-progress"
         }
         systemVersion = "0.1.0"
     } | ConvertTo-Json -Compress
@@ -217,14 +217,14 @@ try {
     Assert-True (Test-Path $eventsFile) "events.jsonl exists after write"
     $content = Get-Content -Path $eventsFile -Raw
     Assert-True ($content -match '"schedule_registered"') "Event contains schedule_registered type"
-    Assert-True ($content -match '"scrum-master"') "Event contains agent name"
+    Assert-True ($content -match '"mScrumMaster"') "Event contains agent name"
     Assert-True ($content -match '"sprint-progress"') "Event contains job name"
     Assert-True ($content -match '"systemVersion"') "Event contains systemVersion field"
 
     $parsed = $eventEntry | ConvertFrom-Json
     Assert-True ($parsed.event -eq "schedule_registered") "Parsed event type is schedule_registered"
     Assert-True ($parsed.details.cron -eq "*/15 * * * *") "Parsed details contain cron"
-    Assert-True ($parsed.details.taskName -eq "VirtualOffice-scrum-master-sprint-progress") "Parsed details contain taskName"
+    Assert-True ($parsed.details.taskName -eq "VirtualOffice-mScrumMaster-sprint-progress") "Parsed details contain taskName"
 } finally {
     Remove-TestRoot -Root $root
 }
@@ -241,13 +241,13 @@ try {
     $auditEntry = @{
         ts            = $nowIso
         action        = "schedule_registered"
-        agent         = "scrum-master"
+        agent         = "mScrumMaster"
         job           = "sprint-progress"
         runId         = "N/A"
         systemVersion = "0.1.0"
         details       = @{
             cron     = "*/15 * * * *"
-            taskName = "VirtualOffice-scrum-master-sprint-progress"
+            taskName = "VirtualOffice-mScrumMaster-sprint-progress"
         }
     } | ConvertTo-Json -Compress
     Add-Content -Path $monthFile -Value $auditEntry -Encoding ASCII
@@ -259,7 +259,7 @@ try {
 
     $parsed = $auditEntry | ConvertFrom-Json
     Assert-True ($parsed.action -eq "schedule_registered") "Parsed audit action is schedule_registered"
-    Assert-True ($parsed.agent -eq "scrum-master") "Parsed audit agent is correct"
+    Assert-True ($parsed.agent -eq "mScrumMaster") "Parsed audit agent is correct"
 } finally {
     Remove-TestRoot -Root $root
 }
@@ -274,11 +274,11 @@ try {
     $nowIso = Get-Date -Format "o"
     $eventEntry = @{
         ts            = $nowIso
-        agent         = "scrum-master"
+        agent         = "mScrumMaster"
         job           = "sprint-progress"
         event         = "schedule_removed"
         details       = @{
-            taskName = "VirtualOffice-scrum-master-sprint-progress"
+            taskName = "VirtualOffice-mScrumMaster-sprint-progress"
         }
         systemVersion = "0.1.0"
     } | ConvertTo-Json -Compress
@@ -287,12 +287,12 @@ try {
     Assert-True (Test-Path $eventsFile) "events.jsonl exists after removal write"
     $content = Get-Content -Path $eventsFile -Raw
     Assert-True ($content -match '"schedule_removed"') "Event contains schedule_removed type"
-    Assert-True ($content -match '"scrum-master"') "Event contains agent name"
+    Assert-True ($content -match '"mScrumMaster"') "Event contains agent name"
     Assert-True ($content -match '"sprint-progress"') "Event contains job name"
 
     $parsed = $eventEntry | ConvertFrom-Json
     Assert-True ($parsed.event -eq "schedule_removed") "Parsed event type is schedule_removed"
-    Assert-True ($parsed.details.taskName -eq "VirtualOffice-scrum-master-sprint-progress") "Parsed details contain taskName"
+    Assert-True ($parsed.details.taskName -eq "VirtualOffice-mScrumMaster-sprint-progress") "Parsed details contain taskName"
 } finally {
     Remove-TestRoot -Root $root
 }
@@ -306,12 +306,12 @@ try {
     $eventsFile = Join-Path $root "state/events.jsonl"
     $nowIso = Get-Date -Format "o"
     $fireTime = (Get-Date).AddMinutes(1).ToString("o")
-    $taskName = "VirtualOffice-oneoff-scrum-master-dry-run-bug-autopilot-$(Get-Date -Format 'yyyyMMddHHmmss')"
+    $taskName = "VirtualOffice-oneoff-mScrumMaster-dry-run-bug-autopilot-$(Get-Date -Format 'yyyyMMddHHmmss')"
 
     # Simulate the event writing logic from Register-OneOff.ps1
     $eventEntry = @{
         ts            = $nowIso
-        agent         = "scrum-master"
+        agent         = "mScrumMaster"
         job           = "dry-run-bug-autopilot"
         event         = "schedule_registered"
         details       = @{
@@ -319,7 +319,7 @@ try {
             taskName     = $taskName
             fireTime     = $fireTime
             delayMinutes = 1
-            description  = "Virtual Office one-off: scrum-master / dry-run-bug-autopilot"
+            description  = "Virtual Office one-off: mScrumMaster / dry-run-bug-autopilot"
         }
         systemVersion = "0.1.0"
     } | ConvertTo-Json -Compress
@@ -328,7 +328,7 @@ try {
     Assert-True (Test-Path $eventsFile) "events.jsonl exists after one-off write"
     $content = Get-Content -Path $eventsFile -Raw
     Assert-True ($content -match '"schedule_registered"') "Event contains schedule_registered type"
-    Assert-True ($content -match '"scrum-master"') "Event contains agent name"
+    Assert-True ($content -match '"mScrumMaster"') "Event contains agent name"
     Assert-True ($content -match '"dry-run-bug-autopilot"') "Event contains job name"
 
     $parsed = $eventEntry | ConvertFrom-Json
@@ -347,17 +347,17 @@ try {
 Write-Host "`nTC74: One-off task name includes timestamp" -ForegroundColor Cyan
 
 $ts = Get-Date -Format "yyyyMMddHHmmss"
-$oneoffName = "VirtualOffice-oneoff-scrum-master-dry-run-bug-autopilot-$ts"
+$oneoffName = "VirtualOffice-oneoff-mScrumMaster-dry-run-bug-autopilot-$ts"
 
 Assert-True ($oneoffName -match 'VirtualOffice-oneoff-.+-\d{14}$') "Task name matches pattern with 14-digit timestamp suffix"
 Assert-True ($oneoffName -match $ts) "Task name contains the expected timestamp value"
 
 # Verify uniqueness: two names generated 0+ seconds apart differ
 $ts2 = (Get-Date).AddSeconds(1).ToString("yyyyMMddHHmmss")
-$oneoffName2 = "VirtualOffice-oneoff-scrum-master-dry-run-bug-autopilot-$ts2"
+$oneoffName2 = "VirtualOffice-oneoff-mScrumMaster-dry-run-bug-autopilot-$ts2"
 # If the second rolled over they differ; if same second they match -- both are valid
 Assert-True ($oneoffName.StartsWith("VirtualOffice-oneoff-")) "One-off name starts with VirtualOffice-oneoff- prefix"
-Assert-True ($oneoffName -ne (Get-TaskName -Agent "scrum-master" -Job "dry-run-bug-autopilot")) "One-off name differs from recurring task name pattern"
+Assert-True ($oneoffName -ne (Get-TaskName -Agent "mScrumMaster" -Job "dry-run-bug-autopilot")) "One-off name differs from recurring task name pattern"
 
 # --- Summary ---
 Write-Host "`n========================================" -ForegroundColor White

@@ -51,13 +51,7 @@ EXCLUDED_DIR_NAMES = {".venv", ".venv-wechat", "venv", "env",
 # without a tracked cleanup ticket. Path is repo-relative with forward
 # slashes; line is the 1-based line number of the offending call.
 KNOWN_VIOLATIONS = {
-    # wechat_pywin_collect.py is an orphan one-off WeChat collector that
-    # shells out to powershell.exe twice. powershell.exe is on PATH on
-    # all supported hosts (unlike az.cmd), so this is a soft violation,
-    # but we still log it here so future readers know it is pre-existing,
-    # not introduced by the lint.
-    ("scripts/wechat_pywin_collect.py", 33),
-    ("scripts/wechat_pywin_collect.py", 38),
+    # (removed: wechat_pywin_collect.py was deleted)
     # post-hygiene-to-teams.py wraps `az` inside a `powershell -Command`
     # invocation rather than calling subprocess directly. The wrapper
     # works because powershell.exe is on PATH; the inner `az` runs under

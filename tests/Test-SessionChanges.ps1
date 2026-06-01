@@ -28,7 +28,7 @@ $ProjectRoot = (Resolve-Path $ProjectRoot).Path
 # ========================================
 Write-Host "`nTC85: Template has 'Meeting Join (Fundamentals)' in section header" -ForegroundColor Cyan
 
-$templateFile = Join-Path $ProjectRoot "templates" "scrum-master-sprint-progress.html"
+$templateFile = Join-Path $ProjectRoot "templates" "mScrumMaster-sprint-progress.html"
 Assert-True (Test-Path $templateFile) "Sprint progress template file exists"
 
 if (Test-Path $templateFile) {
@@ -46,56 +46,56 @@ if (Test-Path $templateFile) {
 }
 
 # ========================================
-# TC86: Dashboard uses "auditor" not "checker" or "memo-checker"
+# TC86: Dashboard uses "mAuditor" not "checker" or "memo-checker"
 # ========================================
-Write-Host "`nTC86: Dashboard uses 'auditor' not 'checker' or 'memo-checker'" -ForegroundColor Cyan
+Write-Host "`nTC86: Dashboard uses 'mAuditor' not 'checker' or 'memo-checker'" -ForegroundColor Cyan
 
 $dashFile = Join-Path $ProjectRoot "state" "dashboard.json"
 Assert-True (Test-Path $dashFile) "Dashboard state file exists"
 
 if (Test-Path $dashFile) {
     $dash = Get-Content -Path $dashFile -Raw | ConvertFrom-Json -AsHashtable
-    Assert-True ($dash["agents"].ContainsKey("auditor")) "Dashboard has 'auditor' agent entry"
+    Assert-True ($dash["agents"].ContainsKey("mAuditor")) "Dashboard has 'mAuditor' agent entry"
     Assert-True (-not $dash["agents"].ContainsKey("checker")) "Dashboard does NOT have 'checker' (old name)"
     Assert-True (-not $dash["agents"].ContainsKey("memo-checker")) "Dashboard does NOT have 'memo-checker' (old name)"
 }
 
 # ========================================
-# TC87: scrum-master.json has "bug-autopilot-meeting-join" (not bare "bug-autopilot")
+# TC87: mScrumMaster.json has "bug-autopilot-meeting-join" (not bare "bug-autopilot")
 # ========================================
-Write-Host "`nTC87: scrum-master.json job renames" -ForegroundColor Cyan
+Write-Host "`nTC87: mScrumMaster.json job renames" -ForegroundColor Cyan
 
-$smJobsFile = Join-Path $ProjectRoot "config" "jobs" "scrum-master.json"
-Assert-True (Test-Path $smJobsFile) "scrum-master.json exists"
+$smJobsFile = Join-Path $ProjectRoot "config" "jobs" "mScrumMaster.json"
+Assert-True (Test-Path $smJobsFile) "mScrumMaster.json exists"
 
 if (Test-Path $smJobsFile) {
     $smJobsRaw = Get-Content -Path $smJobsFile -Raw | ConvertFrom-Json -AsHashtable
     $smJobs = if ($smJobsRaw.ContainsKey("jobs")) { $smJobsRaw["jobs"] } else { $smJobsRaw }
 
-    Assert-True ($smJobs.ContainsKey("bug-autopilot-meeting-join")) "scrum-master has 'bug-autopilot-meeting-join' job"
-    Assert-True (-not $smJobs.ContainsKey("bug-autopilot")) "scrum-master does NOT have bare 'bug-autopilot' job"
-    Assert-True (-not $smJobs.ContainsKey("TODO-sprint-progress")) "scrum-master does NOT have 'TODO-sprint-progress' (moved to auditor)"
-    Assert-True (-not $smJobs.ContainsKey("TODO-compare-runs")) "scrum-master does NOT have 'TODO-compare-runs' (moved to auditor)"
+    Assert-True ($smJobs.ContainsKey("bug-autopilot-meeting-join")) "mScrumMaster has 'bug-autopilot-meeting-join' job"
+    Assert-True (-not $smJobs.ContainsKey("bug-autopilot")) "mScrumMaster does NOT have bare 'bug-autopilot' job"
+    Assert-True (-not $smJobs.ContainsKey("TODO-sprint-progress")) "mScrumMaster does NOT have 'TODO-sprint-progress' (moved to mAuditor)"
+    Assert-True (-not $smJobs.ContainsKey("TODO-compare-runs")) "mScrumMaster does NOT have 'TODO-compare-runs' (moved to mAuditor)"
 }
 
 # ========================================
-# TC88: auditor.json HAS the TODO-sprint-progress and TODO-compare-runs jobs
+# TC88: mAuditor.json HAS the TODO-sprint-progress and TODO-compare-runs jobs
 # ========================================
-Write-Host "`nTC88: auditor.json has the moved jobs" -ForegroundColor Cyan
+Write-Host "`nTC88: mAuditor.json has the moved jobs" -ForegroundColor Cyan
 
-$auditorJobsFile = Join-Path $ProjectRoot "config" "jobs" "auditor.json"
-Assert-True (Test-Path $auditorJobsFile) "auditor.json exists"
+$mAuditorJobsFile = Join-Path $ProjectRoot "config" "jobs" "mAuditor.json"
+Assert-True (Test-Path $mAuditorJobsFile) "mAuditor.json exists"
 
-if (Test-Path $auditorJobsFile) {
-    $auditorJobsRaw = Get-Content -Path $auditorJobsFile -Raw | ConvertFrom-Json -AsHashtable
-    $auditorJobs = if ($auditorJobsRaw.ContainsKey("jobs")) { $auditorJobsRaw["jobs"] } else { $auditorJobsRaw }
+if (Test-Path $mAuditorJobsFile) {
+    $mAuditorJobsRaw = Get-Content -Path $mAuditorJobsFile -Raw | ConvertFrom-Json -AsHashtable
+    $mAuditorJobs = if ($mAuditorJobsRaw.ContainsKey("jobs")) { $mAuditorJobsRaw["jobs"] } else { $mAuditorJobsRaw }
 
-    Assert-True ($auditorJobs.ContainsKey("TODO-sprint-progress")) "auditor has 'TODO-sprint-progress' job"
-    Assert-True ($auditorJobs.ContainsKey("TODO-compare-runs")) "auditor has 'TODO-compare-runs' job"
+    Assert-True ($mAuditorJobs.ContainsKey("TODO-sprint-progress")) "mAuditor has 'TODO-sprint-progress' job"
+    Assert-True ($mAuditorJobs.ContainsKey("TODO-compare-runs")) "mAuditor has 'TODO-compare-runs' job"
 }
 
 # ========================================
-# TC89: scrum-master.json prompts referencing hackathon repos include "git pull"
+# TC89: mScrumMaster.json prompts referencing hackathon repos include "git pull"
 # ========================================
 Write-Host "`nTC89: Prompts referencing hackathon repos include 'git pull'" -ForegroundColor Cyan
 
@@ -112,7 +112,7 @@ if (Test-Path $smJobsFile) {
             Assert-True $hasGitPull "Job '$jobName' prompt references hackathon and includes 'git pull'"
         }
     }
-    Assert-True ($hackathonJobs.Count -gt 0) "At least one scrum-master job references hackathon repos"
+    Assert-True ($hackathonJobs.Count -gt 0) "At least one mScrumMaster job references hackathon repos"
 }
 
 # ========================================

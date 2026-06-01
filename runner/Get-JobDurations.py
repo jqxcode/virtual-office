@@ -25,12 +25,12 @@ AUDIT_DIR = PROJECT_ROOT / "output" / "audit"
 
 # VDS vo-theme-0.2.0 aligned colors
 AGENT_COLORS = {
-    "scrum-master": "#3b82f6",   # --vo-status-info
-    "bug-killer": "#ef4444",     # --vo-status-error
+    "mScrumMaster": "#3b82f6",   # --vo-status-info
+    "pBugKiller": "#ef4444",     # --vo-status-error
     "pEmailer": "#22c55e",       # --vo-status-success
-    "auditor": "#a855f7",        # purple (consistent with app.js)
-    "poster": "#f59e0b",         # --vo-status-warning
-    "hang-scout": "#06b6d4",     # cyan
+    "mAuditor": "#a855f7",        # purple (consistent with app.js)
+    "mPoster": "#f59e0b",         # --vo-status-warning
+    "pHangScout": "#06b6d4",     # cyan
 }
 
 def parse_duration(s):

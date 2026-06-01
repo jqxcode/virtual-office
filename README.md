@@ -32,7 +32,7 @@ Virtual Office is an agent orchestration framework that schedules, runs, and mon
 3. (Optional) Trigger a job manually:
 
    ```powershell
-   .\runner\Invoke-AgentJob.ps1 -Agent scrum-master -Job ado-status-update
+   .\runner\Invoke-AgentJob.ps1 -Agent mScrumMaster -Job ado-status-update
    ```
 
 ## Dependencies
@@ -40,7 +40,7 @@ Virtual Office is an agent orchestration framework that schedules, runs, and mon
 - PowerShell 7+
 - Claude Code CLI (`claude`)
 - Windows Task Scheduler
-- py-spy (for hang-scout stack capture)
+- py-spy (for pHangScout stack capture)
 
 ## Directory Layout
 

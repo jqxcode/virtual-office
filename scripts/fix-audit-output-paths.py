@@ -27,30 +27,30 @@ AUDIT_DIR = OUTPUT_DIR / "audit"
 # Map: (agent, job) -> list of filename prefixes to search for.
 # If not listed here, we derive prefixes automatically from the job name.
 JOB_FILE_PREFIXES: Dict[Tuple[str, str], List[str]] = {
-    ("bug-killer", "open-pr-maintenance"): ["pr-maintenance"],
-    ("bug-killer", "scan-and-fix"): ["scan", "daily-summary"],
-    ("bug-killer", "resolve-merge-conflicts"): ["merge-conflicts"],
-    ("scrum-master", "ado-status-update"): ["ado-status-update"],
-    ("scrum-master", "ado-burndown-update"): ["ado-burndown-update"],
-    ("scrum-master", "bug-autopilot-meeting-join"): ["meeting-join-report", "meeting-join"],
-    ("scrum-master", "shiproom-hygiene-check"): ["shiproom-hygiene"],
-    ("scrum-master", "dry-run-ado-status-update"): ["dry-run-ado-status-update"],
-    ("scrum-master", "compare-runs"): ["compare-runs", "run"],
+    ("pBugKiller", "open-pr-maintenance"): ["pr-maintenance"],
+    ("pBugKiller", "scan-and-fix"): ["scan", "daily-summary"],
+    ("pBugKiller", "resolve-merge-conflicts"): ["merge-conflicts"],
+    ("mScrumMaster", "ado-status-update"): ["ado-status-update"],
+    ("mScrumMaster", "ado-burndown-update"): ["ado-burndown-update"],
+    ("mScrumMaster", "bug-autopilot-meeting-join"): ["meeting-join-report", "meeting-join"],
+    ("mScrumMaster", "shiproom-hygiene-check"): ["shiproom-hygiene"],
+    ("mScrumMaster", "dry-run-ado-status-update"): ["dry-run-ado-status-update"],
+    ("mScrumMaster", "compare-runs"): ["compare-runs", "run"],
     ("pEmailer", "scan-all-mailboxes"): ["scan"],
-    ("auditor", "resolve-bugs-cleanup"): ["resolve-bugs-cleanup"],
-    ("auditor", "TODO-sprint-progress"): ["sprint-progress", "todo-sprint-progress"],
-    ("auditor", "consolidate-agent-memories"): ["consolidate-agent-memories"],
-    ("auditor", "FFv2-daily-summary"): ["ffv2-daily-summary", "ffv2"],
-    ("auditor", "YTD-OOF-Summary"): ["ytd-oof-summary"],
+    ("mAuditor", "resolve-bugs-cleanup"): ["resolve-bugs-cleanup"],
+    ("mAuditor", "TODO-sprint-progress"): ["sprint-progress", "todo-sprint-progress"],
+    ("mAuditor", "consolidate-agent-memories"): ["consolidate-agent-memories"],
+    ("mAuditor", "FFv2-daily-summary"): ["ffv2-daily-summary", "ffv2"],
+    ("mAuditor", "YTD-OOF-Summary"): ["ytd-oof-summary"],
 }
 
 # Jobs known to NOT produce local report files (they post to Teams, update ADO, etc.)
 NO_LOCAL_REPORT: Set[Tuple[str, str]] = {
-    ("poster", "AAP-report-posting"),
-    ("poster", "BAP-Perf-Analysis-posting"),
-    ("poster", "Bug-Autopilot-Adoption-daily-summary"),
-    ("poster", "ICM-daily-summary-Join"),
-    ("poster", "ICM-daily-summary-Notes"),
+    ("mPoster", "AAP-report-posting"),
+    ("mPoster", "BAP-Perf-Analysis-posting"),
+    ("mPoster", "Bug-Autopilot-Adoption-daily-summary"),
+    ("mPoster", "ICM-daily-summary-Join"),
+    ("mPoster", "ICM-daily-summary-Notes"),
 }
 
 
