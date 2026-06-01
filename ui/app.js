@@ -8,21 +8,32 @@ var CONFIG = {
 
 // --- Agent color map (single source of truth for all agent colors) ---
 var AGENT_COLORS = {
-  "scrum-master": "#3b82f6",   // blue
-  "bug-killer": "#ef4444",     // red
+  "mScrumMaster": "#3b82f6",   // blue
+  "pBugKiller": "#ef4444",     // red
   "pEmailer": "#22c55e",       // green
-  "auditor": "#a855f7",        // purple
-  "poster": "#f59e0b",         // amber
-  "hang-scout": "#06b6d4"      // cyan
+  "mAuditor": "#a855f7",        // purple
+  "mPoster": "#f59e0b",         // amber
+  "pHangScout": "#06b6d4"      // cyan
 };
 
 // --- Legacy agent name mapping ---
 // Maps old/renamed agent names to their current canonical names
 var LEGACY_AGENT_NAMES = {
-  "memo-checker": "auditor",
-  "checker": "auditor",
+  "memo-checker": "mAuditor",
+  "checker": "mAuditor",
   "emailer": "pEmailer"
-};
+,
+  "scrum-master": "mScrumMaster",
+  "bug-killer": "pBugKiller",
+  "scrum-reporter": "mScrumReporter",
+  "harness-monitor": "pHarnessMonitor",
+  "poster": "mPoster",
+  "hang-scout": "pHangScout",
+  "dreamer": "pDreamer",
+  "researcher": "pResearcher",
+  "approver": "mApprover",
+  "connector": "pConnector",
+  "auditor": "mAuditor"};
 
 function canonicalAgentName(name) {
   return LEGACY_AGENT_NAMES[name] || name;

@@ -20,7 +20,7 @@ mode and asserts:
   * stdout contains the runner's completion marker (``Completed:``)
 
 The test writes to a tmp output directory so the canonical
-``output/scrum-master/`` artefacts are never disturbed.
+``output/mScrumMaster/`` artefacts are never disturbed.
 
 The test is skipped (not silently passed) when ``az`` is not authed on
 the host, because the runner cannot acquire an ADO token in that case.
@@ -81,7 +81,7 @@ class TestShiproomHygieneSmoke(unittest.TestCase):
         )
 
         with tempfile.TemporaryDirectory(prefix="hygiene-smoke-") as tmp:
-            output_dir = os.path.join(tmp, "scrum-master")
+            output_dir = os.path.join(tmp, "mScrumMaster")
             os.makedirs(output_dir, exist_ok=True)
             summary_path = os.path.join(output_dir, "hygiene-teams-summary.json")
             self.assertFalse(

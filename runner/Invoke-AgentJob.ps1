@@ -580,7 +580,7 @@ if (Test-Path $lockFile) {
             # Stale lock -- force clear AND kill the underlying process tree.
             # Just deleting the lock file leaves the runaway process alive,
             # which is the exact bug that produced the 5/26-5/28 333-350 min
-            # bug-killer runs (see tests/test_lock_ttl_enforcement.py).
+            # pBugKiller runs (see tests/test_lock_ttl_enforcement.py).
             Remove-Item -Path $lockFile -Force
             $lockAgeMin = [math]::Round($lockAge.TotalMinutes)
             Write-Event -AgentName $Agent -JobName $Job -Event "stale_lock_cleared" -Details @{
@@ -705,7 +705,7 @@ while ($keepRunning) {
     $runId = -join ((1..8) | ForEach-Object { "{0:x}" -f (Get-Random -Maximum 16) })
 
     # Step 7: Write audit/event/dashboard for start.
-    # Include the runner's own PID on the started event so hang-scout / TTL
+    # Include the runner's own PID on the started event so pHangScout / TTL
     # enforcement can correlate run_id -> process even if the lock file has
     # already been cleared. The claude child PID is recorded separately on
     # the lock file once the child is spawned in step 8.

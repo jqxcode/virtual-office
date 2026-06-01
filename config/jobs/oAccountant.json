@@ -1,0 +1,32 @@
+{
+  "jobs": {
+    "stock-real-data-research": {
+      "displayName": "Stock Strategy Report (Live Data)",
+      "prompt": "Read ${LOCAL_SKILLS}/stock-real-data-research.md for full instructions. Execute the complete pipeline: (1) connect to Fidelity via CDP port 9222 and extract cookies, (2) query all GraphQL endpoints for quotes, positions, sentiment, news, and events, (3) apply Munger 7 mental models and 5 consensus principles, (4) calculate MSFT total economic exposure, (5) check portfolio rules compliance, (6) generate bilingual HTML report following ${SRC_ROOT}/DESIGN.md, (7) save to Stock Analysis folder, open in Edge, and move to Reports tab group. Also create a session log MD file alongside the report.",
+      "requiresInput": false,
+      "schedule": "manual-trigger-weekend",
+      "description": "Generate stock strategy report using live Fidelity data, Munger models, and investment principles. Requires user presence (Fidelity session cookies).",
+      "constraints": {
+        "daysOfWeek": ["Saturday", "Sunday"],
+        "requiresUserPresence": true,
+        "notes": "Fidelity session cookies expire after ~30min idle. User must be logged in on the VM before triggering."
+      }
+    },
+    "tax-return-oakley": {
+      "displayName": "Tax Return - Oakley",
+      "prompt": "Read ${LOCAL_SKILLS}/tax/tax-return-oakley.md for full instructions. Also read ${REPO_PERSONAL}/2026-04-13 oakley2025-return/oakley-tax-notes.md for current state. Then execute the requested phase of the Oakley Management LLC Form 1120 tax return workflow. Follow the skill phases in order. Always verify numbers against source documents. Never e-file without explicit user approval.",
+      "requiresInput": true,
+      "inputPrompt": "Which phase? (e.g., 'Phase 1: gather info', 'Phase 2: QBO fixes', 'Phase 5: TurboTax data entry', 'full return from scratch')",
+      "schedule": "manual",
+      "description": "Prepare and file Oakley Management LLC annual Form 1120 C-Corp tax return"
+    },
+    "bookkeeping-oakley": {
+      "displayName": "Bookkeeping - Oakley",
+      "prompt": "Read ${LOCAL_SKILLS}/tax/bookkeeping-oakley.md for full instructions. Also read ${REPO_PERSONAL}/oakley-bookkeeping-notes.md for reference. Download QBO reports, review categories, fix issues, reconcile bank balances, and generate a status summary.",
+      "requiresInput": true,
+      "inputPrompt": "Period? (e.g., '2026 Q1', 'January 2026', 'full year 2025', 'just download reports')",
+      "schedule": "manual",
+      "description": "Monthly/quarterly QBO bookkeeping review and maintenance for Oakley Management LLC"
+    }
+  }
+}

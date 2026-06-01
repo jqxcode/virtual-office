@@ -2,7 +2,7 @@
 
 Motivation: on 2026-04-14, commit 8447512 silently removed the bug-autopilot
 schedule entries as a "while-we're-here" cleanup. The job definitions in
-config/jobs/scrum-master.json were kept, the runner scripts were kept, only
+config/jobs/mScrumMaster.json were kept, the runner scripts were kept, only
 the cron entries in config/schedules.json were removed. Nobody noticed for
 47 days.
 
@@ -33,12 +33,12 @@ JOBS_DIR = os.path.join(CONFIG_DIR, "jobs")
 # kind = "triggered"   -> must be the target of triggerOnComplete elsewhere
 
 REQUIRED_JOBS = [
-    ("scrum-master", "shiproom-hygiene-check", "direct_cron"),
-    ("scrum-master", "bug-autopilot-meeting-join", "direct_cron"),
-    ("scrum-master", "bug-autopilot-notes", "direct_cron"),
-    ("scrum-master", "ado-status-update", "direct_cron"),
-    ("scrum-master", "ado-burndown-update", "direct_cron"),
-    ("poster", "post-shiproom-hygiene-check", "triggered"),
+    ("mScrumMaster", "shiproom-hygiene-check", "direct_cron"),
+    ("mScrumMaster", "bug-autopilot-meeting-join", "direct_cron"),
+    ("mScrumMaster", "bug-autopilot-notes", "direct_cron"),
+    ("mScrumMaster", "ado-status-update", "direct_cron"),
+    ("mScrumMaster", "ado-burndown-update", "direct_cron"),
+    ("mPoster", "post-shiproom-hygiene-check", "triggered"),
 ]
 
 

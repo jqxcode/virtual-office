@@ -1,14 +1,14 @@
-"""Data freshness invariant -- detect scrum-master runs that exited 0 but
+"""Data freshness invariant -- detect mScrumMaster runs that exited 0 but
 didn't actually refresh their output files.
 
 CONTEXT (2026-05-26 to 2026-05-28 silent-failure pattern)
 ---------------------------------------------------------
-The scrum-master `shiproom-hygiene-check` job is supposed to (re)write
-`output/scrum-master/hygiene-teams-summary.json` every time it runs. The
-downstream poster reads that file and refuses to post if it's stale.
+The mScrumMaster `shiproom-hygiene-check` job is supposed to (re)write
+`output/mScrumMaster/hygiene-teams-summary.json` every time it runs. The
+downstream mPoster reads that file and refuses to post if it's stale.
 
-On 2026-05-27 the poster refused to post because the data file was older
-than the scheduled scrum-master run -- the scrum-master harness recorded
+On 2026-05-27 the mPoster refused to post because the data file was older
+than the scheduled mScrumMaster run -- the mScrumMaster harness recorded
 `completed exit_code=0` even though the underlying script aborted before
 writing fresh output. The harness can't tell.
 
@@ -51,11 +51,11 @@ SLOP_SECONDS = 60
 # fails with a clear "expected output missing" message.
 EXPECTED_OUTPUTS: Dict[str, List[str]] = {
     "shiproom-hygiene-check": [
-        os.path.join(OUTPUT_DIR, "scrum-master", "hygiene-teams-summary.json"),
-        os.path.join(OUTPUT_DIR, "scrum-master", "hygiene-full-results.json"),
+        os.path.join(OUTPUT_DIR, "mScrumMaster", "hygiene-teams-summary.json"),
+        os.path.join(OUTPUT_DIR, "mScrumMaster", "hygiene-full-results.json"),
     ],
     # ado-status-update job copies the latest ADO autopilot report to
-    # output/scrum-master/ado-status-update-YYYYMMDD.html. We resolve the
+    # output/mScrumMaster/ado-status-update-YYYYMMDD.html. We resolve the
     # latest matching dated file at check time.
     "ado-status-update": [
         # sentinel handled in _resolve_expected_output
@@ -148,8 +148,8 @@ def _resolve_expected_output(job_name: str) -> Optional[str]:
     candidates = EXPECTED_OUTPUTS.get(job_name, [])
     for c in candidates:
         if c == "__ado_status_update_dated__":
-            # Find newest output/scrum-master/ado-status-update-YYYYMMDD.html
-            sm_dir = os.path.join(OUTPUT_DIR, "scrum-master")
+            # Find newest output/mScrumMaster/ado-status-update-YYYYMMDD.html
+            sm_dir = os.path.join(OUTPUT_DIR, "mScrumMaster")
             if not os.path.isdir(sm_dir):
                 continue
             matches = [

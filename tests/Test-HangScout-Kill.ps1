@@ -4,7 +4,7 @@
 #
 # Background: prior to this fix, the stale-lock handler only deleted the
 # logical lock file. The process holding it kept running. The 5/26-5/28
-# bug-killer runs (333-350 min, TTL=180) are the production symptom and
+# pBugKiller runs (333-350 min, TTL=180) are the production symptom and
 # tests/test_lock_ttl_enforcement.py is the invariant that catches it.
 #
 # These tests cover:

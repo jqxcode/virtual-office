@@ -203,7 +203,7 @@ try {
     # Write dashboard.json with flat format (job data directly on agent, no "jobs" wrapper)
     $flatDash = @{
         agents = @{
-            "scrum-master" = @{
+            "mScrumMaster" = @{
                 "dry-run-bug-autopilot" = @{
                     status = "running"
                     run_id = "abc123"
@@ -218,7 +218,7 @@ try {
     Write-AtomicFile -Path $dashFile -Content $json
 
     $dash = Get-Content -Path $dashFile -Raw | ConvertFrom-Json -AsHashtable
-    $jobEntry = $dash["agents"]["scrum-master"]["dry-run-bug-autopilot"]
+    $jobEntry = $dash["agents"]["mScrumMaster"]["dry-run-bug-autopilot"]
 
     Assert-True ($null -ne $jobEntry) "Flat job entry exists on agent object"
     Assert-True ($jobEntry.ContainsKey("status")) "Flat job entry has 'status' field"
@@ -242,7 +242,7 @@ try {
     # Write dashboard.json with flat format
     $flatDash = @{
         agents = @{
-            "scrum-master" = @{
+            "mScrumMaster" = @{
                 "dry-run-bug-autopilot" = @{
                     status = "running"
                     run_id = "def456"
@@ -257,7 +257,7 @@ try {
     Write-AtomicFile -Path $dashFile -Content $json
 
     $dash = Get-Content -Path $dashFile -Raw | ConvertFrom-Json -AsHashtable
-    $jobEntry = $dash["agents"]["scrum-master"]["dry-run-bug-autopilot"]
+    $jobEntry = $dash["agents"]["mScrumMaster"]["dry-run-bug-autopilot"]
 
     Assert-True ($jobEntry.ContainsKey("run_id")) "Flat job entry has 'run_id' field"
     Assert-True ($jobEntry["run_id"] -eq "def456") "run_id value is correct"
@@ -278,7 +278,7 @@ try {
     # alongside real job entries -- mirrors production dashboard format
     $dashWithMeta = @{
         agents = @{
-            "scrum-master" = @{
+            "mScrumMaster" = @{
                 "sprint-progress" = @{
                     status = "idle"
                     run_id = "abc123"

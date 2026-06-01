@@ -612,7 +612,7 @@ try {
 # ========================================
 # TC79: Write-AuditEntry retries when audit file is held FileShare::None by a concurrent writer
 # ========================================
-# Regression: 2026-05-29 12:00 PT scrum-reporter/FFv2-daily-summary silent crash.
+# Regression: 2026-05-29 12:00 PT mScrumReporter/FFv2-daily-summary silent crash.
 # Two scheduled jobs hit Write-AuditEntry on the same audit file within the same
 # millisecond. The pre-fix code opened the FileStream once with FileShare::None and
 # let any IOException propagate uncaught, killing the runner before any audit entry,

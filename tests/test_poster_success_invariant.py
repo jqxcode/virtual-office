@@ -3,18 +3,18 @@
 CONTEXT (2026-05-26 to 2026-05-28 silent-failure pattern)
 ---------------------------------------------------------
 The Virtual Office harness records job lifecycle in state/events.jsonl and
-considers `completed exit_code=0` to be "success". But the poster agent
+considers `completed exit_code=0` to be "success". But the mPoster agent
 sometimes writes a *narrative excuse* to its output file instead of actually
 posting to Teams:
 
   * device-code prompt left in the output (auth never completed; the post
     that the harness "completed" never happened). 5 instances over 3 days.
   * "data is stale, refusing to post" -- legitimate refusal, but the upstream
-    scrum-master run that should have refreshed the data ALSO exited 0,
+    mScrumMaster run that should have refreshed the data ALSO exited 0,
     masking the silent breakage of the data pipeline. 2 instances.
 
 Either way, the harness exit_code cannot tell success apart from "fake
-success". This test walks recent poster output files and classifies each
+success". This test walks recent mPoster output files and classifies each
 one by content, then FAILS if it sees device-code failures or any output
 that doesn't match a known pattern (so new failure modes are surfaced
 rather than ignored).
@@ -33,14 +33,14 @@ from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Tuple
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-POSTER_DIR = os.path.join(REPO_ROOT, "output", "poster")
+POSTER_DIR = os.path.join(REPO_ROOT, "output", "mPoster")
 
 # Window of files to inspect. 7 days catches the 5/26-5/28 incident and
 # enough surrounding context for trend detection.
 WINDOW_DAYS = 7
 
 # Filename: post-<job>-YYYYMMDD-HHMMSS.md  OR  <job>-YYYYMMDD-HHMMSS.md
-# We accept both because the actual output/poster directory mixes naming
+# We accept both because the actual output/mPoster directory mixes naming
 # styles (post-shiproom-..., Bug-Autopilot-..., ICM-daily-summary-...).
 POSTER_FILE_RE = re.compile(r"^.+-(\d{8})-(\d{6})\.md$")
 
@@ -51,7 +51,7 @@ POSTER_FILE_RE = re.compile(r"^.+-(\d{8})-(\d{6})\.md$")
 SUCCESS_MARKERS = (
     "HTTP 201",
     "messageId",
-    "message ID",  # poster narrative often writes "message ID `<id>`"
+    "message ID",  # mPoster narrative often writes "message ID `<id>`"
     "webUrl",
 )
 DEVICE_CODE_MARKERS = (
@@ -87,8 +87,8 @@ def _classify(content: str) -> str:
     return CLASS_OTHER
 
 
-def _recent_poster_files() -> List[str]:
-    """Return absolute paths of poster .md files modified within WINDOW_DAYS."""
+def _recent_mPoster_files() -> List[str]:
+    """Return absolute paths of mPoster .md files modified within WINDOW_DAYS."""
     if not os.path.isdir(POSTER_DIR):
         return []
     cutoff = time.time() - WINDOW_DAYS * 86400
@@ -112,7 +112,7 @@ def _recent_poster_files() -> List[str]:
 def _print_table(rows: List[Tuple[str, str, str]]) -> None:
     """Print classification table. rows = (filename, mtime_iso, classification)."""
     if not rows:
-        print("  (no poster output files in window)")
+        print("  (no mPoster output files in window)")
         return
     name_w = max(len(r[0]) for r in rows)
     cls_w = max(len(r[2]) for r in rows)
@@ -125,10 +125,10 @@ def _print_table(rows: List[Tuple[str, str, str]]) -> None:
 
 
 class TestPosterSuccessInvariant(unittest.TestCase):
-    """Fail if any recent poster output indicates a silent failure."""
+    """Fail if any recent mPoster output indicates a silent failure."""
 
-    def test_recent_poster_outputs_are_real_posts(self):
-        files = _recent_poster_files()
+    def test_recent_mPoster_outputs_are_real_posts(self):
+        files = _recent_mPoster_files()
         rows: List[Tuple[str, str, str]] = []
         counts: Dict[str, int] = {
             CLASS_SUCCESS: 0,
@@ -167,13 +167,13 @@ class TestPosterSuccessInvariant(unittest.TestCase):
         problems: List[str] = []
         if counts[CLASS_DEVICE_CODE] > 0:
             problems.append(
-                f"{counts[CLASS_DEVICE_CODE]} poster output(s) contain a device-code "
+                f"{counts[CLASS_DEVICE_CODE]} mPoster output(s) contain a device-code "
                 "prompt -- the harness recorded exit_code=0 but the post NEVER reached "
                 "Teams. Files: " + ", ".join(details[CLASS_DEVICE_CODE])
             )
         if counts[CLASS_OTHER] > 0:
             problems.append(
-                f"{counts[CLASS_OTHER]} poster output(s) match no known pattern "
+                f"{counts[CLASS_OTHER]} mPoster output(s) match no known pattern "
                 "(neither HTTP 201 success nor a recognized refusal). Update the "
                 "classifier or fix the failure. Files: "
                 + ", ".join(details[CLASS_OTHER])

@@ -61,7 +61,7 @@ Virtual Office is a Windows-based agent orchestration framework that schedules, 
 
 ## Task Scheduler Integration
 
-All scheduled tasks use the `VO-` prefix (e.g., `VO-scrum-master-ado-status-update`).
+All scheduled tasks use the `VO-` prefix (e.g., `VO-mScrumMaster-ado-status-update`).
 Tasks invoke `wscript Run-Hidden.vbs "pwsh -NoProfile -File ..."` to suppress
 foreground console windows. This avoids the S4U (Service for User) logon type
 which requires administrator privileges. See design-decisions.md for rationale.
@@ -72,22 +72,22 @@ which requires administrator privileges. See design-decisions.md for rationale.
 
 | Agent | Display Name | Group | Description | Stale Lock (min) |
 |-------|-------------|-------|-------------|-------------------|
-| scrum-master | Scrum Master | Work Agents | Sprint progress, ADO autopilot, bug autopilot runs | 120 |
-| bug-killer | Bug Killer | Work Agents | Scans repos for open issues, creates fix PRs, maintains open PRs | 180 |
-| poster | Poster | Work Agents | Posts daily Bug-AutoPilot summary to Teams channel | 30 |
+| mScrumMaster | Scrum Master | Work Agents | Sprint progress, ADO autopilot, bug autopilot runs | 120 |
+| pBugKiller | Bug Killer | Work Agents | Scans repos for open issues, creates fix PRs, maintains open PRs | 180 |
+| mPoster | Poster | Work Agents | Posts daily Bug-AutoPilot summary to Teams channel | 30 |
 | pEmailer | pEmailer | Other Agents | Manages Gmail inboxes -- scan, classify, digest (portal: localhost:8402) | 60 |
-| auditor | Auditor | Other Agents | Memory consolidation, sprint progress, compare-runs, OOF summary, report audit | 120 |
-| hang-scout | Hang Scout | Other Agents | Hung job detection, py-spy diagnosis, daily 5W incident report | 15 |
+| mAuditor | Auditor | Other Agents | Memory consolidation, sprint progress, compare-runs, OOF summary, report audit | 120 |
+| pHangScout | Hang Scout | Other Agents | Hung job detection, py-spy diagnosis, daily 5W incident report | 15 |
 
 ### Agent Rename History
 
-- `memo-checker` was renamed to `checker`, then to `auditor` (displayName: "Auditor"). The agent now consolidates memory management, sprint progress reporting, run comparison, and report template auditing.
+- `memo-checker` was renamed to `checker`, then to `mAuditor` (displayName: "Auditor"). The agent now consolidates memory management, sprint progress reporting, run comparison, and report template auditing.
 
 ---
 
 ## Job Inventory
 
-### scrum-master
+### mScrumMaster
 
 | Job | Schedule | Description |
 |-----|----------|-------------|
@@ -96,13 +96,13 @@ which requires administrator privileges. See design-decisions.md for rationale.
 | bug-autopilot-notes | On-demand | Bug autopilot (live) for Meeting Notes bugs |
 | ado-burndown-update | On-demand | ADO autopilot burndown update (live) |
 
-### bug-killer
+### pBugKiller
 
 | Job | Schedule | Description |
 |-----|----------|-------------|
 | scan-and-fix | 10am + 10pm daily | Scan all repos for open issues (all types), discover new repos, analyze and fix |
 | open-pr-maintenance | Hourly at :03 | Resolve merge conflicts + address review comments on all open PRs |
-| daily-summary | 1:30am daily | Aggregates all bug-killer activity from past 24h into single report, opens in Edge "Daily" tab group |
+| daily-summary | 1:30am daily | Aggregates all pBugKiller activity from past 24h into single report, opens in Edge "Daily" tab group |
 
 ### pEmailer
 
@@ -110,7 +110,7 @@ which requires administrator privileges. See design-decisions.md for rationale.
 |-----|----------|-------------|
 | scan-all-mailboxes | 7am daily | Scan all Gmail mailboxes, classify, generate digest |
 
-### auditor
+### mAuditor
 
 | Job | Schedule | Description |
 |-----|----------|-------------|
@@ -119,18 +119,18 @@ which requires administrator privileges. See design-decisions.md for rationale.
 | TODO-compare-runs | 11am daily | Compare run results, file GitHub issues |
 | YTD-OOF-Summary | 6am last day of month | Monthly YTD OOF summary for direct reports |
 
-### poster
+### mPoster
 
 | Job | Schedule | Description |
 |-----|----------|-------------|
 | Bug-Autopilot-Adoption-daily-summary | 7:30am daily | Queries ADO, posts formatted summary to Teams Bug-Autopilot channel |
 
-### hang-scout
+### pHangScout
 
 | Job | Schedule | Description |
 |-----|----------|-------------|
 | detect-hang | Hourly at :45 | Scans all agent lock files, classifies hangs, py-spy stack capture, kills if safe |
-| detect-scrum-master | On-demand | Targeted hang detection for scrum-master only (20min hang / 60min kill) |
+| detect-mScrumMaster | On-demand | Targeted hang detection for mScrumMaster only (20min hang / 60min kill) |
 | daily-report | Midnight daily | 5W incident report with bug-autopilot performance analysis |
 
 ### Job Rename / Merge History
@@ -139,29 +139,29 @@ which requires administrator privileges. See design-decisions.md for rationale.
 - `consolidate` renamed to `consolidate-agent-memories` (clearer purpose)
 - `detect` renamed to `detect-hang` (consistent naming)
 - `resolve-merge-conflicts` + `review-pr-comments` merged into `open-pr-maintenance` (single hourly job handles both)
-- New: `detect-scrum-master` -- targeted hang detection with tighter thresholds
-- New: `Bug-Autopilot-Adoption-daily-summary` -- poster agent's Teams posting job
-- New: `daily-report` -- hang-scout's 5W report with bug-autopilot perf analysis
-- New: `daily-summary` -- bug-killer's aggregated activity report at 1:30am
+- New: `detect-mScrumMaster` -- targeted hang detection with tighter thresholds
+- New: `Bug-Autopilot-Adoption-daily-summary` -- mPoster agent's Teams posting job
+- New: `daily-report` -- pHangScout's 5W report with bug-autopilot perf analysis
+- New: `daily-summary` -- pBugKiller's aggregated activity report at 1:30am
 
 ---
 
 ## Hang Detection Architecture
 
-The hang-scout agent uses per-agent configurable thresholds stored in the
+The pHangScout agent uses per-agent configurable thresholds stored in the
 `detect-hang` job's `hangDetection` config block:
 
 ```
 hangDetection:
   defaultHangThresholdMinutes: 60
   defaultKillThresholdMinutes: 120
-  exclude: [hang-scout]
+  exclude: [pHangScout]
   perAgent:
-    scrum-master:  hang=60  kill=120
-    bug-killer:    hang=90  kill=180
+    mScrumMaster:  hang=60  kill=120
+    pBugKiller:    hang=90  kill=180
     pEmailer:      hang=30  kill=60
-    auditor:       hang=20  kill=30
-    poster:        hang=15  kill=30
+    mAuditor:       hang=20  kill=30
+    mPoster:        hang=15  kill=30
 ```
 
 Detection flow:
@@ -371,7 +371,7 @@ immediately below the main title:
 ```
 
 This provides consistent provenance tracking across all agent outputs.
-The auditor's consolidate-agent-memories job includes a report template audit
+The mAuditor's consolidate-agent-memories job includes a report template audit
 that verifies all agent files and job configs enforce this standard.
 
 ---

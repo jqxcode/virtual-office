@@ -541,20 +541,20 @@ if (-not (Test-Path $AppJsFile)) {
 # ========================================
 Write-Host "`nTC79: Scrum-master agent prompt includes Fundamentals area path filter" -ForegroundColor Cyan
 
-$ScrumMasterFile = "C:/Users/qitxu/.claude/agents/scrum-master.md"
+$ScrumMasterFile = "C:/Users/qitxu/.claude/agents/mScrumMaster.md"
 if (-not (Test-Path $ScrumMasterFile)) {
-    Write-Host "ERROR: Cannot find scrum-master.md at $ScrumMasterFile" -ForegroundColor Red
+    Write-Host "ERROR: Cannot find mScrumMaster.md at $ScrumMasterFile" -ForegroundColor Red
     $script:Failed++
 } else {
     $ScrumMasterContent = Get-Content -Path $ScrumMasterFile -Raw
 
     # The sprint-progress section should mention Fundamentals
     $hasFundamentals = $ScrumMasterContent -match "Fundamentals"
-    Assert-True $hasFundamentals "scrum-master.md contains 'Fundamentals' in sprint-progress section"
+    Assert-True $hasFundamentals "mScrumMaster.md contains 'Fundamentals' in sprint-progress section"
 
     # Should have an instruction to exclude other sub-areas
     $hasExcludeInstruction = $ScrumMasterContent -match "Exclude items from other sub-areas"
-    Assert-True $hasExcludeInstruction "scrum-master.md contains instruction to exclude other sub-areas"
+    Assert-True $hasExcludeInstruction "mScrumMaster.md contains instruction to exclude other sub-areas"
 }
 
 # ========================================
@@ -700,15 +700,15 @@ if (-not (Test-Path $AgentsJsonFileTC85)) {
     $hasPortalUrlField = $null -ne $emailerAgent.portalUrl -and $emailerAgent.portalUrl -ne ""
     Assert-True $hasPortalUrlField "pEmailer agent in agents.json has a non-empty portalUrl field"
 
-    # Verify scrum-master does NOT have portalUrl
-    $scrumMasterAgent = $AgentsJsonTC85.agents."scrum-master"
+    # Verify mScrumMaster does NOT have portalUrl
+    $scrumMasterAgent = $AgentsJsonTC85.agents."mScrumMaster"
     $scrumMasterHasPortal = $null -ne ($scrumMasterAgent.PSObject.Properties | Where-Object { $_.Name -eq "portalUrl" })
-    Assert-True (-not $scrumMasterHasPortal) "scrum-master agent does NOT have portalUrl field"
+    Assert-True (-not $scrumMasterHasPortal) "mScrumMaster agent does NOT have portalUrl field"
 
-    # Verify bug-killer does NOT have portalUrl
-    $bugKillerAgent = $AgentsJsonTC85.agents."bug-killer"
+    # Verify pBugKiller does NOT have portalUrl
+    $bugKillerAgent = $AgentsJsonTC85.agents."pBugKiller"
     $bugKillerHasPortal = $null -ne ($bugKillerAgent.PSObject.Properties | Where-Object { $_.Name -eq "portalUrl" })
-    Assert-True (-not $bugKillerHasPortal) "bug-killer agent does NOT have portalUrl field"
+    Assert-True (-not $bugKillerHasPortal) "pBugKiller agent does NOT have portalUrl field"
 }
 
 # --- Summary ---
