@@ -1,4 +1,4 @@
-# Virtual Office Dashboard - HTTP Server
+﻿# Virtual Office Dashboard - HTTP Server
 # Serves the dashboard UI and proxies state files as API endpoints
 # Usage: powershell -File server.ps1
 
@@ -200,8 +200,18 @@ try {
                                 "pre-commit-test" = "Run VO test suite before git commit"
                                 "port-5000-check" = "Warn if port 5000 already in use"
                                 "git-guardrails" = "Block dangerous git commands (reset --hard, clean, checkout .)"
+                                "block-dangerous-git" = "Block dangerous git commands (reset --hard, clean, checkout .)"
+                                "block-dangerous-commands" = "Block rm -rf, format, and other destructive commands"
+                                "block-bad-report-open" = "Enforce CDP-based report opening (no Start-Process msedge)"
+                                "block-cdp-focus-steal" = "Prevent CDP commands from stealing window focus"
                                 "loop-detector" = "Detect 3+ repeated failures, suggest different approach"
                                 "verify-read-before-edit" = "Warn if edited file path doesn't exist"
+                                "verify-field-semantics" = "Check API field semantics when editing token/cost files"
+                                "validate-report-html" = "Validate HTML reports follow design system rules"
+                                "post-write-format" = "Check PS1 BOM encoding and Python formatting"
+                                "metric-sanity-check" = "Scan staged diff for percentage formulas without bounds checks"
+                                "impossible-value-detector" = "Detect >100% or <0% impossible values in output"
+                                "brain-push-debounced" = "Debounced push of Agent Brain state to repo"
                                 "echo-session-name" = "Log session identifier"
                                 "archive-session" = "Archive session state to Agent Brain repo"
                                 "session-end-score" = "Log session scorecard to rules engine"
@@ -209,6 +219,8 @@ try {
                                 "trigger-file-write" = "Signal RDP client that session ended"
                                 "shadow-sync-push" = "Push Agent Brain state to repo"
                                 "session-start-verify" = "Run rules engine verification checks"
+                                "stop-failure-alert" = "Alert on rate-limit or critical stop failures"
+                                "import-from-brain" = "Import Agent Brain state at session start"
                             }
                             # Map CC event types to portal hook types
                             $typeMap = @{
@@ -216,6 +228,8 @@ try {
                                 "PostToolUse" = "post-tool"
                                 "SessionEnd" = "session-end"
                                 "Stop" = "session-stop"
+                                "StopFailure" = "stop-failure"
+                                "SessionStart" = "session-start"
                             }
                             foreach ($eventType in @($ccObj.hooks.PSObject.Properties.Name)) {
                                 $portalType = $typeMap[$eventType]
@@ -230,7 +244,7 @@ try {
                                         # Extract name from command path
                                         $hookName = ""
                                         if ($cmdStr -match '[\\/]([^\\/]+)\.(sh|py|ps1)') {
-                                            $hookName = $Matches[1]
+                                            $hookName = $Matches[1] -replace '_', '-'
                                         } elseif ($cmdStr -match 'block-dangerous-git') {
                                             $hookName = "git-guardrails"
                                         } elseif ($cmdStr -match 'port.?5000|lsof.*5000') {
@@ -243,6 +257,8 @@ try {
                                             $hookName = "fix-session-snapshot"
                                         } elseif ($cmdStr -match 'claude\.trigger') {
                                             $hookName = "trigger-file-write"
+                                        } elseif ($cmdStr -match 'import_from_brain') {
+                                            $hookName = "import-from-brain"
                                         } else {
                                             $hookName = $cmdStr.Substring(0, [Math]::Min(40, $cmdStr.Length))
                                         }
@@ -252,6 +268,8 @@ try {
                                         if ($eventType -eq "PostToolUse") { $triggerText = "after $matcherLabel commands" }
                                         elseif ($eventType -eq "SessionEnd") { $triggerText = "when session ends" }
                                         elseif ($eventType -eq "Stop") { $triggerText = "when agent stops" }
+                                        elseif ($eventType -eq "StopFailure") { $triggerText = "on rate-limit or critical failure" }
+                                        elseif ($eventType -eq "SessionStart") { $triggerText = "when session starts" }
                                         $hookItem = [PSCustomObject]@{
                                             name = $hookName
                                             trigger = $triggerText
