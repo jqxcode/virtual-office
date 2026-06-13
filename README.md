@@ -23,7 +23,15 @@ Virtual Office is an agent orchestration framework that schedules, runs, and mon
 
    This creates `VO-*` tasks that use `Run-Hidden.vbs` to run without foreground windows.
 
-2. Start the live dashboard at http://localhost:8400:
+2. Register the portal server to auto-start at logon:
+
+   ```powershell
+   .\ui\Register-PortalServer.ps1
+   ```
+
+   This creates a `VO-Portal-Server` scheduled task that launches `server.ps1` in a hidden window on every login (port 8400, auto-restart on failure). To unregister: `.\ui\Register-PortalServer.ps1 -Unregister`.
+
+   To start manually instead (foreground):
 
    ```powershell
    .\ui\server.ps1
@@ -53,6 +61,7 @@ virtual-office/
   runner/          - Core orchestration engine (PS1 scripts)
     Run-Hidden.vbs - VBScript wrapper to suppress console windows
   ui/              - Live dashboard (HTML + JS + local server)
+    Register-PortalServer.ps1 - Register/unregister auto-start task
   state/           - Runtime state (gitignored)
   output/          - Agent outputs + audit logs (gitignored)
   tests/           - Test suite + fixtures
