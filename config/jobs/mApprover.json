@@ -8,7 +8,7 @@
       "description": "Approve pending entitlement requests and renew own expiring memberships daily"
     },
     "approve-FFv2": {
-      "prompt": "Run the FFv2 approval script with the following extra arguments (may be empty): [{{EXTRA_ARGS}}]. You MUST invoke the script via Bash now -- do not skip, do not claim the work was already done, do not assume a prior turn ran it. There is no prior turn. Command to execute: `python ${LOCAL_SKILLS}/data_tools/ffv2-approve.py {{EXTRA_ARGS}}` (when extra args is empty, just run the script with no arguments). The script auto-detects argument type: no args = approve all directs' pending flights, a number = flight ID, a URL containing featureFlight/ = extract ID, anything else = person name. After the script exits, report the results summary it printed.",
+      "prompt": "Run the FFv2 approval script with the following extra arguments (may be empty): [{{EXTRA_ARGS}}]. You MUST invoke the script via Bash or powershell script now -- do not skip, do not claim the work was already done, do not assume a prior turn ran it. There is no prior turn. Command to execute: `python ${LOCAL_SKILLS}/data_tools/ffv2-approve.py {{EXTRA_ARGS}}` (when extra args is empty, just run the script with no arguments). The script auto-detects argument type: no args = approve all directs' pending flights, a number = flight ID, a URL containing featureFlight/ = extract ID, anything else = person name. After the script exits, report the results summary it printed.",
       "maxRuns": 0,
       "saveOutput": true,
       "description": "Approve all pending FFv2 flights from directs (daily 9:33pm), or targeted by person/ID/URL"

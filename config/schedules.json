@@ -1,7 +1,7 @@
 {
   "schedules": [
     {
-      "agent": "mScrumReporter",
+      "agent": "mPoster",
       "job": "TODO-sprint-progress",
       "cron": "0 7 * * 1-5",
       "description": "Sprint progress report weekday mornings at 7am"
@@ -55,7 +55,13 @@
       "description": "Memory consolidation and report at 3am daily"
     },
     {
-      "agent": "mScrumReporter",
+      "agent": "mAuditor",
+      "job": "schedule-health-check",
+      "cron": "0 11 * * *",
+      "description": "Daily schedule-health guard at 11am: reconcile live tasks vs config and flag weekday jobs with no 'started' event in events.jsonl within ~26h"
+    },
+    {
+      "agent": "mPoster",
       "job": "YTD-OOF-Summary",
       "cron": "0 6 L * *",
       "description": "YTD OOF summary report on the last day of each month at 6am"
@@ -103,7 +109,7 @@
       "description": "CoreIdentity entitlement approvals at 8am daily"
     },
     {
-      "agent": "mScrumReporter",
+      "agent": "mPoster",
       "job": "FFv2-daily-summary",
       "cron": "0 12 * * 1-5",
       "description": "Feature Flight V2 daily report for direct reports flights, weekdays at noon"

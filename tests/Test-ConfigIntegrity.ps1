@@ -172,6 +172,25 @@ foreach ($agentName in $agents.Keys) {
 }
 Assert-True (-not $hasLegacyAgent) "No legacy agent names (memo-checker, checker) found in agents.json"
 
+# ========================================
+# TC9: mAuditor/schedule-health-check guard exists in jobs AND schedules
+# ========================================
+Write-Host "`nTC9: mAuditor/schedule-health-check exists in both job config and schedules" -ForegroundColor Cyan
+
+$hasShcJob = $allJobs.ContainsKey("mAuditor") -and $allJobs["mAuditor"].ContainsKey("schedule-health-check")
+Assert-True $hasShcJob "Job 'mAuditor/schedule-health-check' exists in config/jobs/mAuditor.json"
+
+$shcScheduled = $schedules | Where-Object { $_["agent"] -eq "mAuditor" -and $_["job"] -eq "schedule-health-check" }
+$shcScheduledCount = @($shcScheduled).Count
+Assert-True ($shcScheduledCount -ge 1) "mAuditor/schedule-health-check has at least one schedule entry"
+
+if ($shcScheduledCount -ge 1) {
+    $shcCron = @($shcScheduled)[0]["cron"]
+    $shcDow = ($shcCron.Trim() -split '\s+')[4]
+    $runsWeekdays = ($shcDow -eq "*") -or ($shcDow -match "1-5") -or ($shcDow -match "1" -and $shcDow -match "5")
+    Assert-True $runsWeekdays "mAuditor/schedule-health-check cron '$shcCron' runs on weekdays (dow field '$shcDow')"
+}
+
 # --- Summary ---
 Write-Host "`n========================================" -ForegroundColor White
 Write-Host "Test-ConfigIntegrity: $script:Passed passed, $script:Failed failed" -ForegroundColor $(if ($script:Failed -gt 0) { "Red" } else { "Green" })

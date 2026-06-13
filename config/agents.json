@@ -33,14 +33,6 @@
       "staleLockTimeoutMinutes": 120,
       "group": "Work Agents"
     },
-    "mScrumReporter": {
-      "displayName": "mScrumReporter",
-      "icon": "",
-      "agentFile": "~/.claude/agents/mScrumReporter.md",
-      "description": "Generates sprint progress reports, OOF summaries, and Feature Flight daily reports for CMD Meeting Join and Meeting Notes teams",
-      "staleLockTimeoutMinutes": 150,
-      "group": "Work Agents"
-    },
     "pHarnessMonitor": {
       "displayName": "pHarnessMonitor",
       "icon": "",
@@ -53,8 +45,8 @@
       "displayName": "mPoster",
       "icon": "",
       "agentFile": "~/.claude/agents/mPoster.md",
-      "description": "Posts daily Bug-AutoPilot summary to Teams Bug-Autopilot channel from ADO query data",
-      "staleLockTimeoutMinutes": 30,
+      "description": "Posts daily Bug-AutoPilot summary, ICM daily summaries, and shiproom hygiene checks to Teams; also generates sprint progress reports, OOF summaries, and Feature Flight daily reports for CMD Meeting Join and Meeting Notes teams",
+      "staleLockTimeoutMinutes": 150,
       "group": "Work Agents"
     },
     "pHangScout": {
