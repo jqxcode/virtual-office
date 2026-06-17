@@ -35,6 +35,14 @@
       "inputPrompt": "What to do? (e.g., 'ingest from OneDrive default', 'ingest from C:\\path\\to\\folder for company island_meltdown', 'scan pending only', 'summary 2026-Q1 oakley', 'export oakley 2026-01-01:2026-03-31 for bookkeeping')",
       "schedule": "manual",
       "description": "Ingest, scan with Claude vision, dedup, tag (company/category/project), and summarize business receipts for Oakley, Island Meltdown, Dexin, and personal expenses"
+    },
+    "island-meltdown-ingredients": {
+      "displayName": "Island Meltdown - Ingredients & Menu Cost",
+      "prompt": "Read ${LOCAL_SKILLS}/tax/island-meltdown-ingredients.md for full instructions. Manage the Island Meltdown shaved ice ingredient inventory and menu cost spreadsheet at C:\\Users\\qitxu\\OneDrive\\Documents\\2-ShavedIce\\20260612-Estimate.xlsx. Use openpyxl for all Excel edits. Always back up the file before bulk changes. Cross-reference receipts via /receipt search for S/N and pricing. When adding new flavors, follow the naming convention '{Flavor} ({Size}) - {Year}' in the MenuCost sheet.",
+      "requiresInput": true,
+      "inputPrompt": "What to do? (e.g., 'add new flavor: taro with condensed milk, mochi, whip cream', 'update prices from 2026 receipts', 'backfill missing S/N from receipts', 'apply experiment results A1=180 A2=210 A3=250', 'compare 2025 vs 2026 costs')",
+      "schedule": "manual",
+      "description": "Manage Island Meltdown shaved ice ingredients, recipes, menu costs, and cup sizing for seasonal pricing"
     }
   }
 }
