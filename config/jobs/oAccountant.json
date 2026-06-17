@@ -27,6 +27,14 @@
       "inputPrompt": "Period? (e.g., '2026 Q1', 'January 2026', 'full year 2025', 'just download reports')",
       "schedule": "manual",
       "description": "Monthly/quarterly QBO bookkeeping review and maintenance for Oakley Management LLC"
+    },
+    "receipt-ingest": {
+      "displayName": "Receipt Ingest & Tag",
+      "prompt": "Read ${LOCAL_SKILLS}/tax/receipt-ingest.md for full instructions. Execute the receipt ingest pipeline: (1) ingest new receipts from the requested source folder (default: OneDrive Screenshots) using `--no-scan`, (2) list pending scans, (3) read each pending image directly with the read tool and extract vendor/date/line items/totals/payment method/category guess — embed SKUs inside line item descriptions because the sku field is silently dropped, (4) save scan results via batch_update_from_scans, (5) apply company/category/project/reimbursable tags per the heuristics in the skill file, (6) promote drafts to the live store through project tooling (do NOT hand-edit receipts.json), and (7) produce a per-company summary plus duplicate audit. Always back up data\\receipts.json before bulk changes. Never delegate OCR to sub-agents — direct Claude vision is materially more accurate.",
+      "requiresInput": true,
+      "inputPrompt": "What to do? (e.g., 'ingest from OneDrive default', 'ingest from C:\\path\\to\\folder for company island_meltdown', 'scan pending only', 'summary 2026-Q1 oakley', 'export oakley 2026-01-01:2026-03-31 for bookkeeping')",
+      "schedule": "manual",
+      "description": "Ingest, scan with Claude vision, dedup, tag (company/category/project), and summarize business receipts for Oakley, Island Meltdown, Dexin, and personal expenses"
     }
   }
 }
