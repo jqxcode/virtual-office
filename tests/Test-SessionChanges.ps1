@@ -1,4 +1,4 @@
-#Requires -Version 7.0
+﻿#Requires -Version 7.0
 # Test-SessionChanges.ps1 -- Tests for changes made in current session (2026-03-26)
 # Run: pwsh -File tests/Test-SessionChanges.ps1
 
@@ -246,6 +246,51 @@ if ((Test-Path $schedulesFile) -and (Test-Path $agentsFile)) {
         Write-Host "    Missing agents: $($missingAgents -join ', ')" -ForegroundColor Yellow
     }
     Assert-True ($missingAgents.Count -eq 0) "All scheduled agents exist in agents.json"
+}
+
+# ========================================
+# TC94: pHangScout.json has closewait-tcp-hang classification with killThresholdMinutes
+# ========================================
+Write-Host "`nTC94: pHangScout.json has closewait-tcp-hang classification" -ForegroundColor Cyan
+
+$hangScoutJobFile = Join-Path $ProjectRoot "config" "jobs" "pHangScout.json"
+Assert-True (Test-Path $hangScoutJobFile) "pHangScout.json exists"
+
+if (Test-Path $hangScoutJobFile) {
+    $hsRaw = Get-Content -Path $hangScoutJobFile -Raw | ConvertFrom-Json -AsHashtable
+    $hsJobs = if ($hsRaw.ContainsKey("jobs")) { $hsRaw["jobs"] } else { $hsRaw }
+
+    Assert-True ($hsJobs.ContainsKey("detect-hang")) "pHangScout has detect-hang job"
+
+    if ($hsJobs.ContainsKey("detect-hang")) {
+        $detectHang = $hsJobs["detect-hang"]
+        Assert-True ($detectHang.ContainsKey("hangDetection")) "detect-hang has hangDetection config"
+
+        if ($detectHang.ContainsKey("hangDetection")) {
+            $hd = $detectHang["hangDetection"]
+            Assert-True ($hd.ContainsKey("perClassification")) "hangDetection has perClassification"
+
+            if ($hd.ContainsKey("perClassification")) {
+                $pc = $hd["perClassification"]
+                Assert-True ($pc.ContainsKey("closewait-tcp-hang")) "perClassification has closewait-tcp-hang entry"
+
+                if ($pc.ContainsKey("closewait-tcp-hang")) {
+                    $cwEntry = $pc["closewait-tcp-hang"]
+                    Assert-True ($cwEntry.ContainsKey("killThresholdMinutes")) "closewait-tcp-hang has killThresholdMinutes"
+                    Assert-True ($cwEntry.ContainsKey("reason")) "closewait-tcp-hang has reason"
+                    Assert-True ([int]$cwEntry["killThresholdMinutes"] -gt 0) "closewait-tcp-hang killThresholdMinutes is positive"
+                }
+            }
+        }
+    }
+
+    # Verify the detect-hang prompt mentions the CloseWait detection logic
+    if ($hsJobs.ContainsKey("detect-hang")) {
+        $prompt = [string]$hsJobs["detect-hang"]["prompt"]
+        Assert-True ($prompt -match "CloseWait") "detect-hang prompt includes CloseWait detection"
+        Assert-True ($prompt -match "Get-NetTCPConnection") "detect-hang prompt uses Get-NetTCPConnection for TCP check"
+        Assert-True ($prompt -match "closewait-tcp-hang") "detect-hang prompt references closewait-tcp-hang classification"
+    }
 }
 
 # --- Summary ---
