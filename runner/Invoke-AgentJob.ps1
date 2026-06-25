@@ -732,9 +732,19 @@ while ($keepRunning) {
     try {
         # Build command arguments (--output-format json for cost/token tracking)
         $claudeArgs = @()
-        if ($agentFile -and (Test-Path $agentFile)) {
+        if ($agentFile) {
+            # An agentFile is configured for this agent. The file MUST exist --
+            # if it does not, fail loud instead of silently running a bare
+            # prompt with no persona/scope (see incident: missing agent file
+            # silently degraded the run).
+            if (-not (Test-Path $agentFile)) {
+                Write-AuditEntry -Action "failed" -AgentName $Agent -JobName $Job -RunId $runId -Details @{ reason = "agent_file_not_found"; agent_file = $agentFile }
+                Write-Event -AgentName $Agent -JobName $Job -Event "failed" -Details @{ run_id = $runId; reason = "agent_file_not_found"; agent_file = $agentFile }
+                throw "agentFile configured for agent '$Agent' but not found: $agentFile"
+            }
             $claudeArgs = @("--output-format", "json", "--agent", $agentFile, $prompt)
         } else {
+            # No agentFile configured at all -- bare prompt invocation is expected.
             $claudeArgs = @("--output-format", "json", $prompt)
         }
 
