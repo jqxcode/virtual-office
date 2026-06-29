@@ -217,6 +217,34 @@ function Write-ErrorEntry {
     Add-Content -Path $ERRORS_FILE -Value $line -Encoding ASCII
 }
 
+function Test-ZombieProcess {
+    <#
+    .SYNOPSIS
+        Detect whether a PID is in an unkillable zombie state.
+    .DESCRIPTION
+        A zombie process appears in Get-Process but all kill methods fail and it
+        consumes 0 CPU.  We detect this by sampling CPU twice 500ms apart: if
+        the process is still present after both samples AND the CPU delta is 0,
+        it is considered a zombie.  Returns $true if the process is a zombie.
+    #>
+    param(
+        [Parameter(Mandatory)]
+        [int]$Pid
+    )
+    try {
+        $snap1 = Get-Process -Id $Pid -ErrorAction SilentlyContinue
+        if ($null -eq $snap1) { return $false }
+        $cpu1 = $snap1.TotalProcessorTime.TotalMilliseconds
+        Start-Sleep -Milliseconds 500
+        $snap2 = Get-Process -Id $Pid -ErrorAction SilentlyContinue
+        if ($null -eq $snap2) { return $false }  # It exited -- not a zombie
+        $cpu2 = $snap2.TotalProcessorTime.TotalMilliseconds
+        return ($cpu2 - $cpu1) -eq 0
+    } catch {
+        return $false
+    }
+}
+
 function Stop-RunProcessTree {
     <#
     .SYNOPSIS
@@ -229,9 +257,13 @@ function Stop-RunProcessTree {
           killed       -- $true if any process was actually terminated
           already_gone -- $true if the PID was not alive at the time we looked
           pids_killed  -- array of integer PIDs that were terminated
+          zombie_pids  -- array of PIDs that are alive but unkillable (zombie state)
           errors       -- array of string error messages (non-fatal)
         The function never throws -- TTL enforcement is best-effort cleanup,
         not a critical-path operation.
+        When zombie_pids is non-empty the caller should remove the lock file
+        (already done before calling here) and log the zombie PIDs for manual
+        cleanup.  Do NOT retry the same failing kill methods.
     #>
     param(
         [Parameter(Mandatory)]
@@ -241,6 +273,7 @@ function Stop-RunProcessTree {
         killed       = $false
         already_gone = $false
         pids_killed  = @()
+        zombie_pids  = @()
         errors       = @()
     }
 
@@ -292,23 +325,73 @@ function Stop-RunProcessTree {
     [array]::Reverse($toKill)
 
     foreach ($p in $toKill) {
+        $alive = Get-Process -Id $p -ErrorAction SilentlyContinue
+        if ($null -eq $alive) { continue }
+
+        $killed = $false
+
+        # Attempt 1: Stop-Process -Force
         try {
-            $alive = Get-Process -Id $p -ErrorAction SilentlyContinue
-            if ($null -eq $alive) { continue }
             Stop-Process -Id $p -Force -ErrorAction Stop
             $result.pids_killed += $p
             $result.killed = $true
+            $killed = $true
         } catch {
             $result.errors += "Stop-Process(pid=$p) failed: $_"
-            # Fall back to taskkill /F /T as a belt-and-suspenders measure.
-            try {
-                & taskkill.exe /F /T /PID $p 2>$null | Out-Null
-                if ($LASTEXITCODE -eq 0) {
+        }
+
+        if ($killed) { continue }
+
+        # Attempt 2: taskkill /F /T
+        try {
+            & taskkill.exe /F /T /PID $p 2>$null | Out-Null
+            if ($LASTEXITCODE -eq 0) {
+                $result.pids_killed += $p
+                $result.killed = $true
+                $killed = $true
+            } else {
+                $result.errors += "taskkill(pid=$p) exited with code $LASTEXITCODE"
+            }
+        } catch {
+            $result.errors += "taskkill(pid=$p) failed: $_"
+        }
+
+        if ($killed) { continue }
+
+        # Attempt 3: WMI Terminate (escalated -- works when OS handle table is broken)
+        try {
+            $wmiProc = Get-CimInstance -ClassName Win32_Process -Filter "ProcessId=$p" -ErrorAction SilentlyContinue
+            if ($null -ne $wmiProc) {
+                $wmiResult = Invoke-CimMethod -InputObject $wmiProc -MethodName Terminate -ErrorAction SilentlyContinue
+                if ($null -ne $wmiResult -and $wmiResult.ReturnValue -eq 0) {
                     $result.pids_killed += $p
                     $result.killed = $true
+                    $killed = $true
+                } else {
+                    $rc = if ($null -ne $wmiResult) { $wmiResult.ReturnValue } else { "null" }
+                    $result.errors += "WMI Terminate(pid=$p) returned $rc"
                 }
-            } catch {
-                $result.errors += "taskkill(pid=$p) failed: $_"
+            }
+        } catch {
+            $result.errors += "WMI Terminate(pid=$p) failed: $_"
+        }
+
+        if ($killed) { continue }
+
+        # All kill methods failed.  Check for zombie state (alive but 0 CPU delta).
+        # Do NOT retry -- the OS cannot kill this process.  Record it for manual cleanup.
+        $isZombie = Test-ZombieProcess -Pid $p
+        if ($isZombie) {
+            $result.zombie_pids += $p
+            $result.errors += "pid=$p is unkillable zombie (alive, 0 CPU delta) -- recorded for manual cleanup"
+        } else {
+            # Process may have exited between kill attempts -- not a zombie, just a race.
+            $stillAlive = Get-Process -Id $p -ErrorAction SilentlyContinue
+            if ($null -eq $stillAlive) {
+                $result.pids_killed += $p
+                $result.killed = $true
+            } else {
+                $result.errors += "pid=$p still alive after all kill attempts but not detected as zombie"
             }
         }
     }
@@ -618,6 +701,8 @@ if (Test-Path $lockFile) {
 
                 $forceReason = if ($killResult.already_gone) {
                     "already_exited"
+                } elseif ($killResult.zombie_pids.Count -gt 0) {
+                    "zombie_unkillable lock_removed_for_recovery"
                 } else {
                     $killReason
                 }
@@ -625,6 +710,7 @@ if (Test-Path $lockFile) {
                     run_id = $lockedByRunId
                     pid = $lockedByPid
                     pids_killed = $killResult.pids_killed
+                    zombie_pids = $killResult.zombie_pids
                     already_gone = $killResult.already_gone
                     reason = $forceReason
                     errors = $killResult.errors
@@ -632,10 +718,14 @@ if (Test-Path $lockFile) {
                 Write-AuditEntry -Action "force_killed" -AgentName $Agent -JobName $lockedByJob -RunId $lockedByRunId -Details @{
                     pid = $lockedByPid
                     pids_killed = $killResult.pids_killed
+                    zombie_pids = $killResult.zombie_pids
                     already_gone = $killResult.already_gone
                     reason = $forceReason
                 }
-                Write-Host "force_killed: agent='$Agent' job='$lockedByJob' pid=$lockedByPid already_gone=$($killResult.already_gone) pids_killed=$($killResult.pids_killed -join ',')"
+                if ($killResult.zombie_pids.Count -gt 0) {
+                    Write-Host "WARNING: zombie process(es) detected -- all kill methods failed. Lock removed so next run can proceed. Manual cleanup needed for PID(s): $($killResult.zombie_pids -join ',')"
+                }
+                Write-Host "force_killed: agent='$Agent' job='$lockedByJob' pid=$lockedByPid already_gone=$($killResult.already_gone) pids_killed=$($killResult.pids_killed -join ',') zombie_pids=$($killResult.zombie_pids -join ',')"
             } else {
                 # No PID recorded on the lock -- still emit force_killed with
                 # reason=no_pid so the TTL invariant test can see the sweep
