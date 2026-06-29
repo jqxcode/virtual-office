@@ -766,7 +766,12 @@ if (Test-Path $lockFile) {
 }
 
 # --- Run loop (handles queue drain) ---
+# Wrap in try-finally to guarantee lock cleanup on abnormal exit (crash,
+# unhandled exception, pipeline termination). Without this, a script crash
+# leaves an orphaned lock file that blocks the agent until TTL expires.
+# See: https://github.com/jqxcode/virtual-office/issues/61
 $keepRunning = $true
+try {
 while ($keepRunning) {
     # Record the lock timestamp (lock file is written atomically with PID after process starts)
     $lockTs = (Get-Date -Format "o")
@@ -1067,6 +1072,20 @@ while ($keepRunning) {
     # Step 12: Release lock only when there's nothing left to run
     if (-not $keepRunning) {
         if (Test-Path $lockFile) { Remove-Item -Path $lockFile -Force }
+    }
+}
+} finally {
+    # Guarantee lock cleanup on ANY exit path (crash, unhandled exception,
+    # pipeline termination, Ctrl+C). This prevents the batch stale-lock
+    # scenario where all agents exit simultaneously and leave orphaned locks.
+    if (Test-Path $lockFile) {
+        Remove-Item -Path $lockFile -Force -ErrorAction SilentlyContinue
+        Write-Host "Lock released in finally block for '$Agent'."
+        try {
+            Write-AuditEntry -Action "lock_released_finally" -AgentName $Agent -JobName $Job -RunId $runId -Details @{
+                reason = "abnormal_exit_cleanup"
+            }
+        } catch { }
     }
 }
 
