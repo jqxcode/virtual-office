@@ -106,13 +106,42 @@ foreach ($entry in $schedules) {
 $liveTasks = @{}   # taskName -> @{ agent; job }   (agent/job parsed from action)
 $skippedNonAgent = @()
 $liveTaskList = @()
-try {
-    $liveTaskList = @(Get-ScheduledTask | Where-Object {
-        $_.TaskName -like "${TASK_PREFIX}*" -and $_.TaskName -notlike "${ONEOFF_PREFIX}*"
+
+# Enumerate live tasks via a background job with a hard timeout.
+# Get-ScheduledTask can hang indefinitely when the Task Scheduler service is
+# slow or starting up, which caused 38+ stuck subprocess retries (issue #50).
+$SCHTASK_TIMEOUT_SEC = 30
+$taskPrefix   = $TASK_PREFIX
+$oneoffPrefix = $ONEOFF_PREFIX
+$enumJob = Start-Job -ScriptBlock {
+    param($tp, $op)
+    @(Get-ScheduledTask | Where-Object {
+        $_.TaskName -like "${tp}*" -and $_.TaskName -notlike "${op}*"
     })
-} catch {
-    Write-Error "Could not enumerate scheduled tasks: $_"
-    exit 2
+} -ArgumentList $taskPrefix, $oneoffPrefix
+
+$jobFinished = Wait-Job -Job $enumJob -Timeout $SCHTASK_TIMEOUT_SEC
+
+if ($null -eq $jobFinished) {
+    # Timed out -- kill the job and continue with degraded (empty) task list.
+    Stop-Job  -Job $enumJob
+    Remove-Job -Job $enumJob -Force
+    Write-Warning "Get-ScheduledTask timed out after ${SCHTASK_TIMEOUT_SEC}s (Task Scheduler may be slow). Continuing with empty task list -- live-task checks will show all expected tasks as missing."
+} else {
+    if ($enumJob.State -eq "Failed") {
+        $err = $enumJob.ChildJobs[0].JobStateInfo.Reason
+        Remove-Job -Job $enumJob -Force
+        Write-Error "Could not enumerate scheduled tasks: $err"
+        exit 2
+    }
+    try {
+        $liveTaskList = @(Receive-Job -Job $enumJob)
+    } catch {
+        Write-Error "Could not enumerate scheduled tasks: $_"
+        Remove-Job -Job $enumJob -Force
+        exit 2
+    }
+    Remove-Job -Job $enumJob -Force
 }
 
 foreach ($task in $liveTaskList) {
