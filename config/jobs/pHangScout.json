@@ -22,7 +22,7 @@
           },
           "interactive-auth-hang": {
             "killThresholdMinutes": 5,
-            "reason": "Bash subprocess is running an interactive auth command (az login --use-device-code or similar device code / browser OAuth flow). These commands require a human at a browser and will NEVER complete in a headless agent context. Fast-kill at 5 min -- no grace period needed."
+            "reason": "Bash subprocess is running an interactive auth command (az login --use-device-code, az devops login, or similar interactive auth flow). These commands require human input and will NEVER complete in a headless agent context. Fast-kill at 5 min -- no grace period needed."
           }
         },
         "perAgent": {
