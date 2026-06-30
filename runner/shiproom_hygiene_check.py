@@ -241,6 +241,55 @@ WIQL_CHECK14_FLAKY_BUGS = (
     "AND [System.AreaPath] UNDER '{area}'"
 )
 
+# --- Madhu requirement (2026-06-29 EM Sync) checks: 15, 17, 18, 20 ---
+
+WIQL_CHECK15_ROLLOUT_ACTIVE_MONTH = (
+    "SELECT [System.Id], [System.Title], [System.State], "
+    "[System.IterationPath], [System.AreaPath] "
+    "FROM workitems "
+    "WHERE [System.WorkItemType] = 'Feature' "
+    "AND [System.State] IN ('Active', 'RollingOut') "
+    "AND NOT [System.IterationPath] UNDER '{month}' "
+    "AND [System.AreaPath] UNDER '{area}'"
+)
+
+WIQL_CHECK17_ZERO_REMAINING = (
+    "SELECT [System.Id], [System.Title], [System.State], [System.AreaPath] "
+    "FROM workitems "
+    "WHERE [System.WorkItemType] IN ('Task', 'Bug') "
+    "AND [System.State] = 'Active' "
+    "AND [Microsoft.VSTS.Scheduling.RemainingWork] = 0 "
+    "AND [System.AreaPath] UNDER '{area}'"
+)
+
+WIQL_CHECK18_STALE_REMAINING = (
+    "SELECT [System.Id], [System.Title], [System.State], [System.AreaPath] "
+    "FROM workitems "
+    "WHERE [System.WorkItemType] IN ('Task', 'Bug') "
+    "AND [System.State] <> 'Closed' AND [System.State] <> 'Removed' "
+    "AND [Microsoft.VSTS.Scheduling.RemainingWork] > 0 "
+    "AND [System.ChangedDate] < @today - {stale_days} "
+    "AND [System.AreaPath] UNDER '{area}'"
+)
+
+WIQL_CHECK20_BACKLOG_ORDER = (
+    "SELECT [System.Id], [System.Title], [System.State], [System.Tags], "
+    "[Microsoft.VSTS.Common.StackRank], [System.AreaPath] "
+    "FROM workitems "
+    "WHERE [System.WorkItemType] = 'Feature' "
+    "AND [System.State] <> 'Closed' AND [System.State] <> 'Removed' "
+    "AND [System.AreaPath] UNDER '{area}' "
+    "ORDER BY [Microsoft.VSTS.Common.StackRank]"
+)
+
+# Check 18 staleness threshold (days since last change) -- configurable.
+STALE_REMAINING_DAYS = 30
+
+# Check 20 backlog-order tiers (lower tier = belongs higher / at top of backlog).
+# Exception tier (0) is detected via a lowercase substring match on System.Tags.
+EXCEPTION_TAGS = ["exception"]
+TIER_BY_STATE = {"RollingOut": 1, "Active": 2, "Committed": 3}
+
 
 # ---------------------------------------------------------------------------
 # Safety helpers (unit-tested)
@@ -577,6 +626,73 @@ def _parse_iter_date(s):
         return datetime.fromisoformat(s.replace("Z", "+00:00")).date()
     except Exception:
         return None
+
+
+def current_month_node(current_iter):
+    # type: (Dict[str, Any]) -> str
+    """Current-month iteration node = parent of the current sprint path
+    (strip a trailing '\\Sprint NNN ...' segment). Robust to month-folder
+    spelling drift across years (e.g. 'Jun' vs 'June')."""
+    path = (current_iter or {}).get("path", "") or ""
+    idx = path.find("\\Sprint")
+    if idx != -1:
+        return path[:idx]
+    return path
+
+
+def _tier_for(state, tags):
+    # type: (str, Optional[str]) -> int
+    """Madhu backlog-order tier (2026-06-29 EM Sync): exception=0,
+    RollingOut=1, Active=2, Committed=3, everything else (Proposed/New/
+    backlog)=4. Lower tier should sit higher in the backlog."""
+    tl = (tags or "").lower()
+    for t in EXCEPTION_TAGS:
+        if t and t in tl:
+            return 0
+    return TIER_BY_STATE.get(state, 4)
+
+
+def detect_order_inversions(rows):
+    # type: (List[Dict[str, Any]]) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]
+    """Pure backlog state-order analysis (Madhu req 2026-06-29 EM Sync).
+
+    rows: list of {id, title, state, tags, owner, stackRank}. Returns
+    (flagged, suggested): `flagged` = items that sit below a higher-priority-
+    state item once ordered by StackRank (an inversion); `suggested` = the
+    same rows re-sorted into the desired (tier, StackRank) order.
+    """
+    enriched = []
+    for r in rows:
+        enriched.append({
+            "id": r.get("id"),
+            "title": r.get("title", ""),
+            "state": r.get("state", ""),
+            "owner": r.get("owner", ""),
+            "stackRank": r.get("stackRank"),
+            "tier": _tier_for(r.get("state", ""), r.get("tags", "")),
+        })
+    enriched.sort(key=lambda r: (r["stackRank"] is None,
+                                 r["stackRank"] if r["stackRank"] is not None else 0))
+    flagged = []
+    running_max = -1
+    running_item = None
+    for r in enriched:
+        if r["tier"] < running_max and running_item is not None:
+            flagged.append({
+                "id": r["id"], "title": r["title"], "state": r["state"],
+                "tier": r["tier"], "stackRank": r["stackRank"], "owner": r["owner"],
+                "below": "#{0} ({1})".format(running_item["id"], running_item["state"]),
+            })
+        else:
+            running_max = r["tier"]
+            running_item = r
+    suggested = [
+        {"id": r["id"], "title": r["title"], "state": r["state"],
+         "tier": r["tier"], "stackRank": r["stackRank"]}
+        for r in sorted(enriched, key=lambda x: (x["tier"], x["stackRank"] is None,
+                                                 x["stackRank"] if x["stackRank"] is not None else 0))
+    ]
+    return flagged, suggested
 
 
 # ---------------------------------------------------------------------------
@@ -1473,6 +1589,201 @@ def check14(token, pbi_token, allowed_areas, now):
 
 
 # ---------------------------------------------------------------------------
+# Madhu requirement (2026-06-29 EM Sync) checks: 15, 17, 18, 20
+# ---------------------------------------------------------------------------
+
+
+def check15(token, allowed_areas, mc, dry_run, current_iter):
+    # type: (str, List[str], MutationController, bool, Dict[str, Any]) -> Dict[str, Any]
+    print("Check 15: Rolling-out/Active Features not in current month (Madhu req 6/29)")
+    items = []
+    month = current_month_node(current_iter)
+    if not month:
+        print("  check15: no current-month node resolved; skipping", file=sys.stderr)
+        return {"items": [], "count": 0}
+    print("  Current-month node: {0}".format(month))
+    for area in allowed_areas:
+        wiql = WIQL_CHECK15_ROLLOUT_ACTIVE_MONTH.format(month=month, area=area)
+        if not _abort_if_no_area_filter("check15", wiql, False, mc):
+            continue
+        ids = wiql_query(wiql, token)
+        if not ids:
+            continue
+        wis = get_work_items_batch(ids, token, fields=[
+            "System.Id", "System.Title", "System.State", "System.IterationPath",
+            "System.AssignedTo", "System.AreaPath",
+        ])
+        for wi in wis:
+            wid = wi["id"]
+            f = wi.get("fields", {})
+            ap = f.get("System.AreaPath", "")
+            if not area_path_allowed(ap, allowed_areas):
+                mc.plan({"event": "skip_area_mismatch", "check": "check15", "id": wid, "areaPath": ap})
+                continue
+            prev_path = f.get("System.IterationPath", "")
+            if prev_path == month or prev_path.startswith(month + "\\"):
+                continue
+            plan_ok = mc.plan({
+                "event": "plan_patch",
+                "check": "check15",
+                "id": wid,
+                "areaPath": ap,
+                "ops": [{"op": "add", "path": "/fields/System.IterationPath", "value": month}],
+            })
+            if plan_ok and not dry_run:
+                r = patch_work_item(wid, [
+                    {"op": "add", "path": "/fields/System.IterationPath", "value": month},
+                ], token)
+                add_comment(wid, (
+                    "{0} This Feature is '{1}' but was not in the current month. Per Madhu's "
+                    "backlog rule (2026-06-29 EM Sync), rolling-out/active items must be in the "
+                    "current month, so it was auto-moved to {2}."
+                ).format(mention_html(wi), f.get("System.State", ""), month), token)
+                mc.record({
+                    "check": "check15", "id": wid, "areaPath": ap,
+                    "before": {"iterationPath": prev_path},
+                    "after": {"iterationPath": month},
+                    "ok": bool(r),
+                })
+                action = "moved" if r else "move-failed"
+            elif plan_ok and dry_run:
+                action = "would-move (dry-run)"
+            else:
+                action = "skipped (cap)"
+            items.append({
+                "id": wid,
+                "title": f.get("System.Title", ""),
+                "state": f.get("System.State", ""),
+                "owner": get_owner_name(wi),
+                "previousIteration": prev_path,
+                "action": action,
+            })
+    return {"items": items, "count": len(items)}
+
+
+def check17(token, allowed_areas, dry_run):
+    # type: (str, List[str], bool) -> Dict[str, Any]
+    print("Check 17: Zero RemainingWork on Active items (Madhu req 6/29)")
+    items = []
+    for area in allowed_areas:
+        wiql = WIQL_CHECK17_ZERO_REMAINING.format(area=area)
+        if not validate_wiql_has_area_filter(wiql, False):
+            print("  ABORT check17: missing area filter", file=sys.stderr)
+            continue
+        ids = wiql_query(wiql, token)
+        if not ids:
+            continue
+        wis = get_work_items_batch(ids, token, fields=[
+            "System.Id", "System.Title", "System.State", "System.AssignedTo",
+            "System.AreaPath", "Microsoft.VSTS.Scheduling.RemainingWork",
+        ])
+        for wi in wis:
+            f = wi.get("fields", {})
+            ap = f.get("System.AreaPath", "")
+            if not area_path_allowed(ap, allowed_areas):
+                continue
+            wid = wi["id"]
+            if not dry_run:
+                add_comment(wid, (
+                    "{0} This Active item shows 0 Remaining Work. Per Madhu's backlog rule "
+                    "(2026-06-29 EM Sync), an active item with work left must not show 0 - "
+                    "please set a realistic Remaining Work value or close it."
+                ).format(mention_html(wi)), token)
+            items.append({
+                "id": wid,
+                "title": f.get("System.Title", ""),
+                "state": f.get("System.State", ""),
+                "owner": get_owner_name(wi),
+                "area": AREA_SHORT.get(ap, ap),
+                "action": "commented" if not dry_run else "would-comment (dry-run)",
+            })
+    return {"items": items, "count": len(items)}
+
+
+def check18(token, allowed_areas, dry_run, today):
+    # type: (str, List[str], bool, date) -> Dict[str, Any]
+    print("Check 18: Stale RemainingWork > {0}d (Madhu req 6/29)".format(STALE_REMAINING_DAYS))
+    items = []
+    for area in allowed_areas:
+        wiql = WIQL_CHECK18_STALE_REMAINING.format(area=area, stale_days=STALE_REMAINING_DAYS)
+        if not validate_wiql_has_area_filter(wiql, False):
+            print("  ABORT check18: missing area filter", file=sys.stderr)
+            continue
+        ids = wiql_query(wiql, token)
+        if not ids:
+            continue
+        wis = get_work_items_batch(ids, token, fields=[
+            "System.Id", "System.Title", "System.State", "System.AssignedTo",
+            "System.AreaPath", "System.ChangedDate",
+            "Microsoft.VSTS.Scheduling.RemainingWork",
+        ])
+        for wi in wis:
+            f = wi.get("fields", {})
+            ap = f.get("System.AreaPath", "")
+            if not area_path_allowed(ap, allowed_areas):
+                continue
+            wid = wi["id"]
+            changed = _parse_iter_date(f.get("System.ChangedDate"))
+            days = (today - changed).days if changed else None
+            rw = f.get("Microsoft.VSTS.Scheduling.RemainingWork")
+            if not dry_run:
+                add_comment(wid, (
+                    "{0} This item has {1} Remaining Work but hasn't been updated in {2} days. "
+                    "Per Madhu's backlog rule (2026-06-29 EM Sync), Remaining Work must reflect "
+                    "reality - please refresh the estimate or close it."
+                ).format(mention_html(wi), rw, days if days is not None else "30+"), token)
+            items.append({
+                "id": wid,
+                "title": f.get("System.Title", ""),
+                "state": f.get("System.State", ""),
+                "owner": get_owner_name(wi),
+                "area": AREA_SHORT.get(ap, ap),
+                "remainingWork": rw,
+                "daysSinceChanged": days,
+                "action": "commented" if not dry_run else "would-comment (dry-run)",
+            })
+    return {"items": items, "count": len(items)}
+
+
+def check20(token, allowed_areas):
+    # type: (str, List[str]) -> Dict[str, Any]
+    print("Check 20: Backlog state-order violations (Madhu req 6/29)")
+    flagged = []
+    suggested = []
+    for area in allowed_areas:
+        wiql = WIQL_CHECK20_BACKLOG_ORDER.format(area=area)
+        if not validate_wiql_has_area_filter(wiql, False):
+            print("  ABORT check20: missing area filter", file=sys.stderr)
+            continue
+        ids = wiql_query(wiql, token)
+        if not ids:
+            continue
+        wis = get_work_items_batch(ids, token, fields=[
+            "System.Id", "System.Title", "System.State", "System.Tags",
+            "System.AssignedTo", "System.AreaPath",
+            "Microsoft.VSTS.Common.StackRank",
+        ])
+        rows = []
+        for wi in wis:
+            f = wi.get("fields", {})
+            ap = f.get("System.AreaPath", "")
+            if not area_path_allowed(ap, allowed_areas):
+                continue
+            rows.append({
+                "id": wi["id"],
+                "title": f.get("System.Title", ""),
+                "state": f.get("System.State", ""),
+                "tags": f.get("System.Tags", ""),
+                "owner": get_owner_name(wi),
+                "stackRank": f.get("Microsoft.VSTS.Common.StackRank"),
+            })
+        area_flagged, area_suggested = detect_order_inversions(rows)
+        flagged.extend(area_flagged)
+        suggested.extend(area_suggested)
+    return {"items": flagged, "count": len(flagged), "suggestedOrder": suggested}
+
+
+# ---------------------------------------------------------------------------
 # HTML report generation
 # ---------------------------------------------------------------------------
 
@@ -1919,6 +2230,110 @@ def _build_check14_section(res):
     )
 
 
+def _build_check15_section(res):
+    items = res["items"]
+    if not items:
+        return ""
+    ids = [it["id"] for it in items]
+    rows = []
+    for it in items:
+        rows.append(_row(
+            '<a href="{0}">{1}</a>'.format(_wi_link(it["id"]), it["id"]),
+            _html_escape(it.get("title", "")),
+            _html_escape(it.get("state", "")),
+            _html_escape(it.get("owner", "")),
+            _html_escape(it.get("previousIteration", "")),
+            '<span class="badge badge-moved">{0}</span>'.format(_html_escape(it.get("action", ""))),
+        ))
+    return _section_html(
+        "Check 15: Rolling-out/Active Items Not in Current Month",
+        "{0} moved".format(len(items)),
+        "Madhu requirement (6/29 EM Sync): Active/RollingOut Features must be in the current month. Auto-moved to the current-month node.",
+        ["Feature ID", "Title", "State", "Owner", "Previous Iteration", "Action"],
+        rows,
+        _query_link(ids, "Open all {0} items in ADO query".format(len(items))),
+    )
+
+
+def _build_check17_section(res):
+    items = res["items"]
+    if not items:
+        return ""
+    ids = [it["id"] for it in items]
+    rows = []
+    for it in items:
+        rows.append(_row(
+            '<a href="{0}">{1}</a>'.format(_wi_link(it["id"]), it["id"]),
+            _html_escape(it.get("title", "")),
+            _html_escape(it.get("state", "")),
+            _html_escape(it.get("owner", "")),
+            _html_escape(it.get("area", "")),
+            '<span class="badge badge-flagged">{0}</span>'.format(_html_escape(it.get("action", ""))),
+        ))
+    return _section_html(
+        "Check 17: Zero Remaining Work on Active Items",
+        "{0} flagged".format(len(items)),
+        "Madhu requirement (6/29 EM Sync): an Active item with work left must not show 0 Remaining Work. Owner notified to set a realistic value.",
+        ["ID", "Title", "State", "Owner", "Area", "Action"],
+        rows,
+        _query_link(ids, "Open all {0} items in ADO query".format(len(items))),
+    )
+
+
+def _build_check18_section(res):
+    items = res["items"]
+    if not items:
+        return ""
+    ids = [it["id"] for it in items]
+    rows = []
+    for it in items:
+        days = it.get("daysSinceChanged")
+        rows.append(_row(
+            '<a href="{0}">{1}</a>'.format(_wi_link(it["id"]), it["id"]),
+            _html_escape(it.get("title", "")),
+            _html_escape(it.get("state", "")),
+            _html_escape(it.get("owner", "")),
+            _html_escape(it.get("area", "")),
+            _html_escape(it.get("remainingWork", "")),
+            _html_escape("{0}d".format(days) if days is not None else ""),
+            '<span class="badge badge-flagged">{0}</span>'.format(_html_escape(it.get("action", ""))),
+        ))
+    return _section_html(
+        "Check 18: Stale Remaining Work",
+        "{0} flagged".format(len(items)),
+        "Madhu requirement (6/29 EM Sync): Remaining Work must reflect reality. These items have work left but have not been updated in over {0} days.".format(STALE_REMAINING_DAYS),
+        ["ID", "Title", "State", "Owner", "Area", "Remaining", "Stale", "Action"],
+        rows,
+        _query_link(ids, "Open all {0} items in ADO query".format(len(items))),
+    )
+
+
+def _build_check20_section(res):
+    items = res["items"]
+    if not items:
+        return ""
+    ids = [it["id"] for it in items]
+    rows = []
+    for it in items:
+        rows.append(_row(
+            '<a href="{0}">{1}</a>'.format(_wi_link(it["id"]), it["id"]),
+            _html_escape(it.get("title", "")),
+            _html_escape(it.get("state", "")),
+            _html_escape(it.get("tier", "")),
+            _html_escape(it.get("stackRank", "")),
+            _html_escape(it.get("owner", "")),
+            _html_escape(it.get("below", "")),
+        ))
+    return _section_html(
+        "Check 20: Backlog State-Order Violations",
+        "{0} out of order".format(len(items)),
+        "Madhu requirement (6/29 EM Sync): backlog order should be exceptions &gt; RollingOut &gt; Active &gt; Committed &gt; plan/backlog. These items sit below a higher-priority-state item. Report-only (no auto-reorder); see suggested order in the JSON output.",
+        ["ID", "Title", "State", "Tier", "StackRank", "Owner", "Sits Below"],
+        rows,
+        _query_link(ids, "Open all {0} items in ADO query".format(len(items))),
+    )
+
+
 def _section_html(title, count_label, blurb, headers, rows, query_link):
     return (
         '<div class="section">'
@@ -1963,12 +2378,17 @@ def render_report(template_path, results, current_iter, prev_iter,
         "{{CHECK12_SECTION}}": _build_check12_section(results.get("check12", _empty_result())),
         "{{CHECK13_SECTION}}": _build_check13_section(results.get("check13", _empty_result())),
         "{{CHECK14_SECTION}}": _build_check14_section(results.get("check14", _empty_result())),
+        "{{CHECK15_SECTION}}": _build_check15_section(results.get("check15", _empty_result())),
+        "{{CHECK17_SECTION}}": _build_check17_section(results.get("check17", _empty_result())),
+        "{{CHECK18_SECTION}}": _build_check18_section(results.get("check18", _empty_result())),
+        "{{CHECK20_SECTION}}": _build_check20_section(results.get("check20", _empty_result())),
     }
 
     # Compute summary numbers
     check_keys = ["check1", "check2", "check2b", "check3", "check4", "check5",
                   "check6", "check7", "check8", "check9", "check10", "check11",
-                  "check12", "check13", "check14"]
+                  "check12", "check13", "check14", "check15", "check17",
+                  "check18", "check20"]
     total_checks = len(check_keys)
     checks_with_issues = sum(
         1 for k in check_keys
@@ -2142,6 +2562,14 @@ def main(argv=None):
         results["check13"] = check13(pbi_token)
     if should_run("14"):
         results["check14"] = check14(ado_token, pbi_token, allowed_areas, start_dt)
+    if should_run("15"):
+        results["check15"] = check15(ado_token, allowed_areas, mc, args.dry_run, current_iter)
+    if should_run("17"):
+        results["check17"] = check17(ado_token, allowed_areas, args.dry_run)
+    if should_run("18"):
+        results["check18"] = check18(ado_token, allowed_areas, args.dry_run, today)
+    if should_run("20"):
+        results["check20"] = check20(ado_token, allowed_areas)
 
     complete_dt = datetime.now(PST)
 
@@ -2159,7 +2587,8 @@ def main(argv=None):
         "mutationCap": args.cap,
     }
     for key in ["check2b", "check4", "check5", "check6", "check7", "check8",
-                "check9", "check10", "check11", "check12", "check13", "check14"]:
+                "check9", "check10", "check11", "check12", "check13", "check14",
+                "check15", "check17", "check18", "check20"]:
         summary[key] = results.get(key, _empty_result())
 
     summary_path = os.path.join(output_dir, "hygiene-teams-summary.json")

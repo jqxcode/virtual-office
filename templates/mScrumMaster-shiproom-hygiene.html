@@ -369,6 +369,86 @@ If no issues, replace {{CHECK13_SECTION}} with empty string. -->
 If no issues (all dashboards healthy), replace {{CHECK14_SECTION}} with empty string.
 Status badges: use badge-fixed for healthy, badge-flagged for degraded, badge-moved for critical (repurposed as attention-needed). -->
 
+<!-- Check 15: Rolling-out/Active items not in current month -->
+<!-- ONLY include this section if Check 15 found issues. Omit entirely if no issues. -->
+{{CHECK15_SECTION}}
+<!-- Replace {{CHECK15_SECTION}} with the block below ONLY if issues were found:
+<div class="section">
+  <h2>Check 15: Rolling-out/Active items not in current month (Madhu requirement, 6/29 EM Sync) <span class="count">N fixed</span></h2>
+  <p style="color:var(--vo-text-tertiary); font-size:12px; margin-bottom:12px;">Rolling-out/Active items should be in the current month. Items were auto-fixed and owners notified.</p>
+  {{CHECK15_QUERY_LINK}}
+  <table>
+    <thead>
+      <tr><th>ID</th><th>Title</th><th>State</th><th>Owner</th><th>Previous Iteration</th><th>Action</th></tr>
+    </thead>
+    <tbody>
+      {{CHECK15_TABLE_ROWS}}
+    </tbody>
+  </table>
+</div>
+If no issues, replace {{CHECK15_SECTION}} with empty string.
+Work item IDs link to https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/{id}. -->
+
+<!-- Check 17: Zero RemainingWork on non-closed Active items -->
+<!-- ONLY include this section if Check 17 found issues. Omit entirely if no issues. -->
+{{CHECK17_SECTION}}
+<!-- Replace {{CHECK17_SECTION}} with the block below ONLY if issues were found:
+<div class="section">
+  <h2>Check 17: Zero RemainingWork on non-closed Active items (Madhu requirement, 6/29 EM Sync) <span class="count">N flagged</span></h2>
+  <p style="color:var(--vo-text-tertiary); font-size:12px; margin-bottom:12px;">Non-closed Active items should not have zero Remaining Work. Owners notified to update Remaining Work or close the item.</p>
+  {{CHECK17_QUERY_LINK}}
+  <table>
+    <thead>
+      <tr><th>ID</th><th>Title</th><th>State</th><th>Owner</th><th>Area</th><th>Action</th></tr>
+    </thead>
+    <tbody>
+      {{CHECK17_TABLE_ROWS}}
+    </tbody>
+  </table>
+</div>
+If no issues, replace {{CHECK17_SECTION}} with empty string.
+Work item IDs link to https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/{id}. -->
+
+<!-- Check 18: Stale RemainingWork (>30 days untouched) -->
+<!-- ONLY include this section if Check 18 found issues. Omit entirely if no issues. -->
+{{CHECK18_SECTION}}
+<!-- Replace {{CHECK18_SECTION}} with the block below ONLY if issues were found:
+<div class="section">
+  <h2>Check 18: Stale RemainingWork (&gt;30 days untouched) (Madhu requirement, 6/29 EM Sync) <span class="count">N flagged</span></h2>
+  <p style="color:var(--vo-text-tertiary); font-size:12px; margin-bottom:12px;">Items with Remaining Work untouched for more than 30 days need owner review. Owners notified to refresh estimates.</p>
+  {{CHECK18_QUERY_LINK}}
+  <table>
+    <thead>
+      <tr><th>ID</th><th>Title</th><th>State</th><th>Owner</th><th>Area</th><th>Remaining Work</th><th>Days Stale</th><th>Action</th></tr>
+    </thead>
+    <tbody>
+      {{CHECK18_TABLE_ROWS}}
+    </tbody>
+  </table>
+</div>
+If no issues, replace {{CHECK18_SECTION}} with empty string.
+Work item IDs link to https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/{id}. -->
+
+<!-- Check 20: Backlog state-order violations -->
+<!-- ONLY include this section if Check 20 found issues. Omit entirely if no issues. -->
+{{CHECK20_SECTION}}
+<!-- Replace {{CHECK20_SECTION}} with the block below ONLY if issues were found:
+<div class="section">
+  <h2>Check 20: Backlog state-order violations (Madhu requirement, 6/29 EM Sync) <span class="count">N flagged</span></h2>
+  <p style="color:var(--vo-text-tertiary); font-size:12px; margin-bottom:12px;">Backlog items should appear in valid state order. Suggested order is rendered below the violation table.</p>
+  {{CHECK20_QUERY_LINK}}
+  <table>
+    <thead>
+      <tr><th>ID</th><th>Title</th><th>State</th><th>Tier</th><th>StackRank</th><th>Owner</th><th>Sits Below</th></tr>
+    </thead>
+    <tbody>
+      {{CHECK20_TABLE_ROWS}}
+    </tbody>
+  </table>
+</div>
+If no issues, replace {{CHECK20_SECTION}} with empty string.
+Work item IDs link to https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/{id}. A suggested order list is also rendered. -->
+
 <!-- Future checks: follow the same pattern.
   1. Add a {{CHECKn_SECTION}} placeholder here.
   2. Include it ONLY if the check found issues; omit entirely if clean.

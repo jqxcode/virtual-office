@@ -91,6 +91,10 @@ class TestValidateWiqlHasAreaFilter(unittest.TestCase):
             (shc.WIQL_CHECK11_SIGNOFFS, {"semester": sem, "area": area}),
             (shc.WIQL_CHECK12_RING_ORDERING, {"semester": sem, "area": area}),
             (shc.WIQL_CHECK14_FLAKY_BUGS, {"area": area}),
+            (shc.WIQL_CHECK15_ROLLOUT_ACTIVE_MONTH, {"month": curr, "area": area}),
+            (shc.WIQL_CHECK17_ZERO_REMAINING, {"area": area}),
+            (shc.WIQL_CHECK18_STALE_REMAINING, {"area": area, "stale_days": 30}),
+            (shc.WIQL_CHECK20_BACKLOG_ORDER, {"area": area}),
         ]:
             rendered = tmpl.format(**kwargs)
             self.assertTrue(
@@ -248,6 +252,89 @@ class TestMutationCap(unittest.TestCase):
         mc.plan({"event": "plan_patch", "id": 2})
         mc.record({"id": 2})
         self.assertFalse(mc.can_patch())
+
+
+# ---------------------------------------------------------------------------
+# Madhu requirement (2026-06-29 EM Sync) checks: 15, 17, 18, 20
+# ---------------------------------------------------------------------------
+
+
+class TestCurrentMonthNode(unittest.TestCase):
+    def test_strips_sprint_suffix(self):
+        ci = {"path": r"MSTeams\2026\H1\Q2\June\Sprint 209 22-June to 5-July"}
+        self.assertEqual(shc.current_month_node(ci), r"MSTeams\2026\H1\Q2\June")
+
+    def test_month_only_path_unchanged(self):
+        ci = {"path": r"MSTeams\2026\H1\Q2\June"}
+        self.assertEqual(shc.current_month_node(ci), r"MSTeams\2026\H1\Q2\June")
+
+    def test_empty_inputs(self):
+        self.assertEqual(shc.current_month_node({}), "")
+        self.assertEqual(shc.current_month_node(None), "")
+
+
+class TestTierFor(unittest.TestCase):
+    def test_state_tiers(self):
+        self.assertEqual(shc._tier_for("RollingOut", ""), 1)
+        self.assertEqual(shc._tier_for("Active", ""), 2)
+        self.assertEqual(shc._tier_for("Committed", ""), 3)
+        self.assertEqual(shc._tier_for("Proposed", ""), 4)
+        self.assertEqual(shc._tier_for("New", ""), 4)
+        self.assertEqual(shc._tier_for("", ""), 4)
+
+    def test_exception_tag_wins(self):
+        self.assertEqual(shc._tier_for("Active", "Exception; foo"), 0)
+        self.assertEqual(shc._tier_for("Proposed", "security-exception"), 0)
+
+    def test_none_tags(self):
+        self.assertEqual(shc._tier_for("RollingOut", None), 1)
+
+
+class TestDetectOrderInversions(unittest.TestCase):
+    def test_clean_order_no_flags(self):
+        rows = [
+            {"id": 1, "state": "RollingOut", "tags": "", "owner": "a", "stackRank": 100},
+            {"id": 2, "state": "Active", "tags": "", "owner": "b", "stackRank": 200},
+            {"id": 3, "state": "Committed", "tags": "", "owner": "c", "stackRank": 300},
+            {"id": 4, "state": "Proposed", "tags": "", "owner": "d", "stackRank": 400},
+        ]
+        flagged, suggested = shc.detect_order_inversions(rows)
+        self.assertEqual(flagged, [])
+        self.assertEqual([r["id"] for r in suggested], [1, 2, 3, 4])
+
+    def test_detects_inversion(self):
+        # Committed (tier 3) ranked ABOVE RollingOut (tier 1): RollingOut is misplaced.
+        rows = [
+            {"id": 10, "state": "Committed", "tags": "", "owner": "a", "stackRank": 100},
+            {"id": 11, "state": "RollingOut", "tags": "", "owner": "b", "stackRank": 200},
+        ]
+        flagged, suggested = shc.detect_order_inversions(rows)
+        self.assertEqual(len(flagged), 1)
+        self.assertEqual(flagged[0]["id"], 11)
+        self.assertIn("#10", flagged[0]["below"])
+        self.assertEqual([r["id"] for r in suggested], [11, 10])
+
+    def test_exception_tier_on_top(self):
+        rows = [
+            {"id": 1, "state": "RollingOut", "tags": "", "owner": "a", "stackRank": 100},
+            {"id": 2, "state": "Active", "tags": "exception", "owner": "b", "stackRank": 500},
+        ]
+        flagged, suggested = shc.detect_order_inversions(rows)
+        # exception (tier 0) at rank 500 sits below RollingOut (tier 1) at 100 -> flagged.
+        self.assertEqual(len(flagged), 1)
+        self.assertEqual(flagged[0]["id"], 2)
+        self.assertEqual([r["id"] for r in suggested], [2, 1])
+
+    def test_handles_none_stackrank(self):
+        rows = [
+            {"id": 1, "state": "RollingOut", "tags": "", "owner": "a", "stackRank": None},
+            {"id": 2, "state": "Proposed", "tags": "", "owner": "b", "stackRank": 50},
+        ]
+        flagged, suggested = shc.detect_order_inversions(rows)
+        # None StackRank sorts last -> ordered [Proposed(50), RollingOut(None)];
+        # RollingOut tier 1 < Proposed tier 4 -> inversion on id 1.
+        self.assertEqual(len(flagged), 1)
+        self.assertEqual(flagged[0]["id"], 1)
 
 
 if __name__ == "__main__":

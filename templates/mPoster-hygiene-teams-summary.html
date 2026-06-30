@@ -1,4 +1,4 @@
-<!-- Teams channel message template for shiproom hygiene checks 2b, 4-14 -->
+<!-- Teams channel message template for shiproom hygiene checks 2b, 4-15, 17-18, 20 -->
 <!-- NOTE: Teams messages use basic HTML only (no CSS classes, no <style> blocks) -->
 <!-- RULE: Only include sections that have items. Omit sections with 0 items entirely. -->
 <!-- If ALL sections are empty, do NOT post at all. -->
@@ -154,4 +154,47 @@ Row: <tr><td><at id="{mention_id}">{name}</at></td><td><a href="{url}">{title}</
   {{CHECK14_ROWS}}
 </table>
 Row: <tr><td>{metric}</td><td>{value}</td><td>{status}</td></tr>
+-->
+{{CHECK15_SECTION}}
+<!-- Replace with EMPTY STRING if no check15 items. Otherwise:
+<p><b>Rolling-out/Active not in current month (auto-fix) ({{CHECK15_COUNT}})</b></p>
+<p>Madhu requirement (6/29 EM Sync): Rolling-out or Active items not in the current month, fixed automatically:</p>
+<table>
+  <tr><th>Item</th><th>Title</th><th>Owner</th><th>State</th><th>Previous Iteration</th><th>Action</th></tr>
+  {{CHECK15_ROWS}}
+</table>
+Row: <tr><td><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/{id}">{id}</a></td><td>{title}</td><td><at id="{mention_id}">{owner}</at></td><td>{state}</td><td>{previousIteration}</td><td>{action}</td></tr>
+-->
+
+{{CHECK17_SECTION}}
+<!-- Replace with EMPTY STRING if no check17 items. Otherwise:
+<p><b>Zero RemainingWork on active items ({{CHECK17_COUNT}})</b></p>
+<p>Madhu requirement (6/29 EM Sync): Active items with zero Remaining Work that need owner attention:</p>
+<table>
+  <tr><th>Item</th><th>Title</th><th>Owner</th><th>State</th><th>Area</th><th>Action</th></tr>
+  {{CHECK17_ROWS}}
+</table>
+Row: <tr><td><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/{id}">{id}</a></td><td>{title}</td><td><at id="{mention_id}">{owner}</at></td><td>{state}</td><td>{area}</td><td>{action}</td></tr>
+-->
+
+{{CHECK18_SECTION}}
+<!-- Replace with EMPTY STRING if no check18 items. Otherwise:
+<p><b>Stale RemainingWork (&gt;30d untouched) ({{CHECK18_COUNT}})</b></p>
+<p>Madhu requirement (6/29 EM Sync): Active items with Remaining Work unchanged for more than 30 days:</p>
+<table>
+  <tr><th>Item</th><th>Title</th><th>Owner</th><th>State</th><th>Area</th><th>Remaining Work</th><th>Days Since Changed</th><th>Action</th></tr>
+  {{CHECK18_ROWS}}
+</table>
+Row: <tr><td><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/{id}">{id}</a></td><td>{title}</td><td><at id="{mention_id}">{owner}</at></td><td>{state}</td><td>{area}</td><td>{remainingWork}</td><td>{daysSinceChanged}</td><td>{action}</td></tr>
+-->
+
+{{CHECK20_SECTION}}
+<!-- Replace with EMPTY STRING if no check20 items. Otherwise:
+<p><b>Backlog state-order violations ({{CHECK20_COUNT}})</b></p>
+<p>Madhu requirement (6/29 EM Sync): Backlog items whose state ordering violates the suggested order:</p>
+<table>
+  <tr><th>Item</th><th>Title</th><th>Owner</th><th>State</th><th>Tier</th><th>Stack Rank</th><th>Below</th></tr>
+  {{CHECK20_ROWS}}
+</table>
+Row: <tr><td><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/{id}">{id}</a></td><td>{title}</td><td><at id="{mention_id}">{owner}</at></td><td>{state}</td><td>{tier}</td><td>{stackRank}</td><td>{below}</td></tr>
 -->

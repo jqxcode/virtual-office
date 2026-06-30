@@ -6,7 +6,7 @@
 
 **The skill IS allowed to mutate items (PATCH state, iteration, relations)**, but ONLY under all of the following conditions. If any condition fails, the check MUST fall back to comment-only.
 
-### Hard rules — apply to every mutating check (1, 2, 3, 5, 6)
+### Hard rules — apply to every mutating check (1, 2, 3, 5, 6, 15)
 
 1. **WIQL must include the area filter literally**: `[System.AreaPath] UNDER '<allowed-area>'`. Before issuing any WIQL whose results will lead to PATCH, the script MUST assert the WIQL string contains `[System.AreaPath] UNDER`. If absent, abort the check and log an audit event.
 
@@ -31,7 +31,7 @@ Compute today's date at runtime; pick the matching set:
   - `MSTeams\Calling Meeting Devices (CMD)\Meetings\Meeting Join\Fundamentals`
   - (Notes is dropped — Notes team handles its own hygiene from then on.)
 
-Comment-only checks (4, 7-14) follow the same area list.
+Comment-only checks (4, 7-14, 17, 18, 20) follow the same area list.
 
 ## Scope
 
@@ -485,6 +485,112 @@ RETURN GROUPBY(_filtered, TestResults[TESTNAME],
 **If DAX token fails**: Fall back to CDP-only for all 3 dashboards. Output "DAX unavailable, using CDP screenshots only."
 **If CDP fails**: Skip CDP portion. Output "CDP unavailable, DAX data only."
 
+## Check 15: Rolling-out/Active Items Not in Current Month
+
+**Source: Madhu requirement (2026-06-29 EM Sync).**
+
+**Goal**: Features in `Active` or `RollingOut` deployment state must live under the current-month iteration node. Madhu: "anything in rolling out or active state must be in current month."
+
+**Action policy: PATCH allowed under the Hard Rules in the safety policy. MutationController-guarded.**
+
+**State tokens**: Feature deployment states are `Active`, `Committed`, `Proposed`, `RollingOut`, `Closed`. The rolling-out token is `RollingOut` (NO space).
+
+**Current-month node**: Derive `current_month_node` as the parent of the current sprint path by stripping the trailing `\Sprint NNN ...` segment. Example current-month iteration node: `MSTeams\2026\H1\Q2\June`. Do not hard-code month folder spelling because it drifts across years (for example, `Jun` vs `June`).
+
+1. WIQL per allowed-area — run ONCE per area. The query MUST literally contain `[System.AreaPath] UNDER '<allowed-area>'`:
+   ```
+   SELECT [System.Id], [System.Title], [System.State], [System.IterationPath], [System.AreaPath]
+   FROM workitems
+   WHERE [System.WorkItemType] = 'Feature'
+     AND [System.State] IN ('Active','RollingOut')
+     AND NOT [System.IterationPath] UNDER '<current_month_node>'
+     AND [System.AreaPath] UNDER '<allowed-area>'
+   ```
+2. For each result:
+   a. GET item. **Re-verify** `item.fields["System.AreaPath"]` starts with the allowed-area string before PATCH; skip and audit-log if not.
+   b. Dry-run: write the planned `System.IterationPath` change to the patch preview and do NOT PATCH.
+   c. Execute through MutationController only if all Hard Rules pass and the 50-PATCH cap has not been reached.
+   d. PATCH `System.IterationPath` → `current_month_node`.
+   e. Comment @mentioning owner: "Madhu shiproom rule: Features in Active or RollingOut state must be in the current month. This Feature was auto-moved to {current_month_node}. Please update state or iteration if this does not reflect the rollout plan."
+3. Collect: ID, Title, Owner, State, previous IterationPath, new IterationPath, AreaPath.
+
+Check 16 & 19: deferred, not implemented this iteration.
+
+## Check 17: Zero RemainingWork on Non-Closed Active Items
+
+**Source: Madhu requirement (2026-06-29 EM Sync).**
+
+**Goal**: Madhu: "zero work means there is no work, but I can clearly see there is work remaining." Flag non-closed `Active`/`RollingOut` items whose `Microsoft.VSTS.Scheduling.RemainingWork` is 0 or empty.
+
+**Action policy: Report-only + @mention comment. No PATCH. Respect dry-run (no comment in dry-run).**
+
+1. WIQL per area:
+   ```
+   SELECT [System.Id], [System.Title], [System.State], [System.AssignedTo], [Microsoft.VSTS.Scheduling.RemainingWork], [System.AreaPath]
+   FROM workitems
+   WHERE [System.State] IN ('Active','RollingOut')
+     AND [System.State] <> 'Closed'
+     AND ([Microsoft.VSTS.Scheduling.RemainingWork] = 0 OR [Microsoft.VSTS.Scheduling.RemainingWork] = '')
+     AND [System.AreaPath] UNDER '<area>'
+   ```
+2. Collect: ID, Title, Owner, State, RemainingWork, AreaPath.
+3. Comment @mentioning owner unless dry-run: "Madhu shiproom rule: this Active/RollingOut item has RemainingWork set to 0 or empty, but work appears to remain. Please set a realistic RemainingWork estimate."
+4. **Report-only** (no auto-fix). The bot cannot infer the correct value.
+
+## Check 18: Stale RemainingWork (Untouched > 30 Days)
+
+**Source: Madhu requirement (2026-06-29 EM Sync).**
+
+**Goal**: Madhu: "34 days remaining ... means this has not been looked at for a month." Flag items with `Microsoft.VSTS.Scheduling.RemainingWork` > 0 and `System.ChangedDate` older than 30 days.
+
+**Action policy: Report-only + @mention comment. No PATCH. Respect dry-run (no comment in dry-run).**
+
+**Threshold**: Default = 30 days. Make this configurable.
+
+1. WIQL per area:
+   ```
+   SELECT [System.Id], [System.Title], [System.State], [System.AssignedTo], [System.ChangedDate], [Microsoft.VSTS.Scheduling.RemainingWork], [System.AreaPath]
+   FROM workitems
+   WHERE [System.State] <> 'Closed'
+     AND [System.State] <> 'Removed'
+     AND [Microsoft.VSTS.Scheduling.RemainingWork] > 0
+     AND [System.ChangedDate] < @today - <stale_remaining_work_days>
+     AND [System.AreaPath] UNDER '<area>'
+   ORDER BY [System.ChangedDate] ASC
+   ```
+2. Collect: ID, Title, Owner, State, ChangedDate, RemainingWork, AreaPath, ageDays.
+3. Comment @mentioning owner unless dry-run: "Madhu shiproom rule: this item has RemainingWork > 0 but has not been changed in more than {stale_remaining_work_days} days. Please refresh the estimate or close/move the work if it is no longer active."
+4. **Report-only** (no auto-fix).
+
+## Check 20: Backlog State-Order Violations
+
+**Source: Madhu requirement (2026-06-29 EM Sync).**
+
+**Goal**: Enforce Madhu's stack order (top→bottom): exceptions → `RollingOut` → `Active` → `Committed` → plan/backlog.
+
+**Action policy: REPORT-ONLY. No StackRank PATCH. Bulk reorder is the exact incident risk class.**
+
+**Field mapping**: Backlog node = `MSTeams\Backlog`. StackRank field = `Microsoft.VSTS.Common.StackRank` (ascending = top of backlog).
+
+**Tier map**: `{exception:0, RollingOut:1, Active:2, Committed:3, Proposed/New/backlog:4}`. Exception tier is detected via a configurable tag/type list. Default: `System.Tags` contains `exception`. If exception detection cannot be resolved, degrade gracefully to the 4 state tiers and note "exception tier skipped".
+
+1. WIQL per allowed-area — run ONCE per area. The query MUST include the area filter and MUST NOT include an iteration filter; it covers the whole backlog including `MSTeams\Backlog`:
+   ```
+   SELECT [System.Id], [System.Title], [System.State], [System.Tags], [Microsoft.VSTS.Common.StackRank], [System.AreaPath]
+   FROM workitems
+   WHERE [System.WorkItemType] = 'Feature'
+     AND [System.State] NOT IN ('Closed','Removed')
+     AND [System.AreaPath] UNDER '<allowed-area>'
+   ORDER BY [Microsoft.VSTS.Common.StackRank] ASC
+   ```
+2. Walk the StackRank-ordered list top→bottom:
+   a. Compute each item's tier.
+   b. Track `running_max_tier`.
+   c. Any item with `tier < running_max_tier` is an inversion because it sits below a higher-priority-state item; flag it.
+3. Emit flagged inversions: ID, Title, State, StackRank, tier, AreaPath, and the preceding higher-priority-state context.
+4. Emit a "suggested correct order": the same list re-sorted by `(tier, current StackRank)`.
+5. **Report-only** (no auto-fix). Results included in Teams post.
+
 ---
 
 ## Teams Summary Output
@@ -506,11 +612,15 @@ RETURN GROUPBY(_filtered, TestResults[TESTNAME],
   "check11": { "items": [...], "count": N },
   "check12": { "items": [...], "count": N },
   "check13": { "items": [...], "count": N },
-  "check14": { "dashboards": [...], "overallStatus": "...", "count": N }
+  "check14": { "dashboards": [...], "overallStatus": "...", "count": N },
+  "check15": { "items": [], "count": 0 },
+  "check17": { "items": [], "count": 0 },
+  "check18": { "items": [], "count": 0 },
+  "check20": { "items": [], "count": 0, "suggestedOrder": [] }
 }
 ```
 
-Each check key MUST exist even if empty (`{ "items": [], "count": 0 }`). The poster reads `check2b`, `check4`, ..., `check13`, `check14` directly — if these keys are missing or nested inside another object, the poster will see empty data and skip posting.
+Each check key MUST exist even if empty (`{ "items": [], "count": 0 }`). The poster reads `check2b`, `check4`, ..., `check13`, `check14`, `check15`, `check17`, `check18`, `check20` directly — if these keys are missing or nested inside another object, the poster will see empty data and skip posting.
 
 ---
 
@@ -526,16 +636,18 @@ Each check key MUST exist even if empty (`{ "items": [], "count": 0 }`). The pos
 | `{{VO_SUBTITLE}}` | `Agent: Scrum Master \| Job: shiproom-hygiene-check \| Start: <PST> \| Complete: <PST>` |
 | `{{DATE}}` | Today's date (YYYY-MM-DD) |
 | `{{CURRENT_SPRINT}}` / `{{PREVIOUS_SPRINT}}` | Actual sprint names |
-| `{{TOTAL_CHECKS}}` | Number of checks run (10 including 2b) |
+| `{{TOTAL_CHECKS}}` | Number of checks run (now includes Checks 15, 17, 18, 20; Check 16 and Check 19 are deferred) |
 | `{{CHECKS_PASSED}}` | Checks with 0 issues |
 | `{{CHECKS_WITH_ISSUES}}` | Checks that found issues |
 | `{{TOTAL_ACTIONS}}` | Sum of all items fixed/moved/flagged |
 
 ### Section visibility:
 
-For each check (1, 2, 2b, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14):
+For each check (1, 2, 2b, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 17, 18, 20):
 - If 0 issues: replace `{{CHECKn_SECTION}}` with **empty string**
 - If issues found: replace with the full HTML block from the template comments, filling in table rows
+
+Required check placeholders: `{{CHECK1_SECTION}}`, `{{CHECK2_SECTION}}`, `{{CHECK2B_SECTION}}`, `{{CHECK3_SECTION}}`, `{{CHECK4_SECTION}}`, `{{CHECK5_SECTION}}`, `{{CHECK6_SECTION}}`, `{{CHECK7_SECTION}}`, `{{CHECK8_SECTION}}`, `{{CHECK9_SECTION}}`, `{{CHECK10_SECTION}}`, `{{CHECK11_SECTION}}`, `{{CHECK12_SECTION}}`, `{{CHECK13_SECTION}}`, `{{CHECK14_SECTION}}`, `{{CHECK15_SECTION}}`, `{{CHECK17_SECTION}}`, `{{CHECK18_SECTION}}`, `{{CHECK20_SECTION}}`.
 
 If ALL checks passed: replace `{{ALL_CLEAR_SECTION}}` with `<div class="section all-clear">All checks passed - no hygiene issues found.</div>`. Otherwise empty string.
 
