@@ -501,7 +501,7 @@ RETURN GROUPBY(_filtered, TestResults[TESTNAME],
    ```
    SELECT [System.Id], [System.Title], [System.State], [System.IterationPath], [System.AreaPath]
    FROM workitems
-   WHERE [System.WorkItemType] = 'Feature'
+   WHERE [System.WorkItemType] IN ('Feature','Exception')
      AND [System.State] IN ('Active','RollingOut')
      AND NOT [System.IterationPath] UNDER '<current_month_node>'
      AND [System.AreaPath] UNDER '<allowed-area>'
@@ -572,13 +572,13 @@ Check 16 & 19: deferred, not implemented this iteration.
 
 **Field mapping**: Backlog node = `MSTeams\Backlog`. StackRank field = `Microsoft.VSTS.Common.StackRank` (ascending = top of backlog).
 
-**Tier map**: `{exception:0, RollingOut:1, Active:2, Committed:3, Proposed/New/backlog:4}`. Exception tier is detected via a configurable tag/type list. Default: `System.Tags` contains `exception`. If exception detection cannot be resolved, degrade gracefully to the 4 state tiers and note "exception tier skipped".
+**Tier map**: `{exception:0, RollingOut:1, Active:2, Committed:3, Proposed/New/backlog:4}`. The exception tier is detected primarily by **work-item TYPE == `Exception`** (the Features backlog board interleaves `Exception` items with `Feature` items, ordered by StackRank), with a `System.Tags` substring match on `exception` kept as a fallback. If exception detection cannot be resolved, degrade gracefully to the 4 state tiers and note "exception tier skipped".
 
 1. WIQL per allowed-area — run ONCE per area. The query MUST include the area filter and MUST NOT include an iteration filter; it covers the whole backlog including `MSTeams\Backlog`:
    ```
-   SELECT [System.Id], [System.Title], [System.State], [System.Tags], [Microsoft.VSTS.Common.StackRank], [System.AreaPath]
+   SELECT [System.Id], [System.Title], [System.WorkItemType], [System.State], [System.Tags], [Microsoft.VSTS.Common.StackRank], [System.AreaPath]
    FROM workitems
-   WHERE [System.WorkItemType] = 'Feature'
+   WHERE [System.WorkItemType] IN ('Feature','Exception')
      AND [System.State] NOT IN ('Closed','Removed')
      AND [System.AreaPath] UNDER '<allowed-area>'
    ORDER BY [Microsoft.VSTS.Common.StackRank] ASC

@@ -286,6 +286,14 @@ class TestTierFor(unittest.TestCase):
         self.assertEqual(shc._tier_for("Active", "Exception; foo"), 0)
         self.assertEqual(shc._tier_for("Proposed", "security-exception"), 0)
 
+    def test_exception_type_wins(self):
+        # Board interleaves Exception work-item TYPE at the top, regardless of state/tags.
+        self.assertEqual(shc._tier_for("Open", "", "Exception"), 0)
+        self.assertEqual(shc._tier_for("Proposed", "", "Exception"), 0)
+        # Non-exception types fall through to state tiers.
+        self.assertEqual(shc._tier_for("RollingOut", "", "Feature"), 1)
+        self.assertEqual(shc._tier_for("Proposed", "", "Feature"), 4)
+
     def test_none_tags(self):
         self.assertEqual(shc._tier_for("RollingOut", None), 1)
 
@@ -324,6 +332,28 @@ class TestDetectOrderInversions(unittest.TestCase):
         self.assertEqual(len(flagged), 1)
         self.assertEqual(flagged[0]["id"], 2)
         self.assertEqual([r["id"] for r in suggested], [2, 1])
+
+    def test_exception_type_at_top_clean(self):
+        # Real board layout: Exception (type) at row 1, then Features by state.
+        rows = [
+            {"id": 1, "state": "Open", "type": "Exception", "tags": "", "owner": "a", "stackRank": 100},
+            {"id": 2, "state": "RollingOut", "type": "Feature", "tags": "", "owner": "b", "stackRank": 200},
+            {"id": 3, "state": "Active", "type": "Feature", "tags": "", "owner": "c", "stackRank": 300},
+        ]
+        flagged, suggested = shc.detect_order_inversions(rows)
+        self.assertEqual(flagged, [])
+        self.assertEqual([r["id"] for r in suggested], [1, 2, 3])
+
+    def test_exception_type_misranked_flagged(self):
+        # An Exception (tier 0) ranked BELOW a Feature -> inversion, detected by type not tag.
+        rows = [
+            {"id": 2, "state": "RollingOut", "type": "Feature", "tags": "", "owner": "b", "stackRank": 100},
+            {"id": 1, "state": "Open", "type": "Exception", "tags": "", "owner": "a", "stackRank": 900},
+        ]
+        flagged, suggested = shc.detect_order_inversions(rows)
+        self.assertEqual(len(flagged), 1)
+        self.assertEqual(flagged[0]["id"], 1)
+        self.assertEqual([r["id"] for r in suggested], [1, 2])
 
     def test_handles_none_stackrank(self):
         rows = [

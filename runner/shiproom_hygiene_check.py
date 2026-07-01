@@ -247,7 +247,7 @@ WIQL_CHECK15_ROLLOUT_ACTIVE_MONTH = (
     "SELECT [System.Id], [System.Title], [System.State], "
     "[System.IterationPath], [System.AreaPath] "
     "FROM workitems "
-    "WHERE [System.WorkItemType] = 'Feature' "
+    "WHERE [System.WorkItemType] IN ('Feature', 'Exception') "
     "AND [System.State] IN ('Active', 'RollingOut') "
     "AND NOT [System.IterationPath] UNDER '{month}' "
     "AND [System.AreaPath] UNDER '{area}'"
@@ -273,10 +273,10 @@ WIQL_CHECK18_STALE_REMAINING = (
 )
 
 WIQL_CHECK20_BACKLOG_ORDER = (
-    "SELECT [System.Id], [System.Title], [System.State], [System.Tags], "
-    "[Microsoft.VSTS.Common.StackRank], [System.AreaPath] "
+    "SELECT [System.Id], [System.Title], [System.WorkItemType], [System.State], "
+    "[System.Tags], [Microsoft.VSTS.Common.StackRank], [System.AreaPath] "
     "FROM workitems "
-    "WHERE [System.WorkItemType] = 'Feature' "
+    "WHERE [System.WorkItemType] IN ('Feature', 'Exception') "
     "AND [System.State] <> 'Closed' AND [System.State] <> 'Removed' "
     "AND [System.AreaPath] UNDER '{area}' "
     "ORDER BY [Microsoft.VSTS.Common.StackRank]"
@@ -286,7 +286,10 @@ WIQL_CHECK20_BACKLOG_ORDER = (
 STALE_REMAINING_DAYS = 30
 
 # Check 20 backlog-order tiers (lower tier = belongs higher / at top of backlog).
-# Exception tier (0) is detected via a lowercase substring match on System.Tags.
+# The exception tier (0) is detected primarily by work-item TYPE == 'Exception'
+# (the Features backlog board interleaves Exception items with Features), with a
+# System.Tags substring match kept as a fallback signal.
+EXCEPTION_TYPES = ["Exception"]
 EXCEPTION_TAGS = ["exception"]
 TIER_BY_STATE = {"RollingOut": 1, "Active": 2, "Committed": 3}
 
@@ -640,11 +643,17 @@ def current_month_node(current_iter):
     return path
 
 
-def _tier_for(state, tags):
-    # type: (str, Optional[str]) -> int
+def _tier_for(state, tags, wtype=None):
+    # type: (str, Optional[str], Optional[str]) -> int
     """Madhu backlog-order tier (2026-06-29 EM Sync): exception=0,
     RollingOut=1, Active=2, Committed=3, everything else (Proposed/New/
-    backlog)=4. Lower tier should sit higher in the backlog."""
+    backlog)=4. Lower tier should sit higher in the backlog.
+
+    Exceptions are detected primarily by work-item TYPE == 'Exception'
+    (how the Features backlog board surfaces them), with a System.Tags
+    substring match kept as a fallback."""
+    if wtype and wtype in EXCEPTION_TYPES:
+        return 0
     tl = (tags or "").lower()
     for t in EXCEPTION_TAGS:
         if t and t in tl:
@@ -667,9 +676,10 @@ def detect_order_inversions(rows):
             "id": r.get("id"),
             "title": r.get("title", ""),
             "state": r.get("state", ""),
+            "type": r.get("type", ""),
             "owner": r.get("owner", ""),
             "stackRank": r.get("stackRank"),
-            "tier": _tier_for(r.get("state", ""), r.get("tags", "")),
+            "tier": _tier_for(r.get("state", ""), r.get("tags", ""), r.get("type")),
         })
     enriched.sort(key=lambda r: (r["stackRank"] is None,
                                  r["stackRank"] if r["stackRank"] is not None else 0))
@@ -1759,8 +1769,8 @@ def check20(token, allowed_areas):
         if not ids:
             continue
         wis = get_work_items_batch(ids, token, fields=[
-            "System.Id", "System.Title", "System.State", "System.Tags",
-            "System.AssignedTo", "System.AreaPath",
+            "System.Id", "System.Title", "System.WorkItemType", "System.State",
+            "System.Tags", "System.AssignedTo", "System.AreaPath",
             "Microsoft.VSTS.Common.StackRank",
         ])
         rows = []
@@ -1773,6 +1783,7 @@ def check20(token, allowed_areas):
                 "id": wi["id"],
                 "title": f.get("System.Title", ""),
                 "state": f.get("System.State", ""),
+                "type": f.get("System.WorkItemType", ""),
                 "tags": f.get("System.Tags", ""),
                 "owner": get_owner_name(wi),
                 "stackRank": f.get("Microsoft.VSTS.Common.StackRank"),
