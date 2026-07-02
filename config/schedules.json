@@ -179,6 +179,12 @@
       "job": "scan-mentions-and-draft",
       "cron": "0 18 * * 1-5",
       "description": "Teams mention scan at 6pm weekdays"
+    },
+    {
+      "agent": "pEmailer",
+      "job": "MSFT-email",
+      "cron": "0 17 * * 5",
+      "description": "MSFT (Outlook/M365) inbox triage via WorkIQ MCP every Friday at 5pm"
     }
   ]
 }
