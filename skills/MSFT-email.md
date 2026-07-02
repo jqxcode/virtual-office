@@ -47,10 +47,10 @@ Resolve ids **by name at runtime** (folders are stable but ids change if recreat
 ### Phase 2 — Delete noise → Deleted Items (recoverable)
 `workiq-delete_entity /me/messages/{id}` for:
 - Office 365 / SharePoint notifications, Power BI, Lockbox
-- Meeting **cancellations** and **forwards**
+- **Meeting invites, cancellations, and forwards** — delete all meeting-schedule mail. The meeting is already on the calendar, so the email is redundant clutter.
 - Automatic replies (`Automatic reply:` / `Out of Office:`)
 - Azure User Access Review; Event Polls
-> Meeting **invites** are **not** auto-deleted — show them in the report and delete only after the user reviews.
+> Runs **unattended — no review gate**; meeting invites are deleted outright (recoverable in Deleted Items). If you ever want to eyeball invites first, generate the Phase 6 report *before* Phase 2.
 
 ### Phase 3 — Block → Junk
 `workiq-do_action /me/mailFolders/inbox/messages/{id}/move` with `jsonBody={"destinationId":"junkemail"}`:
