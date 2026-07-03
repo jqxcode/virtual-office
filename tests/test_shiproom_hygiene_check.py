@@ -273,6 +273,45 @@ class TestCurrentMonthNode(unittest.TestCase):
         self.assertEqual(shc.current_month_node(None), "")
 
 
+class TestPickMonthNode(unittest.TestCase):
+    """Date-driven current-month node (fixes the H1->H2 boundary false-positive
+    where Sprint 209 is still filed under H1\\Q2\\June but runs into July)."""
+
+    def _nodes(self):
+        d = date
+        return [
+            {"path": r"MSTeams\2026\H1\Q2\June", "start": d(2026, 6, 1), "finish": d(2026, 6, 30)},
+            {"path": r"MSTeams\2026\H2\Q3\July", "start": d(2026, 7, 1), "finish": d(2026, 7, 31)},
+            {"path": r"MSTeams\2026\H2\Q3\August", "start": d(2026, 8, 1), "finish": d(2026, 8, 31)},
+            # non-month noise that must be ignored:
+            {"path": r"MSTeams\2026\H2\Q3", "start": d(2026, 7, 1), "finish": d(2026, 9, 30)},
+            {"path": r"MSTeams\GEAR\CY26\H2\Jun29-Jul10", "start": d(2026, 6, 29), "finish": d(2026, 7, 10)},
+            {"path": r"MSTeams\2026\H2\Q3\July\Sprint 210 6-July to 19-July", "start": d(2026, 7, 6), "finish": d(2026, 7, 19)},
+        ]
+
+    def test_picks_july_on_boundary_day(self):
+        # 2026-07-02: sprint-parent heuristic would say June; date-driven must say July.
+        self.assertEqual(shc.pick_month_node(self._nodes(), date(2026, 7, 2)), r"MSTeams\2026\H2\Q3\July")
+
+    def test_picks_june_late_june(self):
+        self.assertEqual(shc.pick_month_node(self._nodes(), date(2026, 6, 25)), r"MSTeams\2026\H1\Q2\June")
+
+    def test_ignores_quarter_gear_and_sprint(self):
+        node = shc.pick_month_node(self._nodes(), date(2026, 7, 2))
+        self.assertNotIn("Q3\\Sprint", node or "")
+        self.assertNotIn("GEAR", node or "")
+        self.assertTrue(node.count("\\") == 4)  # MSTeams\year\H\Q\Month
+
+    def test_none_when_no_match(self):
+        self.assertIsNone(shc.pick_month_node(self._nodes(), date(2027, 1, 1)))
+
+    def test_path_transform(self):
+        self.assertEqual(
+            shc._node_path_to_wiql(r"\MSTeams\Iteration\2026\H2\Q3\July"),
+            r"MSTeams\2026\H2\Q3\July",
+        )
+
+
 class TestTierFor(unittest.TestCase):
     def test_state_tiers(self):
         self.assertEqual(shc._tier_for("RollingOut", ""), 1)

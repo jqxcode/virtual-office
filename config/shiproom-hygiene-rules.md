@@ -495,7 +495,7 @@ RETURN GROUPBY(_filtered, TestResults[TESTNAME],
 
 **State tokens**: Feature deployment states are `Active`, `Committed`, `Proposed`, `RollingOut`, `Closed`. The rolling-out token is `RollingOut` (NO space).
 
-**Current-month node**: Derive `current_month_node` as the parent of the current sprint path by stripping the trailing `\Sprint NNN ...` segment. Example current-month iteration node: `MSTeams\2026\H1\Q2\June`. Do not hard-code month folder spelling because it drifts across years (for example, `Jun` vs `June`).
+**Current-month node**: Resolve **date-driven** — pick the primary `MSTeams\<year>\H<1|2>\Q<1-4>\<Month>` iteration node whose `[startDate, finishDate]` range contains today (via the classification-nodes tree). Example on 2026-07-02: `MSTeams\2026\H2\Q3\July`. This is correct across the H1→H2 boundary. **Do NOT** use "parent of the current sprint path" as the primary source: at a boundary the current sprint can still be filed under the previous month's node (e.g. Sprint 209 "22-June to 5-July" is under `H1\Q2\June` yet runs into July), which falsely flags items that are genuinely in the current (July) month. The sprint-parent heuristic is kept only as a fallback if the iteration tree can't be read.
 
 1. WIQL per allowed-area — run ONCE per area. The query MUST literally contain `[System.AreaPath] UNDER '<allowed-area>'`:
    ```

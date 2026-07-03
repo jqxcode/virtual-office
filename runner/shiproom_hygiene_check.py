@@ -37,6 +37,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import shutil
 import ssl
 import subprocess
@@ -633,14 +634,89 @@ def _parse_iter_date(s):
 
 def current_month_node(current_iter):
     # type: (Dict[str, Any]) -> str
-    """Current-month iteration node = parent of the current sprint path
+    """FALLBACK current-month node = parent of the current sprint path
     (strip a trailing '\\Sprint NNN ...' segment). Robust to month-folder
-    spelling drift across years (e.g. 'Jun' vs 'June')."""
+    spelling drift, but WRONG at a semester boundary when the current sprint
+    is still filed under the previous month's node (e.g. Sprint 209 filed
+    under H1\\Q2\\June but running into July). Prefer resolve_current_month_node."""
     path = (current_iter or {}).get("path", "") or ""
     idx = path.find("\\Sprint")
     if idx != -1:
         return path[:idx]
     return path
+
+
+# Primary month node pattern: MSTeams\<year>\H<1|2>\Q<1-4>\<MonthName>
+# (excludes GEAR/zz_Archive/other roots and Sprint leaves).
+_MONTH_NODE_RE = re.compile(r"^MSTeams\\\d{4}\\H[12]\\Q[1-4]\\[A-Za-z]+$")
+
+
+def _node_path_to_wiql(path):
+    # type: (str) -> str
+    """Convert a classification-node path (\\MSTeams\\Iteration\\2026\\H2\\Q3\\July)
+    to WIQL iteration form (MSTeams\\2026\\H2\\Q3\\July)."""
+    p = (path or "").lstrip("\\")
+    return p.replace("\\Iteration\\", "\\", 1)
+
+
+def pick_month_node(nodes, today):
+    # type: (List[Dict[str, Any]], date) -> Optional[str]
+    """Pure: from a flat list of {path (WIQL form), start (date), finish (date)},
+    return the primary month node whose [start, finish] contains `today`.
+    Date-driven so it is correct across H1->H2 boundaries. Deepest/most-specific
+    match wins if several qualify."""
+    best = None
+    for n in nodes:
+        path = n.get("path", "")
+        s = n.get("start"); f = n.get("finish")
+        if not s or not f or not _MONTH_NODE_RE.match(path):
+            continue
+        if s <= today <= f:
+            if best is None or len(path) > len(best):
+                best = path
+    return best
+
+
+def _iteration_month_nodes(token):
+    # type: (str) -> List[Dict[str, Any]]
+    """Fetch the iteration classification tree and flatten to month-node
+    candidates: {path (WIQL form), start, finish}."""
+    resp = ado_request(
+        "{0}/_apis/wit/classificationnodes/iterations?$depth=6&api-version=7.1".format(PROJECT),
+        token,
+    )
+    out = []  # type: List[Dict[str, Any]]
+    if not resp:
+        return out
+
+    def walk(node):
+        attrs = node.get("attributes") or {}
+        wpath = _node_path_to_wiql(node.get("path", ""))
+        if _MONTH_NODE_RE.match(wpath):
+            out.append({
+                "path": wpath,
+                "start": _parse_iter_date(attrs.get("startDate")),
+                "finish": _parse_iter_date(attrs.get("finishDate")),
+            })
+        for c in node.get("children", []) or []:
+            walk(c)
+
+    walk(resp)
+    return out
+
+
+def resolve_current_month_node(token, today, fallback_iter):
+    # type: (str, date, Dict[str, Any]) -> str
+    """Date-driven current-month node (correct across semester boundaries).
+    Finds the primary MSTeams\\year\\H\\Q\\Month node whose date range contains
+    today; falls back to the sprint-parent heuristic if the tree can't be read."""
+    try:
+        node = pick_month_node(_iteration_month_nodes(token), today)
+        if node:
+            return node
+    except Exception as e:
+        print("  resolve_current_month_node fallback: {0}".format(e), file=sys.stderr)
+    return current_month_node(fallback_iter)
 
 
 def _tier_for(state, tags, wtype=None):
@@ -1603,11 +1679,11 @@ def check14(token, pbi_token, allowed_areas, now):
 # ---------------------------------------------------------------------------
 
 
-def check15(token, allowed_areas, mc, dry_run, current_iter):
-    # type: (str, List[str], MutationController, bool, Dict[str, Any]) -> Dict[str, Any]
+def check15(token, allowed_areas, mc, dry_run, current_iter, today):
+    # type: (str, List[str], MutationController, bool, Dict[str, Any], date) -> Dict[str, Any]
     print("Check 15: Rolling-out/Active Features not in current month (Madhu req 6/29)")
     items = []
-    month = current_month_node(current_iter)
+    month = resolve_current_month_node(token, today, current_iter)
     if not month:
         print("  check15: no current-month node resolved; skipping", file=sys.stderr)
         return {"items": [], "count": 0}
@@ -2574,7 +2650,7 @@ def main(argv=None):
     if should_run("14"):
         results["check14"] = check14(ado_token, pbi_token, allowed_areas, start_dt)
     if should_run("15"):
-        results["check15"] = check15(ado_token, allowed_areas, mc, args.dry_run, current_iter)
+        results["check15"] = check15(ado_token, allowed_areas, mc, args.dry_run, current_iter, today)
     if should_run("17"):
         results["check17"] = check17(ado_token, allowed_areas, args.dry_run)
     if should_run("18"):
