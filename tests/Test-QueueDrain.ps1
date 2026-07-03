@@ -81,13 +81,14 @@ function Invoke-Runner {
 
     $testConstants = Join-Path $Root "runner/constants.ps1"
     $runnerContent = $runnerContent -replace '\. \(Join-Path \$PSScriptRoot "constants\.ps1"\)', ". '$testConstants'"
-    $runnerContent = $runnerContent -replace '\$output = & claude --agent \$agentFile \$prompt 2>&1 \| Out-String', '$output = "mock output"'
-    $runnerContent = $runnerContent -replace '\$output = & claude \$prompt 2>&1 \| Out-String', '$output = "mock output"'
+    # Mock the agent CLI via the runner's VO_CLI_MOCK_OUTPUT test seam (inherited by the child pwsh).
+    $env:VO_CLI_MOCK_OUTPUT = "mock output"
 
     $testRunner = Join-Path $Root "runner/test-runner.ps1"
     Set-Content -Path $testRunner -Value $runnerContent -Encoding UTF8
 
     $result = pwsh -NoProfile -File $testRunner -Agent $AgentName -Job $JobName 2>&1 | Out-String
+    $env:VO_CLI_MOCK_OUTPUT = $null
     return @{
         Output   = $result
         ExitCode = $LASTEXITCODE

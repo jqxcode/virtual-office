@@ -802,13 +802,13 @@ while ($keepRunning) {
     # Step 7: Write audit/event/dashboard for start.
     # Include the runner's own PID on the started event so pHangScout / TTL
     # enforcement can correlate run_id -> process even if the lock file has
-    # already been cleared. The claude child PID is recorded separately on
+    # already been cleared. The agent (agency.exe) child PID is recorded separately on
     # the lock file once the child is spawned in step 8.
     Write-AuditEntry -Action "started" -AgentName $Agent -JobName $Job -RunId $runId -Details @{ runner_pid = $PID }
     Write-Event -AgentName $Agent -JobName $Job -Event "started" -Details @{ run_id = $runId; runner_pid = $PID }
     Update-Dashboard -AgentName $Agent -JobName $Job -Status "running" -Details @{ run_id = $runId; runner_pid = $PID; started = (Get-Date -Format "o") }
 
-    # Step 8: Invoke claude
+    # Step 8: Invoke the agent via agc (agency.exe copilot)
     $agentDef = $agentsConfig[$Agent]
     $agentFile = $null
     if ($agentDef.ContainsKey("agentFile")) {
@@ -825,83 +825,115 @@ while ($keepRunning) {
     $costData = $null
     $runStart = Get-Date
     try {
-        # Build command arguments (--output-format json for cost/token tracking)
-        $claudeArgs = @()
+        # Resolve the Copilot agent NAME from the configured agentFile basename.
+        # agents.json still points at legacy ~/.claude/agents/<name>.md paths, but the
+        # Copilot CLI resolves agents by NAME from ~/.copilot/agents/<name>.agent.md.
+        $agentName2 = $null
         if ($agentFile) {
-            # An agentFile is configured for this agent. The file MUST exist --
-            # if it does not, fail loud instead of silently running a bare
-            # prompt with no persona/scope (see incident: missing agent file
-            # silently degraded the run).
-            if (-not (Test-Path $agentFile)) {
-                Write-AuditEntry -Action "failed" -AgentName $Agent -JobName $Job -RunId $runId -Details @{ reason = "agent_file_not_found"; agent_file = $agentFile }
-                Write-Event -AgentName $Agent -JobName $Job -Event "failed" -Details @{ run_id = $runId; reason = "agent_file_not_found"; agent_file = $agentFile }
-                throw "agentFile configured for agent '$Agent' but not found: $agentFile"
+            $agentName2 = [System.IO.Path]::GetFileNameWithoutExtension($agentFile)  # e.g. poster.md -> poster
+            $copilotAgentFile = Join-Path $HOME ".copilot/agents/$agentName2.agent.md"
+            # The agent file MUST exist -- if it does not, fail loud instead of silently
+            # running a bare prompt with no persona/scope (see incident: missing agent
+            # file silently degraded the run).
+            if (-not (Test-Path $copilotAgentFile)) {
+                Write-AuditEntry -Action "failed" -AgentName $Agent -JobName $Job -RunId $runId -Details @{ reason = "agent_file_not_found"; agent = $agentName2; agent_file = $copilotAgentFile }
+                Write-Event -AgentName $Agent -JobName $Job -Event "failed" -Details @{ run_id = $runId; reason = "agent_file_not_found"; agent = $agentName2; agent_file = $copilotAgentFile }
+                throw "Copilot agent '$agentName2' configured for '$Agent' but not found: $copilotAgentFile"
             }
-            $claudeArgs = @("--output-format", "json", "--agent", $agentFile, $prompt)
-        } else {
-            # No agentFile configured at all -- bare prompt invocation is expected.
-            $claudeArgs = @("--output-format", "json", $prompt)
         }
 
-        # Start claude process and capture PID
-        $pinfo = New-Object System.Diagnostics.ProcessStartInfo
-        $pinfo.FileName = "claude"
-        $pinfo.Arguments = ($claudeArgs | ForEach-Object { if ($_ -match '\s') { "`"$_`"" } else { $_ } }) -join " "
-        $pinfo.RedirectStandardOutput = $true
-        $pinfo.RedirectStandardError = $true
-        $pinfo.UseShellExecute = $false
-        $pinfo.CreateNoWindow = $true
+        $rawOutput = ""
+        $errOutput = ""
+        if ($env:VO_CLI_MOCK_OUTPUT) {
+            # Test seam: bypass the real agent CLI (used by Test-*.ps1). Set
+            # VO_CLI_MOCK_OUTPUT (and optionally VO_CLI_MOCK_EXIT) to simulate a run.
+            $rawOutput = $env:VO_CLI_MOCK_OUTPUT
+            $exitCode  = if ($env:VO_CLI_MOCK_EXIT) { [int]$env:VO_CLI_MOCK_EXIT } else { 0 }
+            $lockContent = @{ ts = $lockTs; job = $Job; pid = $PID; run_id = $runId } | ConvertTo-Json -Compress
+            Write-AtomicFile -Path $lockFile -Content $lockContent
+        } else {
+            # Invoke the agent via 'agc' (agency.exe copilot). Mirrors the user's profile agc:
+            #   agency.exe copilot -- --model claude-opus-4.8 --effort max --context long_context <args>
+            # -p runs non-interactively; --allow-all lets the agent use tools without prompts;
+            # --output-format json emits JSONL (one event per line) which we parse below.
+            $copilotArgs = @("copilot", "--", "--model", "claude-opus-4.8", "--effort", "max", "--context", "long_context", "--output-format", "json", "--allow-all")
+            if ($agentName2) { $copilotArgs += @("--agent", $agentName2) }
+            $copilotArgs += @("-p", $prompt)
 
-        $proc = [System.Diagnostics.Process]::Start($pinfo)
+            # Start the agency/copilot process and capture PID
+            $pinfo = New-Object System.Diagnostics.ProcessStartInfo
+            $pinfo.FileName = "agency.exe"
+            $pinfo.Arguments = ($copilotArgs | ForEach-Object { if ($_ -match '\s') { "`"$_`"" } else { $_ } }) -join " "
+            $pinfo.RedirectStandardOutput = $true
+            $pinfo.RedirectStandardError = $true
+            $pinfo.UseShellExecute = $false
+            $pinfo.CreateNoWindow = $true
 
-        # Write lock atomically with PID -- single write, no PID-less window
-        $lockContent = @{ ts = $lockTs; job = $Job; pid = $proc.Id; run_id = $runId } | ConvertTo-Json -Compress
-        Write-AtomicFile -Path $lockFile -Content $lockContent
+            $proc = [System.Diagnostics.Process]::Start($pinfo)
 
-        $output = $proc.StandardOutput.ReadToEnd()
-        $errOutput = $proc.StandardError.ReadToEnd()
-        $proc.WaitForExit()
-        $exitCode = $proc.ExitCode
+            # Write lock atomically with PID -- single write, no PID-less window
+            $lockContent = @{ ts = $lockTs; job = $Job; pid = $proc.Id; run_id = $runId } | ConvertTo-Json -Compress
+            Write-AtomicFile -Path $lockFile -Content $lockContent
 
-        # Parse JSON output to extract result text and cost data
-        $rawOutput = $output
+            $rawOutput = $proc.StandardOutput.ReadToEnd()
+            $errOutput = $proc.StandardError.ReadToEnd()
+            $proc.WaitForExit()
+            $exitCode  = $proc.ExitCode
+        }
+
+        # Parse Copilot CLI JSONL output: collect assistant message text + the final result event.
+        $output = $rawOutput
         try {
-            $jsonResult = $rawOutput | ConvertFrom-Json -AsHashtable
-            if ($jsonResult -and $jsonResult.ContainsKey("result")) {
-                $output = [string]$jsonResult["result"]
+            $assistantParts = New-Object System.Collections.Generic.List[string]
+            $outputTokensSum = 0
+            $modelName = "claude-opus-4.8"
+            $resultEvent = $null
+            foreach ($line in ($rawOutput -split "`n")) {
+                $t = $line.Trim()
+                if ($t.Length -eq 0 -or $t[0] -ne '{') { continue }
+                $obj = $null
+                try { $obj = $t | ConvertFrom-Json -AsHashtable } catch { continue }
+                if (-not ($obj -is [hashtable]) -or -not $obj.ContainsKey("type")) { continue }
+                if ($obj["type"] -eq "assistant.message") {
+                    $d = $obj["data"]
+                    if ($d -and $d.ContainsKey("content") -and $d["content"]) { $assistantParts.Add([string]$d["content"]) }
+                    if ($d -and $d.ContainsKey("outputTokens")) { $outputTokensSum += [int]$d["outputTokens"] }
+                    if ($d -and $d.ContainsKey("model") -and $d["model"]) { $modelName = [string]$d["model"] }
+                } elseif ($obj["type"] -eq "result") {
+                    $resultEvent = $obj
+                }
             }
-            # Extract cost/usage data
+            if ($assistantParts.Count -gt 0) { $output = ($assistantParts -join "`n`n") }
+            # Extract cost/usage from the final result event (Copilot schema differs from Claude's).
             $costData = @{
-                costUSD = if ($jsonResult.ContainsKey("total_cost_usd")) { $jsonResult["total_cost_usd"] } else { 0 }
-                durationMs = if ($jsonResult.ContainsKey("duration_ms")) { $jsonResult["duration_ms"] } else { 0 }
-                durationApiMs = if ($jsonResult.ContainsKey("duration_api_ms")) { $jsonResult["duration_api_ms"] } else { 0 }
-                numTurns = if ($jsonResult.ContainsKey("num_turns")) { $jsonResult["num_turns"] } else { 0 }
-                sessionId = if ($jsonResult.ContainsKey("session_id")) { $jsonResult["session_id"] } else { "" }
+                costUSD         = 0    # Copilot CLI does not report a USD cost
+                model           = $modelName
+                outputTokens    = $outputTokensSum
+                inputTokens     = 0
+                numTurns        = 0
+                sessionId       = ""
+                durationMs      = 0
+                durationApiMs   = 0
+                premiumRequests = 0
             }
-            if ($jsonResult.ContainsKey("usage")) {
-                $u = $jsonResult["usage"]
-                $costData["inputTokens"] = if ($u.ContainsKey("input_tokens")) { $u["input_tokens"] } else { 0 }
-                $costData["outputTokens"] = if ($u.ContainsKey("output_tokens")) { $u["output_tokens"] } else { 0 }
-                $costData["cacheCreationTokens"] = if ($u.ContainsKey("cache_creation_input_tokens")) { $u["cache_creation_input_tokens"] } else { 0 }
-                $costData["cacheReadTokens"] = if ($u.ContainsKey("cache_read_input_tokens")) { $u["cache_read_input_tokens"] } else { 0 }
-            }
-            if ($jsonResult.ContainsKey("modelUsage")) {
-                $models = $jsonResult["modelUsage"]
-                $modelName = ($models.Keys | Select-Object -First 1)
-                if ($modelName) {
-                    $m = $models[$modelName]
-                    $costData["model"] = $modelName
-                    $costData["contextWindow"] = if ($m.ContainsKey("contextWindow")) { $m["contextWindow"] } else { 0 }
-                    # Context usage = input + cache_creation + output (cache_read is FREE - doesn't consume context)
-                    $totalTokens = $costData["inputTokens"] + $costData["cacheCreationTokens"] + $costData["outputTokens"]
-                    if ($costData["contextWindow"] -gt 0) {
-                        $costData["contextUsedPct"] = [math]::Round(($totalTokens / $costData["contextWindow"]) * 100, 1)
+            if ($resultEvent) {
+                if ($resultEvent.ContainsKey("sessionId")) { $costData["sessionId"] = [string]$resultEvent["sessionId"] }
+                if ($resultEvent.ContainsKey("exitCode"))  { $exitCode = [int]$resultEvent["exitCode"] }
+                if ($resultEvent.ContainsKey("usage")) {
+                    $u = $resultEvent["usage"]
+                    if ($u.ContainsKey("premiumRequests"))    { $costData["premiumRequests"] = $u["premiumRequests"] }
+                    if ($u.ContainsKey("sessionDurationMs"))  { $costData["durationMs"]       = $u["sessionDurationMs"] }
+                    if ($u.ContainsKey("totalApiDurationMs")) { $costData["durationApiMs"]    = $u["totalApiDurationMs"] }
+                    if ($u.ContainsKey("codeChanges")) {
+                        $cc = $u["codeChanges"]
+                        if ($cc.ContainsKey("linesAdded"))   { $costData["linesAdded"]   = $cc["linesAdded"] }
+                        if ($cc.ContainsKey("linesRemoved")) { $costData["linesRemoved"] = $cc["linesRemoved"] }
                     }
                 }
             }
         } catch {
-            # JSON parsing failed -- use raw output as-is (e.g. CLI error before JSON)
-            Write-Host "Note: Could not parse JSON output, using raw text. Error: $_"
+            # JSON parsing failed -- use raw output as-is (e.g. CLI error before any JSON)
+            Write-Host "Note: Could not parse Copilot JSON output, using raw text. Error: $_"
         }
 
         if ($errOutput) {
@@ -923,7 +955,7 @@ while ($keepRunning) {
         $relLogPath = "output/$Agent/$Job-$(Get-Date -Format 'yyyyMMdd-HHmmss').md"
         Write-ErrorEntry -Agent $Agent -Job $Job -RunId $runId `
             -Level $errorLevel `
-            -Summary "Claude CLI exited with code $exitCode" `
+            -Summary "Agent CLI (copilot) exited with code $exitCode" `
             -Detail $output `
             -LogPath $relLogPath `
             -ExitCode $exitCode `

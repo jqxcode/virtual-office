@@ -224,22 +224,21 @@ function Invoke-Runner {
     $testConstants = Join-Path $Root "runner/constants.ps1"
     $runnerContent = $runnerContent -replace '\. \(Join-Path \$PSScriptRoot "constants\.ps1"\)', ". '$testConstants'"
 
-    # Replace claude invocation with a mock that returns specific exit code
+    # Mock the agent CLI via the runner's VO_CLI_MOCK_OUTPUT / VO_CLI_MOCK_EXIT test seam.
     if ($MockExitCode -eq 0) {
-        $runnerContent = $runnerContent -replace '\$output = & claude --agent \$agentFile \$prompt 2>&1 \| Out-String', '$output = "mock agent output with file"'
-        $runnerContent = $runnerContent -replace '\$output = & claude \$prompt 2>&1 \| Out-String', '$output = "mock agent output"'
+        $env:VO_CLI_MOCK_OUTPUT = "mock agent output"
+        $env:VO_CLI_MOCK_EXIT = $null
     } else {
-        # Replace the entire try/catch block's claude calls to simulate failure
-        $runnerContent = $runnerContent -replace '\$output = & claude --agent \$agentFile \$prompt 2>&1 \| Out-String', "`$output = 'ERROR: mock failure'; `$exitCode = $MockExitCode"
-        $runnerContent = $runnerContent -replace '\$output = & claude \$prompt 2>&1 \| Out-String', "`$output = 'ERROR: mock failure'; `$exitCode = $MockExitCode"
-        # Also prevent LASTEXITCODE from overwriting our mock exit code
-        $runnerContent = $runnerContent -replace '\$exitCode = \$LASTEXITCODE', '# $exitCode already set by mock'
+        $env:VO_CLI_MOCK_OUTPUT = "ERROR: mock failure"
+        $env:VO_CLI_MOCK_EXIT = "$MockExitCode"
     }
 
     $testRunner = Join-Path $Root "runner/test-runner.ps1"
     Set-Content -Path $testRunner -Value $runnerContent -Encoding UTF8
 
     $result = pwsh -NoProfile -File $testRunner -Agent $AgentName -Job $JobName 2>&1 | Out-String
+    $env:VO_CLI_MOCK_OUTPUT = $null
+    $env:VO_CLI_MOCK_EXIT = $null
     return @{
         Output   = $result
         ExitCode = $LASTEXITCODE

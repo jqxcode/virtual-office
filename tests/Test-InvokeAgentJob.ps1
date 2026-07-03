@@ -206,7 +206,7 @@ function Invoke-Runner {
         [string]$AgentName = "test-agent",
         [string]$JobName = "test-job"
     )
-    # Copy the real runner, but replace the claude invocation with a mock
+    # Copy the real runner, but mock the agent CLI via the VO_CLI_MOCK_OUTPUT env seam
     $realRunner = Join-Path $PSScriptRoot ".." "runner" "Invoke-AgentJob.ps1"
     $realRunner = (Resolve-Path $realRunner).Path
     $runnerContent = Get-Content -Path $realRunner -Raw
@@ -215,14 +215,14 @@ function Invoke-Runner {
     $testConstants = Join-Path $Root "runner/constants.ps1"
     $runnerContent = $runnerContent -replace '\. \(Join-Path \$PSScriptRoot "constants\.ps1"\)', ". '$testConstants'"
 
-    # Replace claude invocation with a mock that just writes output
-    $runnerContent = $runnerContent -replace '\$output = & claude --agent \$agentFile \$prompt 2>&1 \| Out-String', '$output = "mock agent output with file"'
-    $runnerContent = $runnerContent -replace '\$output = & claude \$prompt 2>&1 \| Out-String', '$output = "mock agent output"'
+    # Mock the agent CLI via the runner's VO_CLI_MOCK_OUTPUT test seam (inherited by the child pwsh).
+    $env:VO_CLI_MOCK_OUTPUT = "mock agent output"
 
     $testRunner = Join-Path $Root "runner/test-runner.ps1"
     Set-Content -Path $testRunner -Value $runnerContent -Encoding UTF8
 
     $result = pwsh -NoProfile -File $testRunner -Agent $AgentName -Job $JobName 2>&1 | Out-String
+    $env:VO_CLI_MOCK_OUTPUT = $null
     return @{
         Output   = $result
         ExitCode = $LASTEXITCODE

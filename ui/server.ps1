@@ -601,13 +601,12 @@ try {
                         if ($procId -gt 0) {
                             Stop-Process -Id $procId -Force -ErrorAction SilentlyContinue
                         }
-                        # Also kill any claude processes in the tree
-                        try {
-                            $claudeProcs = Get-Process -Name "claude" -ErrorAction SilentlyContinue
-                            if ($claudeProcs) {
-                                $claudeProcs | ForEach-Object { Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue }
-                            }
-                        } catch {}
+                        # Also kill the process TREE (agency.exe + copilot/node children) so no
+                        # descendants are orphaned. taskkill /T is scoped to THIS job's PID, so
+                        # concurrent agent runs are unaffected.
+                        if ($procId -gt 0) {
+                            try { & taskkill /F /T /PID $procId 2>$null | Out-Null } catch {}
+                        }
                         # Remove lock file
                         Remove-Item -Path $lockFile -Force -ErrorAction SilentlyContinue
                         # Update dashboard.json
