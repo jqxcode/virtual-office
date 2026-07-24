@@ -104,6 +104,14 @@
       "description": "Microsoft management agent for Connect performance reviews, team feedback, semester planning, and EM operational tasks",
       "staleLockTimeoutMinutes": 120,
       "group": "Work Agents"
+    },
+    "pAssistant": {
+      "displayName": "pAssistant",
+      "icon": "",
+      "agentFile": "~/.claude/agents/assistant.md",
+      "description": "Personal assistant - real-time flight price lookups, cheapest-date matrices, and airline/cabin/city comparisons via the flight-prices skill (headless Google Flights, zero-key). Manual trigger.",
+      "staleLockTimeoutMinutes": 60,
+      "group": "Personal Agents"
     }
   }
 }

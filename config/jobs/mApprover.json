@@ -12,6 +12,12 @@
       "maxRuns": 0,
       "saveOutput": true,
       "description": "Approve all pending FFv2 flights from directs (daily 9:33pm), or targeted by person/ID/URL"
+    },
+    "approve-PR": {
+      "prompt": "Approve one or more Azure DevOps pull requests. Input (PR IDs and/or a PR URL, often pasted as 'Pull Request <id>: Title' lines) is here -- may be empty: [{{EXTRA_ARGS}}]. Follow the 'approve-PR' job in your agent instructions: (1) parse every unique 6-8 digit PR ID from the input and de-duplicate (the same ID can appear twice under different titles); (2) parse the org from any PR URL (https://<org>.visualstudio.com/...) or default to https://domoreexp.visualstudio.com/; (3) verify the azure-devops CLI extension and confirm auth with `az repos pr show --id <firstId> --org <orgUrl>` -- run `az login` if it fails, and flag any draft PR (do not approve drafts unless explicitly asked); (4) cast the approve vote on each unique ID with `az repos pr set-vote --id <id> --vote approve --org <orgUrl>`; (5) verify a sample registered vote 10 and report a per-PR APPROVED/FAILED table plus an 'Approved: N / Total' summary. You MUST actually run the az commands now via powershell -- do not assume a prior turn did it; there is no prior turn. Only approve the PRs listed; never widen scope; report exact IDs and error text for any failure.",
+      "maxRuns": 0,
+      "saveOutput": true,
+      "description": "Approve one or more Azure DevOps pull requests by ID or URL (on demand)"
     }
   }
 }

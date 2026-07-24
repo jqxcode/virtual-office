@@ -2,11 +2,19 @@
   "jobs": {
     "semester-planning": {
       "displayName": "Semester Planning",
-      "prompt": "Read ${LOCAL_SKILLS}/semester-planning.md for full instructions. Automate ADO OKR hierarchy setup for a new semester transition. This includes: (1) duplicating CMD Fundamentals Objectives under the target area path, (2) re-parenting existing KRs using REST API relation swaps, (3) updating query filters to include new work item types, (4) updating dashboard widget queries to the new iteration path. Follow all gotchas documented in the skill (relation swap for re-parenting, owner-sync-function mitigation, dashboard team context). Save summary to OneDrive semester planning folder.",
+      "prompt": "Read ${LOCAL_SKILLS}/semester-planning.md for full instructions. Execute the requested ADO semester planning task. This can include OKR hierarchy setup for a semester transition, query/dashboard iteration updates, planning dashboard review, and requested dashboard action-item fixes. Fetch linked dashboard/wiki/source pages live before applying process, Business Value, field-value, or capacity rules. User request: {{EXTRA_ARGS}}. Follow documented gotchas including relation swap for re-parenting, owner-sync-function mitigation, dashboard team context, and live-source validation. Save summary to OneDrive semester planning folder when the task creates or changes planning artifacts.",
       "requiresInput": true,
-      "inputPrompt": "What semester transition? (e.g., 'H1 to H2 for Meeting Join', 'update Fun Execution dashboard from H1 to H2')",
+      "inputPrompt": "What semester planning task? (e.g., 'H1 to H2 for Meeting Join', 'update Fun Execution dashboard from H1 to H2', 'review CY26H2 Planning dashboard')",
       "schedule": "manual",
-      "description": "Set up ADO OKR hierarchy for new semester: duplicate Objectives, re-parent KRs, update queries and dashboards"
+      "description": "Set up ADO OKR hierarchy, update planning queries/dashboards, review planning action tiles, and apply requested dashboard fixes"
+    },
+    "oneoff-KR-to-excel-semester-goal": {
+      "displayName": "Semester Goal: KR -> Planning Excel",
+      "prompt": "Read ${REPO_PERSONAL}/virtual-office/skills/oneoff-KR-to-excel-semester-goal.md for full instructions. Confirm/adjust the EM's Tier 0 reliability & latency semester targets in a shared planning Excel workbook by reconciling each scenario against the team ADO KR query, then write the needed changes DIRECTLY into the live workbook via Excel for the web co-authoring. NEVER use a Graph/SP REST content overwrite (the file is co-authored/locked and an overwrite would wipe other EMs' edits and drop pivots/charts). Inputs in {{EXTRA_ARGS}}: worksheet share link, ADO KR query URL/GUID, EM owner name (auto-detect via Graph /me if omitted), area scope (e.g. Meeting Join). Only touch the EM's area rows; ignore everything else. Reliability sheet col F (FY27 H1): for YELLOW cells below the existing FY26H2 target or blank, set to the existing-target/KR value (the 'lower line' -- never inflate above target, never regress); leave yellow cells already at target unchanged. Latency sheet col L (Funded FY27): keep KTLO unless it diverges from the funded KR (then enter the target seconds). Use ${LOCAL_SKILLS}/data_tools/xl_coauthor.py: download via same-origin _api/v2.0/shares (az Graph token lacks Files scope), attach to the WAC OOPIF target, enter values through the formula-bar editor with pre-commit verify, NO CDP char events (they double chars). Verify by re-downloading and asserting every cell + fills preserved. Report the full change list.",
+      "requiresInput": true,
+      "inputPrompt": "Worksheet share link + ADO KR query + area? (e.g. '<sharepoint .xlsx link>, query 78fdaca1-..., Meeting Join'). EM name optional (auto-detected).",
+      "schedule": "manual",
+      "description": "Reconcile Tier 0 reliability/latency semester targets against ADO KRs and write them into the live co-authored planning Excel via Excel-for-web (formula-bar co-authoring, no REST overwrite)"
     },
     "microsoft-connect-writing-distill-voice": {
       "displayName": "Connect: Distill Prior Manager Voice",

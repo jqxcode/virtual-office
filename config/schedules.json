@@ -129,8 +129,8 @@
     {
       "agent": "mApprover",
       "job": "approve-FFv2",
-      "cron": "33 21 * * *",
-      "description": "Approve all pending FFv2 flights from directs daily at 9:33pm"
+      "cron": "0 6 * * *",
+      "description": "Approve all pending FFv2 flights from directs daily at 6am"
     },
     {
       "agent": "pHarnessMonitor",
