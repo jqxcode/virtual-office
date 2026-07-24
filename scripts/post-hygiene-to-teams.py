@@ -26,33 +26,49 @@ def get_token() -> str:
     ]).decode().strip()
 
 
-def reindex_mentions(payload: dict) -> dict:
-    """Ensure every <at id="N"> in body has a matching mention entry with unique incrementing ID."""
+def reindex_mentions(payload: dict, dedupe: bool = True) -> dict:
+    """Re-index <at id="N"> tags to unique incrementing IDs matching the mentions array.
+
+    When dedupe=True (default), each unique user is @mentioned only ONCE (the first
+    occurrence in the body); later occurrences of the same user are converted to plain
+    text. This keeps the total mention count at (unique owners + CC) instead of one per
+    table row, staying well under Teams' practical per-message @mention limit (~20).
+    Exceeding that limit is why the 2026-07-23 summary (68 mentions, e.g. one owner
+    repeated 35x) rendered as plain text / did not notify. Everyone still gets exactly
+    one working @mention and still appears (as text) in every row they own.
+    """
     body = payload.get("body", {}).get("content", "")
     mentions = payload.get("mentions", [])
-
-    # Build lookup: old_id -> mention data
     mention_map = {str(m["id"]): m for m in mentions}
 
-    # Find all <at id="N"> tags in order
-    at_tags = re.findall(r'<at id="(\d+)">(.*?)</at>', body)
+    new_mentions: list = []
+    seen_user: dict = {}   # aad user id -> assigned new mention id
+    counter = {"n": 0}
 
-    new_mentions = []
-    new_body = body
+    def _user_id(m):
+        return ((m or {}).get("mentioned") or {}).get("user", {}).get("id")
 
-    for new_id, (old_id, display_name) in enumerate(at_tags):
-        # Replace this specific occurrence (first match only)
-        old_tag = f'<at id="{old_id}">{display_name}</at>'
-        new_tag = f'<at id="{new_id}">{display_name}</at>'
-        new_body = new_body.replace(old_tag, new_tag, 1)
-
-        # Find the mention data for this old_id
-        if old_id in mention_map:
-            m = json.loads(json.dumps(mention_map[old_id]))  # deep copy
-            m["id"] = new_id
-            new_mentions.append(m)
+    def _repl(match):
+        old_id, display_name = match.group(1), match.group(2)
+        m = mention_map.get(old_id)
+        uid = _user_id(m)
+        # Duplicate mention of an already-mentioned user -> plain text.
+        if dedupe and uid is not None and uid in seen_user:
+            return display_name
+        new_id = counter["n"]
+        counter["n"] += 1
+        if m is not None:
+            mm = json.loads(json.dumps(m))  # deep copy
+            mm["id"] = new_id
+            new_mentions.append(mm)
+            if uid is not None:
+                seen_user[uid] = new_id
         else:
             print(f"WARNING: no mention entry for at id={old_id} ({display_name})")
+        return f'<at id="{new_id}">{display_name}</at>'
+
+    # Single left-to-right pass; replacement text is not re-scanned (collision-free).
+    new_body = re.sub(r'<at id="(\d+)">(.*?)</at>', _repl, body)
 
     payload["body"]["content"] = new_body
     payload["mentions"] = new_mentions
