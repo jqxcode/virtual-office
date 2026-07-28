@@ -292,7 +292,18 @@ STALE_REMAINING_DAYS = 30
 # System.Tags substring match kept as a fallback signal.
 EXCEPTION_TYPES = ["Exception"]
 EXCEPTION_TAGS = ["exception"]
-TIER_BY_STATE = {"RollingOut": 1, "Active": 2, "Committed": 3}
+# Lifecycle-state tiers for Madhu's backlog order (6/29 EM Sync; corrected 2026-07-28
+# per EM feedback). Lower tier belongs higher in the backlog.
+#   * "Committed" is NOT a lifecycle state -- it is a FUNDING value
+#     (Custom.CommittedTargettedCut = Committed / not-committed / looking...), a separate
+#     dimension -- so it is intentionally absent here (no work item has State=Committed).
+#   * "Blocked" is an in-flight lifecycle state that may sit ANYWHERE between Active and
+#     RollingOut (before or after), so it is handled via EXEMPT_ORDER_STATES below rather
+#     than tiered to the bottom.
+TIER_BY_STATE = {"RollingOut": 1, "Active": 2}
+# States exempt from state-order inversion detection: they may legitimately appear
+# anywhere in the in-flight zone, so they neither trigger nor receive an inversion flag.
+EXEMPT_ORDER_STATES = {"Blocked"}
 
 
 # ---------------------------------------------------------------------------
@@ -721,9 +732,14 @@ def resolve_current_month_node(token, today, fallback_iter):
 
 def _tier_for(state, tags, wtype=None):
     # type: (str, Optional[str], Optional[str]) -> int
-    """Madhu backlog-order tier (2026-06-29 EM Sync): exception=0,
-    RollingOut=1, Active=2, Committed=3, everything else (Proposed/New/
+    """Madhu backlog-order tier (2026-06-29 EM Sync; corrected 2026-07-28):
+    exception=0, RollingOut=1, Active=2, everything else (Proposed/New/
     backlog)=4. Lower tier should sit higher in the backlog.
+
+    NOTE: "Committed" is a FUNDING value (Custom.CommittedTargettedCut), not a
+    lifecycle state, so it is not a tier here. "Blocked" is an in-flight state
+    handled as a wildcard in detect_order_inversions (EXEMPT_ORDER_STATES), not
+    tiered to the bottom.
 
     Exceptions are detected primarily by work-item TYPE == 'Exception'
     (how the Features backlog board surfaces them), with a System.Tags
@@ -763,6 +779,10 @@ def detect_order_inversions(rows):
     running_max = -1
     running_item = None
     for r in enriched:
+        if r["state"] in EXEMPT_ORDER_STATES:
+            # Wildcard in-flight state (e.g. Blocked): may sit anywhere between Active
+            # and RollingOut, so it never triggers nor receives an inversion flag.
+            continue
         if r["tier"] < running_max and running_item is not None:
             flagged.append({
                 "id": r["id"], "title": r["title"], "state": r["state"],
@@ -2414,7 +2434,7 @@ def _build_check20_section(res):
     return _section_html(
         "Check 20: Backlog State-Order Violations",
         "{0} out of order".format(len(items)),
-        "Madhu requirement (6/29 EM Sync): backlog order should be exceptions &gt; RollingOut &gt; Active &gt; Committed &gt; plan/backlog. These items sit below a higher-priority-state item. Report-only (no auto-reorder); see suggested order in the JSON output.",
+        "Madhu requirement (6/29 EM Sync): backlog order should be exceptions &gt; RollingOut / Active &gt; plan/backlog (Proposed/New). Blocked is exempt (in-flight, may sit anywhere between Active and RollingOut); Committed is a funding value, not a lifecycle state. These items sit below a higher-priority-state item. Report-only (no auto-reorder); see suggested order in the JSON output.",
         ["ID", "Title", "State", "Tier", "StackRank", "Owner", "Sits Below"],
         rows,
         _query_link(ids, "Open all {0} items in ADO query".format(len(items))),

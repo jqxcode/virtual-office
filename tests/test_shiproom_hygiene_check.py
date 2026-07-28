@@ -316,7 +316,7 @@ class TestTierFor(unittest.TestCase):
     def test_state_tiers(self):
         self.assertEqual(shc._tier_for("RollingOut", ""), 1)
         self.assertEqual(shc._tier_for("Active", ""), 2)
-        self.assertEqual(shc._tier_for("Committed", ""), 3)
+        self.assertEqual(shc._tier_for("Committed", ""), 4)  # 'Committed' is a funding value, not a lifecycle tier
         self.assertEqual(shc._tier_for("Proposed", ""), 4)
         self.assertEqual(shc._tier_for("New", ""), 4)
         self.assertEqual(shc._tier_for("", ""), 4)
@@ -342,7 +342,7 @@ class TestDetectOrderInversions(unittest.TestCase):
         rows = [
             {"id": 1, "state": "RollingOut", "tags": "", "owner": "a", "stackRank": 100},
             {"id": 2, "state": "Active", "tags": "", "owner": "b", "stackRank": 200},
-            {"id": 3, "state": "Committed", "tags": "", "owner": "c", "stackRank": 300},
+            {"id": 3, "state": "New", "tags": "", "owner": "c", "stackRank": 300},
             {"id": 4, "state": "Proposed", "tags": "", "owner": "d", "stackRank": 400},
         ]
         flagged, suggested = shc.detect_order_inversions(rows)
@@ -350,9 +350,9 @@ class TestDetectOrderInversions(unittest.TestCase):
         self.assertEqual([r["id"] for r in suggested], [1, 2, 3, 4])
 
     def test_detects_inversion(self):
-        # Committed (tier 3) ranked ABOVE RollingOut (tier 1): RollingOut is misplaced.
+        # Proposed (tier 4) ranked ABOVE RollingOut (tier 1): RollingOut is misplaced.
         rows = [
-            {"id": 10, "state": "Committed", "tags": "", "owner": "a", "stackRank": 100},
+            {"id": 10, "state": "Proposed", "tags": "", "owner": "a", "stackRank": 100},
             {"id": 11, "state": "RollingOut", "tags": "", "owner": "b", "stackRank": 200},
         ]
         flagged, suggested = shc.detect_order_inversions(rows)
@@ -360,6 +360,26 @@ class TestDetectOrderInversions(unittest.TestCase):
         self.assertEqual(flagged[0]["id"], 11)
         self.assertIn("#10", flagged[0]["below"])
         self.assertEqual([r["id"] for r in suggested], [11, 10])
+
+    def test_blocked_is_exempt(self):
+        # Corrected 2026-07-28: Blocked is an in-flight state that may sit anywhere between
+        # Active and RollingOut (before or after), so it never flags nor is a reference.
+        rows = [
+            {"id": 1, "state": "Blocked", "tags": "", "owner": "a", "stackRank": 50},
+            {"id": 2, "state": "RollingOut", "tags": "", "owner": "b", "stackRank": 100},
+            {"id": 3, "state": "Active", "tags": "", "owner": "c", "stackRank": 200},
+        ]
+        flagged, _ = shc.detect_order_inversions(rows)
+        self.assertEqual(flagged, [])  # Blocked on top must NOT invert the RollingOut/Active below it
+
+    def test_blocked_at_bottom_not_flagged(self):
+        rows = [
+            {"id": 1, "state": "RollingOut", "tags": "", "owner": "a", "stackRank": 100},
+            {"id": 2, "state": "Active", "tags": "", "owner": "b", "stackRank": 200},
+            {"id": 3, "state": "Blocked", "tags": "", "owner": "c", "stackRank": 900},
+        ]
+        flagged, _ = shc.detect_order_inversions(rows)
+        self.assertEqual(flagged, [])
 
     def test_exception_tier_on_top(self):
         rows = [

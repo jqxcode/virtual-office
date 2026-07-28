@@ -566,13 +566,13 @@ Check 16 & 19: deferred, not implemented this iteration.
 
 **Source: Madhu requirement (2026-06-29 EM Sync).**
 
-**Goal**: Enforce Madhu's stack order (top→bottom): exceptions → `RollingOut` → `Active` → `Committed` → plan/backlog.
+**Goal**: Enforce Madhu's stack order (top→bottom): exceptions → `RollingOut` / `Active` → plan/backlog (`Proposed`/`New`). `Blocked` is an in-flight state that may sit anywhere in the RollingOut/Active zone (before or after) and is **exempt** from inversion detection. (Corrected 2026-07-28 per EM feedback.)
 
 **Action policy: REPORT-ONLY. No StackRank PATCH. Bulk reorder is the exact incident risk class.**
 
 **Field mapping**: Backlog node = `MSTeams\Backlog`. StackRank field = `Microsoft.VSTS.Common.StackRank` (ascending = top of backlog).
 
-**Tier map**: `{exception:0, RollingOut:1, Active:2, Committed:3, Proposed/New/backlog:4}`. The exception tier is detected primarily by **work-item TYPE == `Exception`** (the Features backlog board interleaves `Exception` items with `Feature` items, ordered by StackRank), with a `System.Tags` substring match on `exception` kept as a fallback. If exception detection cannot be resolved, degrade gracefully to the 4 state tiers and note "exception tier skipped".
+**Tier map**: `{exception:0, RollingOut:1, Active:2, Proposed/New/backlog:4}`. `Blocked` is **EXEMPT** — it is never flagged and never used as a running-max reference, because an in-flight Blocked Feature may legitimately sit anywhere between Active and RollingOut (before or after). **`Committed` is NOT a lifecycle state** — it is a funding value (`Custom.CommittedTargettedCut`: Committed / not-committed / looking...), a separate dimension, so it is intentionally absent from the tier map (no work item has `State='Committed'`). The exception tier is detected primarily by **work-item TYPE == `Exception`** (the Features backlog board interleaves `Exception` items with `Feature` items, ordered by StackRank), with a `System.Tags` substring match on `exception` kept as a fallback. If exception detection cannot be resolved, degrade gracefully to the state tiers and note "exception tier skipped".
 
 1. WIQL per allowed-area — run ONCE per area. The query MUST include the area filter and MUST NOT include an iteration filter; it covers the whole backlog including `MSTeams\Backlog`:
    ```
@@ -584,9 +584,9 @@ Check 16 & 19: deferred, not implemented this iteration.
    ORDER BY [Microsoft.VSTS.Common.StackRank] ASC
    ```
 2. Walk the StackRank-ordered list top→bottom:
-   a. Compute each item's tier.
+   a. Compute each item's tier. **Skip `Blocked` items entirely** (exempt: not flagged, not a reference).
    b. Track `running_max_tier`.
-   c. Any item with `tier < running_max_tier` is an inversion because it sits below a higher-priority-state item; flag it.
+   c. Any non-exempt item with `tier < running_max_tier` is an inversion because it sits below a higher-priority-state item; flag it.
 3. Emit flagged inversions: ID, Title, State, StackRank, tier, AreaPath, and the preceding higher-priority-state context.
 4. Emit a "suggested correct order": the same list re-sorted by `(tier, current StackRank)`.
 5. **Report-only** (no auto-fix). Results included in Teams post.
