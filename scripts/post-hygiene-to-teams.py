@@ -17,6 +17,11 @@ PAYLOAD_OUT = "Q:/src/tmp/mPoster-hygiene-teams-final.json"
 RESPONSE_OUT = "Q:/src/tmp/mPoster-hygiene-teams-response.json"
 TEAM_ID = "31ee74d6-0a8f-41a6-b0da-c4d9e3a1db3b"
 CHANNEL_ID = "19:183d481e40af45d09aac7322433fc7ab@thread.tacv2"
+# Teams renders @mentions reliably only up to ~this many per channel message. Observed:
+# 29 rendered fine (2026-07-02); 68 did NOT (2026-07-23, one owner repeated 35x). At or below
+# the cap we tag EVERY name occurrence (per EM request: "every name should be tagged"); above
+# it we dedupe to one @mention per unique user so the message still renders and notifies.
+MAX_RENDER_MENTIONS = 30
 
 
 def get_token() -> str:
@@ -26,20 +31,31 @@ def get_token() -> str:
     ]).decode().strip()
 
 
-def reindex_mentions(payload: dict, dedupe: bool = True) -> dict:
+def reindex_mentions(payload: dict, dedupe="auto") -> dict:
     """Re-index <at id="N"> tags to unique incrementing IDs matching the mentions array.
 
-    When dedupe=True (default), each unique user is @mentioned only ONCE (the first
-    occurrence in the body); later occurrences of the same user are converted to plain
-    text. This keeps the total mention count at (unique owners + CC) instead of one per
-    table row, staying well under Teams' practical per-message @mention limit (~20).
-    Exceeding that limit is why the 2026-07-23 summary (68 mentions, e.g. one owner
-    repeated 35x) rendered as plain text / did not notify. Everyone still gets exactly
-    one working @mention and still appears (as text) in every row they own.
+    dedupe:
+      "auto" (default) -> tag EVERY name occurrence when the message has <=
+          MAX_RENDER_MENTIONS tags (so every name is a real @mention, per EM request);
+          only when it would exceed the cap do we dedupe to one @mention per unique user
+          (later duplicates become plain text) so the message still renders and notifies.
+      True  -> always dedupe to one @mention per unique user.
+      False -> always tag every occurrence.
+
+    Background: one <at> per table row produced 68 mentions on 2026-07-23 which Teams
+    rendered as plain text / did not notify; a 29-mention post on 2026-07-02 rendered fine.
+    The cap keeps us in the render-safe zone while tagging every name for normal-size reports.
+    Whether deduped or not, the mentions array stays 1:1 with the <at> tags (unique ids).
     """
     body = payload.get("body", {}).get("content", "")
     mentions = payload.get("mentions", [])
     mention_map = {str(m["id"]): m for m in mentions}
+
+    if dedupe == "auto":
+        tag_count = len(re.findall(r'<at id="\d+">', body))
+        dedupe = tag_count > MAX_RENDER_MENTIONS
+        print(f"reindex_mentions: {tag_count} raw tags, dedupe={dedupe} "
+              f"(cap={MAX_RENDER_MENTIONS})")
 
     new_mentions: list = []
     seen_user: dict = {}   # aad user id -> assigned new mention id
