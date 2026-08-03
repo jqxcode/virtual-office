@@ -1,4 +1,4 @@
-﻿#Requires -Version 7.0
+#Requires -Version 7.0
 # Test-InvokeAgentJob.ps1 -- Tests for the core Invoke-AgentJob runner logic
 # Run: pwsh -File tests/Test-InvokeAgentJob.ps1
 
@@ -63,20 +63,21 @@ function Write-TestConfig {
         [string]$AgentName = "test-agent",
         [string]$JobName = "test-job",
         [int]$MaxRuns = 0,
-        [string]$Prompt = "echo test output"
+        [string]$Prompt = "echo test output",
+        [string]$Engine = ""
     )
     # agents.json -- runner reads top-level keys as agent names
     $agentsJson = @{ $AgentName = @{ displayName = "Test Agent"; description = "test" } } | ConvertTo-Json
     Set-Content -Path (Join-Path $Root "config/agents.json") -Value $agentsJson -Encoding UTF8
 
     # jobs/{agent}.json -- runner reads top-level keys as job names
-    $jobsJson = @{
-        $JobName = @{
-            prompt  = $Prompt
-            maxRuns = $MaxRuns
-            description = "test job"
-        }
-    } | ConvertTo-Json -Depth 5
+    $jobDef = @{
+        prompt  = $Prompt
+        maxRuns = $MaxRuns
+        description = "test job"
+    }
+    if ($Engine) { $jobDef["engine"] = $Engine }
+    $jobsJson = @{ $JobName = $jobDef } | ConvertTo-Json -Depth 5
     Set-Content -Path (Join-Path $Root "config/jobs/$AgentName.json") -Value $jobsJson -Encoding UTF8
 }
 
@@ -204,7 +205,8 @@ function Invoke-Runner {
     param(
         [string]$Root,
         [string]$AgentName = "test-agent",
-        [string]$JobName = "test-job"
+        [string]$JobName = "test-job",
+        [switch]$CopilotNoFinalPhase
     )
     # Copy the real runner, but replace the claude invocation with a mock
     $realRunner = Join-Path $PSScriptRoot ".." "runner" "Invoke-AgentJob.ps1"
@@ -215,9 +217,36 @@ function Invoke-Runner {
     $testConstants = Join-Path $Root "runner/constants.ps1"
     $runnerContent = $runnerContent -replace '\. \(Join-Path \$PSScriptRoot "constants\.ps1"\)', ". '$testConstants'"
 
-    # Replace claude invocation with a mock that just writes output
-    $runnerContent = $runnerContent -replace '\$output = & claude --agent \$agentFile \$prompt 2>&1 \| Out-String', '$output = "mock agent output with file"'
-    $runnerContent = $runnerContent -replace '\$output = & claude \$prompt 2>&1 \| Out-String', '$output = "mock agent output"'
+    # Redirect the CLI invocation to canned stubs so tests are deterministic and
+    # never call the real claude/copilot binaries. The runner spawns its engine via
+    # ProcessStartInfo ($pinfo.FileName = "claude" | "copilot"); point those at .cmd
+    # stubs that emit canned output matching each engine's parser.
+    $stubDir = Join-Path $Root "stubs"
+    New-Item -ItemType Directory -Path $stubDir -Force | Out-Null
+    # claude -- single JSON object with a "result" field
+    $claudeOut = '{"result":"mock agent output","total_cost_usd":0,"num_turns":1,"session_id":"test-session","usage":{"input_tokens":1,"output_tokens":1,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}}'
+    Set-Content -Path (Join-Path $stubDir "claude.out") -Value $claudeOut -Encoding ASCII
+    Set-Content -Path (Join-Path $stubDir "claude.cmd") -Value "@echo off`r`ntype `"%~dp0claude.out`"" -Encoding ASCII
+    # copilot -- JSONL event stream (final_answer + usage + result)
+    # An intermediate (unphased) message plus, unless -CopilotNoFinalPhase, a
+    # final_answer message. Lets tests cover both the final_answer path and the
+    # fallback-to-last-message path (copilot doesn't always tag final_answer).
+    $copilotMsgs = @('{"type":"assistant.message","data":{"content":"intermediate reasoning step","model":"claude-sonnet-4.5"}}')
+    if ($CopilotNoFinalPhase) {
+        $copilotMsgs += '{"type":"assistant.message","data":{"content":"mock copilot fallback","model":"claude-sonnet-4.5"}}'
+    } else {
+        $copilotMsgs += '{"type":"assistant.message","data":{"phase":"final_answer","content":"mock copilot output","model":"claude-sonnet-4.5"}}'
+    }
+    $copilotOut = ($copilotMsgs + @(
+        '{"type":"session.usage_checkpoint","data":{"totalNanoAiu":1000000000}}',
+        '{"type":"result","exitCode":0,"usage":{"premiumRequests":0,"totalApiDurationMs":10}}'
+    )) -join "`r`n"
+    Set-Content -Path (Join-Path $stubDir "copilot.out") -Value $copilotOut -Encoding ASCII
+    Set-Content -Path (Join-Path $stubDir "copilot.cmd") -Value "@echo off`r`ntype `"%~dp0copilot.out`"" -Encoding ASCII
+    $claudeCmd  = Join-Path $stubDir "claude.cmd"
+    $copilotCmd = Join-Path $stubDir "copilot.cmd"
+    $runnerContent = $runnerContent.Replace('$pinfo.FileName = "claude"',  "`$pinfo.FileName = '$claudeCmd'")
+    $runnerContent = $runnerContent.Replace('$pinfo.FileName = "copilot"', "`$pinfo.FileName = '$copilotCmd'")
 
     $testRunner = Join-Path $Root "runner/test-runner.ps1"
     Set-Content -Path $testRunner -Value $runnerContent -Encoding UTF8
@@ -251,7 +280,7 @@ try {
         Assert-True ($counter["count"] -eq 1) "Counter shows 1 after first run"
     }
 
-    $lockFile = Join-Path $stateDir "lock"
+    $lockFile = Join-Path (Split-Path $stateDir -Parent) "lock"  # agent-level lock (state/agents/<agent>/lock)
     Assert-True (-not (Test-Path $lockFile)) "Lock file is removed after run"
 
     # Check audit entry exists
@@ -273,9 +302,11 @@ try {
 
     # Pre-create lock file to simulate a running job
     $stateDir = Ensure-StateDir -AgentName "test-agent" -JobName "test-job"
-    $lockFile = Join-Path $stateDir "lock"
+    $lockFile = Join-Path (Split-Path $stateDir -Parent) "lock"  # agent-level lock (state/agents/<agent>/lock)
     $queueFile = Join-Path $stateDir "queue"
-    Set-Content -Path $lockFile -Value (Get-Date -Format "o") -Encoding UTF8
+    # JSON lock with a FRESH timestamp -> runner sees a valid running job and queues behind it
+    $lockJson = @{ ts = (Get-Date -Format "o"); job = "test-job"; pid = 999999; run_id = "tc2lock" } | ConvertTo-Json -Compress
+    Set-Content -Path $lockFile -Value $lockJson -Encoding UTF8
 
     $result = Invoke-Runner -Root $root
     Assert-True ($result.ExitCode -eq 0) "Runner exits cleanly when locked"
@@ -468,7 +499,7 @@ try {
 
     # Pre-create lock file with a timestamp 3 hours ago
     $stateDir = Ensure-StateDir -AgentName "test-agent" -JobName "test-job"
-    $lockFile = Join-Path $stateDir "lock"
+    $lockFile = Join-Path (Split-Path $stateDir -Parent) "lock"  # agent-level lock (state/agents/<agent>/lock)
     $staleTime = (Get-Date).AddHours(-3).ToString("o")
     Set-Content -Path $lockFile -Value $staleTime -Encoding ASCII
 
@@ -503,9 +534,10 @@ try {
 
     # Pre-create lock file with a timestamp 30 minutes ago (within default 120m timeout)
     $stateDir = Ensure-StateDir -AgentName "test-agent" -JobName "test-job"
-    $lockFile = Join-Path $stateDir "lock"
-    $freshTime = (Get-Date).AddMinutes(-30).ToString("o")
-    Set-Content -Path $lockFile -Value $freshTime -Encoding ASCII
+    $lockFile = Join-Path (Split-Path $stateDir -Parent) "lock"  # agent-level lock (state/agents/<agent>/lock)
+    # JSON lock 30m old (within 120m timeout) -> fresh, runner should queue and NOT clear it
+    $lockJson = @{ ts = (Get-Date).AddMinutes(-30).ToString("o"); job = "test-job"; pid = 999999; run_id = "tc76lock" } | ConvertTo-Json -Compress
+    Set-Content -Path $lockFile -Value $lockJson -Encoding ASCII
 
     $result = Invoke-Runner -Root $root
     Assert-True ($result.ExitCode -eq 0) "Runner exits cleanly when lock is fresh"
@@ -552,7 +584,7 @@ try {
 
     # Pre-create lock file with a timestamp 45 minutes ago (stale with 30m timeout)
     $stateDir = Ensure-StateDir -AgentName "test-agent" -JobName "test-job"
-    $lockFile = Join-Path $stateDir "lock"
+    $lockFile = Join-Path (Split-Path $stateDir -Parent) "lock"  # agent-level lock (state/agents/<agent>/lock)
     $staleTime = (Get-Date).AddMinutes(-45).ToString("o")
     Set-Content -Path $lockFile -Value $staleTime -Encoding ASCII
 
@@ -587,7 +619,7 @@ try {
 
     # Pre-create lock file with invalid timestamp content
     $stateDir = Ensure-StateDir -AgentName "test-agent" -JobName "test-job"
-    $lockFile = Join-Path $stateDir "lock"
+    $lockFile = Join-Path (Split-Path $stateDir -Parent) "lock"  # agent-level lock (state/agents/<agent>/lock)
     Set-Content -Path $lockFile -Value "invalid-timestamp" -Encoding ASCII
 
     $result = Invoke-Runner -Root $root
@@ -693,6 +725,56 @@ Write-AuditEntry -Action 'started' -AgentName 'tc79-child' -JobName 'tc79-job' -
     }
 } finally {
     if ($blockingStream) { try { $blockingStream.Close() } catch {} }
+    Remove-TestRoot -Root $root
+}
+
+# ========================================
+# TC80: copilot engine -- JSONL output is parsed via the copilot code path
+# ========================================
+Write-Host "`nTC80: copilot engine parses JSONL stub output" -ForegroundColor Cyan
+$root = New-TestRoot
+try {
+    Write-TestConstants -Root $root
+    Write-TestConfig -Root $root -MaxRuns 0 -Engine "copilot"
+    Import-RunnerFunctions -Root $root
+
+    $result = Invoke-Runner -Root $root
+    Assert-True ($result.ExitCode -eq 0) "Runner exits with code 0 for copilot engine"
+
+    $counterFile = Join-Path $root "state/agents/test-agent/test-job/counter.json"
+    Assert-True (Test-Path $counterFile) "counter.json created for copilot run"
+
+    $outFiles = @(Get-ChildItem -Path (Join-Path $root "output/test-agent") -Filter "*.md" -ErrorAction SilentlyContinue)
+    Assert-True ($outFiles.Count -gt 0) "copilot run saved an output file"
+    if ($outFiles.Count -gt 0) {
+        $content = Get-Content -Path $outFiles[0].FullName -Raw
+        Assert-True ($content -match "mock copilot output") "Saved output contains copilot final_answer text (JSONL parsed)"
+    }
+} finally {
+    Remove-TestRoot -Root $root
+}
+
+# ========================================
+# TC81: copilot engine -- fallback to last assistant.message when no final_answer
+# ========================================
+Write-Host "`nTC81: copilot engine falls back to last assistant.message (no final_answer)" -ForegroundColor Cyan
+$root = New-TestRoot
+try {
+    Write-TestConstants -Root $root
+    Write-TestConfig -Root $root -MaxRuns 0 -Engine "copilot"
+    Import-RunnerFunctions -Root $root
+
+    $result = Invoke-Runner -Root $root -CopilotNoFinalPhase
+    Assert-True ($result.ExitCode -eq 0) "Runner exits with code 0 (copilot fallback)"
+
+    $outFiles = @(Get-ChildItem -Path (Join-Path $root "output/test-agent") -Filter "*.md" -ErrorAction SilentlyContinue)
+    Assert-True ($outFiles.Count -gt 0) "copilot fallback run saved an output file"
+    if ($outFiles.Count -gt 0) {
+        $content = Get-Content -Path $outFiles[0].FullName -Raw
+        Assert-True ($content -match "mock copilot fallback") "Saved output uses last assistant.message when no final_answer"
+        Assert-True ($content -notmatch '"type":"assistant\.message"') "Saved output is clean text, not raw JSONL"
+    }
+} finally {
     Remove-TestRoot -Root $root
 }
 

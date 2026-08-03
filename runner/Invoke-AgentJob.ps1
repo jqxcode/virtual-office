@@ -771,6 +771,13 @@ if (Test-Path $lockFile) {
 # leaves an orphaned lock file that blocks the agent until TTL expires.
 # See: https://github.com/jqxcode/virtual-office/issues/61
 $keepRunning = $true
+# Initialize outcome vars before the loop so the maxRuns-skip path (which breaks
+# before the invocation block below) leaves them defined for post-loop code (StrictMode).
+$output = ""
+$exitCode = 0
+$costData = $null
+$relOutputPath = $null
+$outputWriteTime = $null
 try {
 while ($keepRunning) {
     # Record the lock timestamp (lock file is written atomically with PID after process starts)
@@ -820,37 +827,77 @@ while ($keepRunning) {
         }
     }
 
+    # Engine selection -- copilot is strictly opt-in; default remains 'claude'.
+    # Resolution order: job-level "engine" > agent-level "engine" > "claude".
+    $engine = if ($jobDef.ContainsKey("engine")) { [string]$jobDef["engine"] }
+              elseif ($agentDef.ContainsKey("engine")) { [string]$agentDef["engine"] }
+              else { "claude" }
+
     $output = ""
     $exitCode = 0
     $costData = $null
     $runStart = Get-Date
     try {
-        # Build command arguments (--output-format json for cost/token tracking)
-        $claudeArgs = @()
-        if ($agentFile) {
-            # An agentFile is configured for this agent. The file MUST exist --
-            # if it does not, fail loud instead of silently running a bare
-            # prompt with no persona/scope (see incident: missing agent file
-            # silently degraded the run).
-            if (-not (Test-Path $agentFile)) {
-                Write-AuditEntry -Action "failed" -AgentName $Agent -JobName $Job -RunId $runId -Details @{ reason = "agent_file_not_found"; agent_file = $agentFile }
-                Write-Event -AgentName $Agent -JobName $Job -Event "failed" -Details @{ run_id = $runId; reason = "agent_file_not_found"; agent_file = $agentFile }
-                throw "agentFile configured for agent '$Agent' but not found: $agentFile"
-            }
-            $claudeArgs = @("--output-format", "json", "--agent", $agentFile, $prompt)
-        } else {
-            # No agentFile configured at all -- bare prompt invocation is expected.
-            $claudeArgs = @("--output-format", "json", $prompt)
+        # Validate agent file exists (applies to both engines). Fail loud if a
+        # configured persona file is missing (see incident: missing agent file
+        # silently degraded the run).
+        if ($agentFile -and -not (Test-Path $agentFile)) {
+            Write-AuditEntry -Action "failed" -AgentName $Agent -JobName $Job -RunId $runId -Details @{ reason = "agent_file_not_found"; agent_file = $agentFile }
+            Write-Event -AgentName $Agent -JobName $Job -Event "failed" -Details @{ run_id = $runId; reason = "agent_file_not_found"; agent_file = $agentFile }
+            throw "agentFile configured for agent '$Agent' but not found: $agentFile"
         }
 
-        # Start claude process and capture PID
+        # Common process setup
         $pinfo = New-Object System.Diagnostics.ProcessStartInfo
-        $pinfo.FileName = "claude"
-        $pinfo.Arguments = ($claudeArgs | ForEach-Object { if ($_ -match '\s') { "`"$_`"" } else { $_ } }) -join " "
         $pinfo.RedirectStandardOutput = $true
         $pinfo.RedirectStandardError = $true
         $pinfo.UseShellExecute = $false
         $pinfo.CreateNoWindow = $true
+
+        if ($engine -eq "copilot") {
+            # Copilot CLI: agent referenced by NAME (basename of the agentFile,
+            # e.g. ~/.claude/agents/poster.md -> "poster" -> ~/.copilot/agents/poster.agent.md),
+            # non-interactive (-p), JSONL output, headless permissions. Uses
+            # ArgumentList for correct escaping of multi-line/quoted prompts.
+            #
+            # Claude Code expanded {{workspace}} + ${VAR} path templates (from
+            # ~/.claude/env-vars.json) at runtime; copilot does not. Resolve them
+            # here so the prompt AND the child environment carry real paths.
+            # Forward slashes are used -- portable across cmd/pwsh/bash on Windows.
+            $wsRoot = (Split-Path (Split-Path $PROJECT_ROOT -Parent) -Parent) -replace '\\', '/'
+            $repoVars = @('SRC_ROOT','REPO_PERSONAL','REPO_HACKATHON','REPO_WORK','LOCAL_SKILLS')
+            $resolvedVars = @{}
+            foreach ($rv in $repoVars) {
+                $rvVal = [Environment]::GetEnvironmentVariable($rv)
+                if ($rvVal) { $resolvedVars[$rv] = ($rvVal -replace '\\', '/').Replace('{{workspace}}', $wsRoot) }
+            }
+            $copilotPrompt = $prompt
+            foreach ($rv in $resolvedVars.Keys) {
+                $copilotPrompt = $copilotPrompt.Replace('${' + $rv + '}', $resolvedVars[$rv])
+            }
+
+            $pinfo.FileName = "copilot"
+            [void]$pinfo.ArgumentList.Add("-p");              [void]$pinfo.ArgumentList.Add($copilotPrompt)
+            [void]$pinfo.ArgumentList.Add("--output-format"); [void]$pinfo.ArgumentList.Add("json")
+            [void]$pinfo.ArgumentList.Add("--allow-all")
+            [void]$pinfo.ArgumentList.Add("--no-ask-user")
+            if ($agentFile) {
+                $copilotAgent = [System.IO.Path]::GetFileNameWithoutExtension($agentFile)
+                [void]$pinfo.ArgumentList.Add("--agent"); [void]$pinfo.ArgumentList.Add($copilotAgent)
+            }
+            # Ensure headless runs get the same MCP servers regardless of cwd.
+            $userMcp = Join-Path $HOME ".mcp.json"
+            if (Test-Path $userMcp) {
+                [void]$pinfo.ArgumentList.Add("--additional-mcp-config"); [void]$pinfo.ArgumentList.Add("@$userMcp")
+            }
+            # Also expose the resolved paths in the child environment.
+            foreach ($rv in $resolvedVars.Keys) { $pinfo.EnvironmentVariables[$rv] = $resolvedVars[$rv] }
+        } else {
+            # Claude Code CLI (default): single-object JSON output for cost/token tracking.
+            $claudeArgs = if ($agentFile) { @("--output-format", "json", "--agent", $agentFile, $prompt) } else { @("--output-format", "json", $prompt) }
+            $pinfo.FileName = "claude"
+            $pinfo.Arguments = ($claudeArgs | ForEach-Object { if ($_ -match '\s') { "`"$_`"" } else { $_ } }) -join " "
+        }
 
         $proc = [System.Diagnostics.Process]::Start($pinfo)
 
@@ -863,45 +910,93 @@ while ($keepRunning) {
         $proc.WaitForExit()
         $exitCode = $proc.ExitCode
 
-        # Parse JSON output to extract result text and cost data
+        # Parse output to extract result text and cost data
         $rawOutput = $output
-        try {
-            $jsonResult = $rawOutput | ConvertFrom-Json -AsHashtable
-            if ($jsonResult -and $jsonResult.ContainsKey("result")) {
-                $output = [string]$jsonResult["result"]
-            }
-            # Extract cost/usage data
-            $costData = @{
-                costUSD = if ($jsonResult.ContainsKey("total_cost_usd")) { $jsonResult["total_cost_usd"] } else { 0 }
-                durationMs = if ($jsonResult.ContainsKey("duration_ms")) { $jsonResult["duration_ms"] } else { 0 }
-                durationApiMs = if ($jsonResult.ContainsKey("duration_api_ms")) { $jsonResult["duration_api_ms"] } else { 0 }
-                numTurns = if ($jsonResult.ContainsKey("num_turns")) { $jsonResult["num_turns"] } else { 0 }
-                sessionId = if ($jsonResult.ContainsKey("session_id")) { $jsonResult["session_id"] } else { "" }
-            }
-            if ($jsonResult.ContainsKey("usage")) {
-                $u = $jsonResult["usage"]
-                $costData["inputTokens"] = if ($u.ContainsKey("input_tokens")) { $u["input_tokens"] } else { 0 }
-                $costData["outputTokens"] = if ($u.ContainsKey("output_tokens")) { $u["output_tokens"] } else { 0 }
-                $costData["cacheCreationTokens"] = if ($u.ContainsKey("cache_creation_input_tokens")) { $u["cache_creation_input_tokens"] } else { 0 }
-                $costData["cacheReadTokens"] = if ($u.ContainsKey("cache_read_input_tokens")) { $u["cache_read_input_tokens"] } else { 0 }
-            }
-            if ($jsonResult.ContainsKey("modelUsage")) {
-                $models = $jsonResult["modelUsage"]
-                $modelName = ($models.Keys | Select-Object -First 1)
-                if ($modelName) {
-                    $m = $models[$modelName]
-                    $costData["model"] = $modelName
-                    $costData["contextWindow"] = if ($m.ContainsKey("contextWindow")) { $m["contextWindow"] } else { 0 }
-                    # Context usage = input + cache_creation + output (cache_read is FREE - doesn't consume context)
-                    $totalTokens = $costData["inputTokens"] + $costData["cacheCreationTokens"] + $costData["outputTokens"]
-                    if ($costData["contextWindow"] -gt 0) {
-                        $costData["contextUsedPct"] = [math]::Round(($totalTokens / $costData["contextWindow"]) * 100, 1)
+        if ($engine -eq "copilot") {
+            # Copilot emits JSONL (one event object per line). Extract the final
+            # answer text, the result exit code, and usage (AI units, not USD).
+            try {
+                $finalText = $null; $lastAssistantText = $null; $resultExit = $null; $cpUsage = $null; $modelName = $null; $aiuNano = $null
+                foreach ($ln in ($rawOutput -split "`n")) {
+                    $t = $ln.Trim(); if ($t -eq "") { continue }
+                    $o = $null; try { $o = $t | ConvertFrom-Json -AsHashtable } catch { continue }
+                    if ($null -eq $o -or -not ($o -is [hashtable]) -or -not $o.ContainsKey("type")) { continue }
+                    switch ($o["type"]) {
+                        "assistant.message" {
+                            if ($o.ContainsKey("data") -and $null -ne $o["data"]) {
+                                # Track the last non-empty assistant message (any phase) as a fallback,
+                                # since copilot does not always tag the final message phase=="final_answer".
+                                if ($o["data"].ContainsKey("content") -and $o["data"]["content"]) {
+                                    $lastAssistantText = [string]$o["data"]["content"]
+                                    if ($o["data"].ContainsKey("model")) { $modelName = $o["data"]["model"] }
+                                }
+                                if ($o["data"].ContainsKey("phase") -and $o["data"]["phase"] -eq "final_answer" -and $o["data"].ContainsKey("content")) {
+                                    $finalText = [string]$o["data"]["content"]
+                                }
+                            }
+                        }
+                        "result" {
+                            if ($o.ContainsKey("exitCode")) { $resultExit = $o["exitCode"] }
+                            if ($o.ContainsKey("usage")) { $cpUsage = $o["usage"] }
+                        }
+                        "session.usage_checkpoint" {
+                            if ($o.ContainsKey("data") -and $null -ne $o["data"] -and $o["data"].ContainsKey("totalNanoAiu")) { $aiuNano = $o["data"]["totalNanoAiu"] }
+                        }
                     }
                 }
+                if ($null -eq $finalText) { $finalText = $lastAssistantText }
+                if ($null -ne $finalText) { $output = $finalText }
+                if ($null -ne $resultExit) { $exitCode = [int]$resultExit }
+                $costData = @{ costUSD = 0 }
+                if ($modelName) { $costData["model"] = $modelName }
+                if ($null -ne $aiuNano) { $costData["aiu"] = [math]::Round(([double]$aiuNano) / 1e9, 4) }
+                if ($cpUsage -is [hashtable]) {
+                    if ($cpUsage.ContainsKey("premiumRequests")) { $costData["premiumRequests"] = $cpUsage["premiumRequests"] }
+                    if ($cpUsage.ContainsKey("totalApiDurationMs")) { $costData["durationApiMs"] = $cpUsage["totalApiDurationMs"] }
+                    if ($cpUsage.ContainsKey("sessionDurationMs")) { $costData["durationMs"] = $cpUsage["sessionDurationMs"] }
+                }
+            } catch {
+                Write-Host "Note: Could not parse copilot JSONL output, using raw text. Error: $_"
             }
-        } catch {
-            # JSON parsing failed -- use raw output as-is (e.g. CLI error before JSON)
-            Write-Host "Note: Could not parse JSON output, using raw text. Error: $_"
+        } else {
+            try {
+                $jsonResult = $rawOutput | ConvertFrom-Json -AsHashtable
+                if ($jsonResult -and $jsonResult.ContainsKey("result")) {
+                    $output = [string]$jsonResult["result"]
+                }
+                # Extract cost/usage data
+                $costData = @{
+                    costUSD = if ($jsonResult.ContainsKey("total_cost_usd")) { $jsonResult["total_cost_usd"] } else { 0 }
+                    durationMs = if ($jsonResult.ContainsKey("duration_ms")) { $jsonResult["duration_ms"] } else { 0 }
+                    durationApiMs = if ($jsonResult.ContainsKey("duration_api_ms")) { $jsonResult["duration_api_ms"] } else { 0 }
+                    numTurns = if ($jsonResult.ContainsKey("num_turns")) { $jsonResult["num_turns"] } else { 0 }
+                    sessionId = if ($jsonResult.ContainsKey("session_id")) { $jsonResult["session_id"] } else { "" }
+                }
+                if ($jsonResult.ContainsKey("usage")) {
+                    $u = $jsonResult["usage"]
+                    $costData["inputTokens"] = if ($u.ContainsKey("input_tokens")) { $u["input_tokens"] } else { 0 }
+                    $costData["outputTokens"] = if ($u.ContainsKey("output_tokens")) { $u["output_tokens"] } else { 0 }
+                    $costData["cacheCreationTokens"] = if ($u.ContainsKey("cache_creation_input_tokens")) { $u["cache_creation_input_tokens"] } else { 0 }
+                    $costData["cacheReadTokens"] = if ($u.ContainsKey("cache_read_input_tokens")) { $u["cache_read_input_tokens"] } else { 0 }
+                }
+                if ($jsonResult.ContainsKey("modelUsage")) {
+                    $models = $jsonResult["modelUsage"]
+                    $modelName = ($models.Keys | Select-Object -First 1)
+                    if ($modelName) {
+                        $m = $models[$modelName]
+                        $costData["model"] = $modelName
+                        $costData["contextWindow"] = if ($m.ContainsKey("contextWindow")) { $m["contextWindow"] } else { 0 }
+                        # Context usage = input + cache_creation + output (cache_read is FREE - doesn't consume context)
+                        $totalTokens = $costData["inputTokens"] + $costData["cacheCreationTokens"] + $costData["outputTokens"]
+                        if ($costData["contextWindow"] -gt 0) {
+                            $costData["contextUsedPct"] = [math]::Round(($totalTokens / $costData["contextWindow"]) * 100, 1)
+                        }
+                    }
+                }
+            } catch {
+                # JSON parsing failed -- use raw output as-is (e.g. CLI error before JSON)
+                Write-Host "Note: Could not parse JSON output, using raw text. Error: $_"
+            }
         }
 
         if ($errOutput) {
