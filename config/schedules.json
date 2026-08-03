@@ -4,186 +4,217 @@
       "agent": "mPoster",
       "job": "TODO-sprint-progress",
       "cron": "0 7 * * 1-5",
+      "host": "AI0001",
       "description": "Sprint progress report weekday mornings at 7am"
     },
     {
       "agent": "pBugKiller",
       "job": "scan-and-fix",
       "cron": "0 10 * * *",
+      "host": "AI0001",
       "description": "Bug killer scan at 10am daily"
     },
     {
       "agent": "pBugKiller",
       "job": "scan-and-fix",
       "cron": "0 22 * * *",
+      "host": "AI0001",
       "description": "Bug killer scan at 10pm daily"
     },
     {
       "agent": "pBugKiller",
       "job": "open-pr-maintenance",
       "cron": "3 * * * *",
+      "host": "AI0001",
       "description": "Open PR maintenance (merge conflicts + review comments) hourly at :03"
     },
     {
       "agent": "mAuditor",
       "job": "teams-posting-audit",
       "cron": "0 6 * * 1",
+      "host": "AI0001",
       "description": "Teams posting permission audit every Monday at 6am"
     },
     {
       "agent": "pBugKiller",
       "job": "daily-summary",
       "cron": "30 1 * * *",
+      "host": "AI0001",
       "description": "Bug killer daily activity summary at 1:30am"
     },
     {
       "agent": "pEmailer",
       "job": "scan-all-mailboxes",
       "cron": "0 7 * * *",
+      "host": "AI0001",
       "description": "Gmail scan all mailboxes at 7am daily"
     },
     {
       "agent": "pEmailer",
       "job": "email-inbox-summary-generate",
       "cron": "0 6 * * *",
+      "host": "AI0001",
       "description": "Email inbox summary GENERATE sub-flow (rescan + 9 HTMLs + index link) at 6am daily, 1hr before scan-all-mailboxes"
     },
     {
       "agent": "mAuditor",
       "job": "consolidate-agent-memories",
       "cron": "0 3 * * *",
+      "host": "AI0001",
       "description": "Memory consolidation and report at 3am daily"
     },
     {
       "agent": "mAuditor",
       "job": "schedule-health-check",
       "cron": "0 11 * * *",
+      "host": "AI0001",
       "description": "Daily schedule-health guard at 11am: reconcile live tasks vs config and flag weekday jobs with no 'started' event in events.jsonl within ~26h"
     },
     {
       "agent": "mPoster",
       "job": "YTD-OOF-Summary",
       "cron": "0 6 L * *",
+      "host": "AI0001",
       "description": "YTD OOF summary report on the last day of each month at 6am"
     },
     {
       "agent": "mPoster",
       "job": "ICM-daily-summary-Notes",
       "cron": "30 12 * * 1-5",
+      "host": "AI0001",
       "description": "Notes customer ICM daily summary to Teams at 12:30pm weekdays"
     },
     {
       "agent": "mPoster",
       "job": "ICM-daily-summary-Join",
       "cron": "0 9 * * 1-5",
+      "host": "AI0001",
       "description": "Meeting Join customer ICM daily summary to Teams at 9am weekdays"
     },
     {
       "agent": "mPoster",
       "job": "Bug-Autopilot-Adoption-daily-summary",
       "cron": "30 7 * * *",
+      "host": "AI0001",
       "description": "Bug-AutoPilot daily summary post to Teams at 7:30am"
     },
     {
       "agent": "pHangScout",
       "job": "detect-hang",
       "cron": "45 * * * *",
+      "host": "AI0001",
       "description": "Hang detection scan every hour at :45"
     },
     {
       "agent": "pHangScout",
       "job": "daily-report",
       "cron": "0 0 * * *",
+      "host": "AI0001",
       "description": "Daily 5W incident report at midnight"
     },
     {
       "agent": "pHarnessMonitor",
       "job": "resolve-bugs-cleanup",
       "cron": "30 11 * * 1",
+      "host": "AI0001",
       "description": "Auto-close stale Resolved bugs every Monday at 11:30am"
     },
     {
       "agent": "mApprover",
       "job": "approve-CoreIdentity",
       "cron": "0 8 * * *",
+      "host": "AI0003",
       "description": "CoreIdentity entitlement approvals at 8am daily"
     },
     {
       "agent": "mPoster",
       "job": "FFv2-daily-summary",
       "cron": "0 12 * * 1-5",
+      "host": "AI0001",
       "description": "Feature Flight V2 daily report for direct reports flights, weekdays at noon"
     },
     {
       "agent": "mScrumMaster",
       "job": "shiproom-hygiene-check",
       "cron": "45 8 * * 1-5",
+      "host": "AI0003",
       "description": "Run 15 hygiene checks at 8:45am weekdays, then triggerOnComplete fires poster/post-shiproom-hygiene-check"
     },
     {
       "agent": "mScrumMaster",
       "job": "shiproom-hygiene-check",
       "cron": "50 14 * * 1-5",
+      "host": "AI0003",
       "description": "Run 15 hygiene checks at 2:50pm weekdays, then triggerOnComplete fires poster/post-shiproom-hygiene-check"
     },
     {
       "agent": "mApprover",
       "job": "approve-FFv2",
       "cron": "0 6 * * *",
+      "host": "AI0003",
       "description": "Approve all pending FFv2 flights from directs daily at 6am"
     },
     {
       "agent": "pHarnessMonitor",
       "job": "agent-harness-performance",
       "cron": "0 9 * * 0",
+      "host": "AI0001",
       "description": "Weekly harness performance metrics report every Sunday at 9am"
     },
     {
       "agent": "pHarnessMonitor",
       "job": "failure-review",
       "cron": "0 18 * * 1-5",
+      "host": "AI0001",
       "description": "Weekday failure review at 6pm -- generates harness improvement candidates"
     },
     {
       "agent": "mAuditor",
       "job": "agent-brain-health-check",
       "cron": "0 14 * * 6",
+      "host": "AI0001",
       "description": "Agent Brain ecosystem health check every Saturday at 2pm"
     },
     {
       "agent": "mAuditor",
       "job": "brain-weekly-maintenance",
       "cron": "0 22 * * 0",
+      "host": "AI0001",
       "description": "Weekly brain maintenance: archive sessions, compile knowledge, compress, push (Sunday 10pm)"
     },
     {
       "agent": "pResearcher",
       "job": "scan-mentions-and-draft",
       "cron": "0 9 * * 1-5",
+      "host": "AI0001",
       "description": "Teams mention scan at 9am weekdays"
     },
     {
       "agent": "pResearcher",
       "job": "scan-mentions-and-draft",
       "cron": "0 12 * * 1-5",
+      "host": "AI0001",
       "description": "Teams mention scan at noon weekdays"
     },
     {
       "agent": "pResearcher",
       "job": "scan-mentions-and-draft",
       "cron": "0 15 * * 1-5",
+      "host": "AI0001",
       "description": "Teams mention scan at 3pm weekdays"
     },
     {
       "agent": "pResearcher",
       "job": "scan-mentions-and-draft",
       "cron": "0 18 * * 1-5",
+      "host": "AI0001",
       "description": "Teams mention scan at 6pm weekdays"
     },
     {
       "agent": "pEmailer",
       "job": "MSFT-email",
       "cron": "0 17 * * 5",
+      "host": "AI0003",
       "description": "MSFT (Outlook/M365) inbox triage via WorkIQ MCP every Friday at 5pm"
     }
   ]
