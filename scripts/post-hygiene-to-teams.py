@@ -22,9 +22,12 @@ CHANNEL_ID = "19:183d481e40af45d09aac7322433fc7ab@thread.tacv2"
 # the cap we tag EVERY name occurrence (per EM request: "every name should be tagged"); above
 # it we dedupe to one @mention per unique user so the message still renders and notifies.
 MAX_RENDER_MENTIONS = 30
-# The standing CC recipient (Josh Xu). When the message is deduped, this user's tag is kept
-# on their LAST occurrence -- the "CC: ..." line, where they look for their @mention -- rather
-# than an arbitrary earlier table row. Fixes "even the cc did not tag me" (2026-08-03).
+# NOTE: default is now to tag EVERY name occurrence (dedupe=False) per the EM's explicit
+# requirement "every row with a name must be a real @mention" -- which matches the template's
+# own instruction. Dedupe remains available (dedupe=True / "auto") as a fallback. The 2026-07-23
+# non-render was most likely the message SIZE (that body was ~48KB: 68 rows incl. 42 stale
+# items), not the mention count -- today's report is ~24KB and well within limits.
+# The standing CC recipient (Josh Xu) is always tagged on the CC line (see reindex_mentions).
 CC_USER_ID = "90b98fe6-a80b-46e1-9209-b5ebcdf6da6b"
 
 
@@ -35,21 +38,17 @@ def get_token() -> str:
     ]).decode().strip()
 
 
-def reindex_mentions(payload: dict, dedupe="auto") -> dict:
+def reindex_mentions(payload: dict, dedupe=False) -> dict:
     """Re-index <at id="N"> tags to unique incrementing IDs matching the mentions array.
 
     dedupe:
-      "auto" (default) -> tag EVERY name occurrence when the message has <=
-          MAX_RENDER_MENTIONS tags (so every name is a real @mention, per EM request);
-          only when it would exceed the cap do we dedupe to one @mention per unique user
-          (later duplicates become plain text) so the message still renders and notifies.
-      True  -> always dedupe to one @mention per unique user.
-      False -> always tag every occurrence.
+      False (default) -> tag EVERY name occurrence (every row's owner is a real @mention),
+          per the EM requirement and the template's own instruction.
+      True  -> dedupe to one @mention per unique user (later duplicates -> plain text);
+          the CC user's tag is kept on their LAST occurrence (the "CC: ..." line).
+      "auto" -> dedupe only if the message would exceed MAX_RENDER_MENTIONS tags.
 
-    Background: one <at> per table row produced 68 mentions on 2026-07-23 which Teams
-    rendered as plain text / did not notify; a 29-mention post on 2026-07-02 rendered fine.
-    The cap keeps us in the render-safe zone while tagging every name for normal-size reports.
-    Whether deduped or not, the mentions array stays 1:1 with the <at> tags (unique ids).
+    Either way the mentions array stays 1:1 with the <at> tags (unique incrementing ids).
     """
     body = payload.get("body", {}).get("content", "")
     mentions = payload.get("mentions", [])
