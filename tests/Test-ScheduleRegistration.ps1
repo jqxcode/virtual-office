@@ -359,6 +359,108 @@ $oneoffName2 = "VirtualOffice-oneoff-mScrumMaster-dry-run-bug-autopilot-$ts2"
 Assert-True ($oneoffName.StartsWith("VirtualOffice-oneoff-")) "One-off name starts with VirtualOffice-oneoff- prefix"
 Assert-True ($oneoffName -ne (Get-TaskName -Agent "mScrumMaster" -Job "dry-run-bug-autopilot")) "One-off name differs from recurring task name pattern"
 
+# ========================================
+# TC80: Per-machine registration map (registrations.<host>.json)
+# ========================================
+Write-Host "`nTC80: Per-machine registration map" -ForegroundColor Cyan
+$root = New-TestRoot
+try {
+    $stateDir = Join-Path $root "state"
+    $hostName = "TESTBOX01"
+    $registrations = [ordered]@{}
+    $entries = @(
+        @{ agent = "pBugKiller"; job = "scan-and-fix"; cron = "0 10 * * *" }
+        @{ agent = "pBugKiller"; job = "scan-and-fix"; cron = "0 22 * * *" }
+        @{ agent = "mApprover";  job = "approve-FFv2"; cron = "0 6 * * *" }
+    )
+    $counts = @{}
+    foreach ($e in $entries) {
+        $bk = "$($e.agent)|$($e.job)"
+        if (-not $counts.ContainsKey($bk)) { $counts[$bk] = 1 } else { $counts[$bk]++ }
+        $occ = $counts[$bk]
+        $tn = if ($occ -eq 1) { "VO-$($e.agent)-$($e.job)" } else { "VO-$($e.agent)-$($e.job)-$occ" }
+        $registrations[$tn] = [ordered]@{
+            agent = $e.agent; job = $e.job; cron = $e.cron
+            registeredHost = $hostName; registeredAt = (Get-Date -Format "o")
+        }
+    }
+    $regFile = Join-Path $stateDir "registrations.$hostName.json"
+    ($registrations | ConvertTo-Json -Depth 5) | Set-Content -Path $regFile -Encoding UTF8
+    Assert-True (Test-Path $regFile) "registrations.<host>.json is written"
+    $back = Get-Content $regFile -Raw | ConvertFrom-Json
+    Assert-True ($null -ne $back."VO-pBugKiller-scan-and-fix") "First occurrence keyed as VO-pBugKiller-scan-and-fix"
+    Assert-True ($null -ne $back."VO-pBugKiller-scan-and-fix-2") "Duplicate cron keyed with -2 suffix"
+    Assert-True ($back."VO-mApprover-approve-FFv2".registeredHost -eq $hostName) "Record carries registeredHost = machine name"
+} finally {
+    Remove-TestRoot -Root $root
+}
+
+# ========================================
+# TC81: Merge registration maps from multiple machines (portal hosts union)
+# ========================================
+Write-Host "`nTC81: Merge multi-machine registration maps" -ForegroundColor Cyan
+$root = New-TestRoot
+try {
+    $stateDir = Join-Path $root "state"
+    foreach ($h in @("AI0001", "AI0003")) {
+        $m = [ordered]@{
+            "VO-mApprover-approve-FFv2" = [ordered]@{
+                agent = "mApprover"; job = "approve-FFv2"; cron = "0 6 * * *"
+                registeredHost = $h; registeredAt = (Get-Date -Format "o")
+            }
+        }
+        ($m | ConvertTo-Json -Depth 5) | Set-Content -Path (Join-Path $stateDir "registrations.$h.json") -Encoding UTF8
+    }
+    $hostsByAgentJob = @{}
+    foreach ($rf in (Get-ChildItem -Path $stateDir -Filter "registrations.*.json")) {
+        $obj = Get-Content $rf.FullName -Raw | ConvertFrom-Json
+        foreach ($p in $obj.PSObject.Properties) {
+            $rec = $p.Value
+            $k = "$($rec.agent)|$($rec.job)"
+            if (-not $hostsByAgentJob.ContainsKey($k)) { $hostsByAgentJob[$k] = @() }
+            if ($hostsByAgentJob[$k] -notcontains $rec.registeredHost) { $hostsByAgentJob[$k] += $rec.registeredHost }
+        }
+    }
+    $mergedHosts = $hostsByAgentJob["mApprover|approve-FFv2"]
+    Assert-True ($mergedHosts.Count -eq 2) "Same task registered on 2 machines yields 2 hosts"
+    Assert-True ($mergedHosts -contains "AI0001" -and $mergedHosts -contains "AI0003") "Merged hosts include both AI0001 and AI0003"
+} finally {
+    Remove-TestRoot -Root $root
+}
+
+# ========================================
+# TC82: Declared-host filter -- only entries for THIS machine are registered
+# ========================================
+Write-Host "`nTC82: Declared-host registration filter" -ForegroundColor Cyan
+# Mirror the filter + occurrence-counting logic in Register-Schedules.ps1.
+$thisHost = "AI0003"
+$schedEntries = @(
+    @{ agent = "mApprover";    job = "approve-FFv2";           cron = "0 6 * * *";     host = "AI0003" }
+    @{ agent = "mScrumMaster"; job = "shiproom-hygiene-check"; cron = "45 8 * * 1-5";  host = "AI0003" }
+    @{ agent = "mScrumMaster"; job = "shiproom-hygiene-check"; cron = "50 14 * * 1-5"; host = "AI0003" }
+    @{ agent = "pBugKiller";   job = "scan-and-fix";           cron = "0 10 * * *";    host = "AI0001" }
+    @{ agent = "pResearcher";  job = "scan-mentions-and-draft"; cron = "0 9 * * 1-5";  host = "AI0001" }
+    @{ agent = "mAuditor";     job = "legacy-nohost";          cron = "0 3 * * *" }  # no host -> register everywhere
+)
+$counts = @{}
+$registeredHere = @()
+foreach ($e in $schedEntries) {
+    $bk = "$($e.agent)|$($e.job)"
+    if (-not $counts.ContainsKey($bk)) { $counts[$bk] = 1 } else { $counts[$bk]++ }
+    $occ = $counts[$bk]
+    $tn = if ($occ -eq 1) { "VO-$($e.agent)-$($e.job)" } else { "VO-$($e.agent)-$($e.job)-$occ" }
+    $eHost = if ($e.ContainsKey("host")) { $e["host"] } else { $null }
+    if ($eHost -and $eHost -ne $thisHost) { continue }
+    $registeredHere += $tn
+}
+Assert-True ($registeredHere.Count -eq 4) "AI0003 registers exactly 4 tasks (2 mApprover/mScrumMaster + hygiene-check-2 + legacy no-host)"
+Assert-True ($registeredHere -contains "VO-mApprover-approve-FFv2") "Registers AI0003 approve-FFv2"
+Assert-True ($registeredHere -contains "VO-mScrumMaster-shiproom-hygiene-check") "Registers AI0003 hygiene-check (occurrence 1)"
+Assert-True ($registeredHere -contains "VO-mScrumMaster-shiproom-hygiene-check-2") "Registers AI0003 hygiene-check-2 (occurrence 2, dedup preserved)"
+Assert-True ($registeredHere -contains "VO-mAuditor-legacy-nohost") "Registers entry with no declared host (backward compatible)"
+Assert-True ($registeredHere -notcontains "VO-pBugKiller-scan-and-fix") "Skips AI0001-declared scan-and-fix"
+Assert-True ($registeredHere -notcontains "VO-pResearcher-scan-mentions-and-draft") "Skips AI0001-declared scan-mentions-and-draft"
+
 # --- Summary ---
 Write-Host "`n========================================" -ForegroundColor White
 Write-Host "Test-ScheduleRegistration: $script:Passed passed, $script:Failed failed" -ForegroundColor $(if ($script:Failed -gt 0) { "Red" } else { "Green" })

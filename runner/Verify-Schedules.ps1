@@ -66,7 +66,8 @@ $agents = if ($agentsRaw.ContainsKey("agents")) { $agentsRaw["agents"] } else { 
 
 # --- Derive expected task names from schedules.json (mirror Register logic) ---
 
-$expectedTaskNames = @{}   # taskName -> @{ agent; job; cron }
+$expectedTaskNames = @{}   # taskName -> @{ agent; job; cron }   (host-filtered to THIS machine)
+$declaredHostByTask = @{}  # taskName -> declared host (over ALL entries, for cross-host drift check)
 $taskNameCount = @{}
 
 foreach ($entry in $schedules) {
@@ -85,6 +86,11 @@ foreach ($entry in $schedules) {
     } else {
         $taskName = "${TASK_PREFIX}$agentName-$jobName-$occurrence"
     }
+    $entryHost = if ($entry.ContainsKey("host")) { $entry["host"] } else { $null }
+    if ($entryHost) { $declaredHostByTask[$taskName] = $entryHost }
+    # Only entries declared for THIS machine (or with no declared host) are expected to be
+    # live here. Agents are synced across machines; only recurring jobs differ per host.
+    if ($entryHost -and $entryHost -ne $env:COMPUTERNAME) { continue }
     $expectedTaskNames[$taskName] = @{
         agent = $agentName
         job   = $jobName
@@ -225,7 +231,7 @@ foreach ($name in ($liveTasks.Keys | Sort-Object)) {
 Write-Host ""
 Write-Host "=== Verify-Schedules (READ-ONLY reconciler) ===" -ForegroundColor White
 Write-Host "Schedule entries (config): $(@($schedules).Count)"
-Write-Host "Expected task names:       $($expectedTaskNames.Count)"
+Write-Host "Expected task names (this host: $($env:COMPUTERNAME)): $($expectedTaskNames.Count)"
 Write-Host "Live VO-* agent-job tasks: $($liveTasks.Count)"
 Write-Host "Known agents:              $($agents.Count)"
 if ($skippedNonAgent.Count -gt 0) {
@@ -257,6 +263,34 @@ Show-Check -Title "Check 2: every schedules.json entry has a live task" `
 
 Show-Check -Title "Check 3: no orphan live VO-* tasks (all are in schedules.json)" `
     -Items $orphanTasks -Columns @("TaskName", "Agent", "Job")
+
+# --- Check 4 (diagnostic, WARN-only): cross-host mis-registration ---
+# A live VO-* task whose schedules.json entry declares a DIFFERENT host than this machine
+# should not be registered here. These are a specific, named subset of the Check 3 orphans
+# (e.g. the fallout of running Register on the wrong box against a shared schedules.json).
+# WARN-only to avoid double-counting: Check 3 already fails the run for them.
+$crossHostTasks = @()
+foreach ($name in ($liveTasks.Keys | Sort-Object)) {
+    if ($declaredHostByTask.ContainsKey($name)) {
+        $declared = $declaredHostByTask[$name]
+        if ($declared -ne $env:COMPUTERNAME) {
+            $crossHostTasks += [PSCustomObject]@{
+                TaskName     = $name
+                DeclaredHost = $declared
+                ThisHost     = $env:COMPUTERNAME
+            }
+        }
+    }
+}
+Write-Host ""
+if ($crossHostTasks.Count -eq 0) {
+    Write-Host "[PASS] Check 4: no cross-host mis-registered tasks (nothing declared for another machine is live here)" -ForegroundColor Green
+} else {
+    Write-Host "[WARN] Check 4: $($crossHostTasks.Count) task(s) declared for another host are live on $($env:COMPUTERNAME) -- run Register-Schedules.ps1 here to remove (non-fatal; counted under Check 3)" -ForegroundColor Yellow
+    if (-not $Quiet) {
+        $crossHostTasks | Format-Table -Property @("TaskName", "DeclaredHost", "ThisHost") -AutoSize | Out-String | Write-Host
+    }
+}
 
 # --- Verdict ---
 
