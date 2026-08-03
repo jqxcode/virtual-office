@@ -861,11 +861,16 @@ while ($keepRunning) {
             $lockContent = @{ ts = $lockTs; job = $Job; pid = $PID; run_id = $runId } | ConvertTo-Json -Compress
             Write-AtomicFile -Path $lockFile -Content $lockContent
         } else {
-            # Invoke the agent via 'agc' (agency.exe copilot). Mirrors the user's profile agc:
-            #   agency.exe copilot -- --model claude-opus-4.8 --effort max --context long_context <args>
+            # Invoke the agent via 'agc' (agency.exe copilot). Mirrors the user's profile agc,
+            # but WITHOUT '--effort max': that flag is rejected by valid Sonnet models
+            # (e.g. claude-sonnet-4.5 -> "does not support reasoning effort configuration"),
+            # which crashed poster/pemailer once agc actually ran headless. Per the user's own
+            # note (reference_agency_copilot_cli), opus+max+long_context is the slowest combo;
+            # dropping --effort max also cuts latency for these unattended batch jobs.
+            #   agency.exe copilot -- --model claude-opus-4.8 --context long_context <args>
             # -p runs non-interactively; --allow-all lets the agent use tools without prompts;
             # --output-format json emits JSONL (one event per line) which we parse below.
-            $copilotArgs = @("copilot", "--", "--model", "claude-opus-4.8", "--effort", "max", "--context", "long_context", "--output-format", "json", "--allow-all")
+            $copilotArgs = @("copilot", "--", "--model", "claude-opus-4.8", "--context", "long_context", "--output-format", "json", "--allow-all")
             if ($agentName2) { $copilotArgs += @("--agent", $agentName2) }
             $copilotArgs += @("-p", $prompt)
 
