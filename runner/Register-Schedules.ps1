@@ -199,13 +199,15 @@ foreach ($entry in $schedules["schedules"]) {
         $taskName = "${TASK_PREFIX}$agentName-$jobName-$occurrence"
     }
 
-    # Declared-host filter: each schedule entry may declare which machine it runs on.
+    # Declared-host filter: each schedule entry may declare which machine(s) it runs on.
     # Agents are synced identically across machines; only recurring jobs differ, so host
-    # is a per-entry property. Skip entries whose host is set and does not match this box.
-    # Entries with no host are registered everywhere (backward compatible).
-    $entryHost = if ($entry.ContainsKey("host")) { $entry["host"] } else { $null }
-    if ($entryHost -and $entryHost -ne $REGISTERED_HOST) {
-        Write-Host "Skipping (declared host '$entryHost' != '$REGISTERED_HOST'): $taskName" -ForegroundColor DarkGray
+    # is a per-entry property. host may be a single name ("AI0003") or a list
+    # (["AI0001","AI0003"]) for jobs that run on multiple machines. Register here only if
+    # this machine is in the declared set. No declared host = register everywhere (back-compat).
+    $entryHosts = @()
+    if ($entry.ContainsKey("host") -and $entry["host"]) { $entryHosts = @($entry["host"]) }
+    if ($entryHosts.Count -gt 0 -and $entryHosts -notcontains $REGISTERED_HOST) {
+        Write-Host "Skipping (declared hosts '$($entryHosts -join ", ")' exclude '$REGISTERED_HOST'): $taskName" -ForegroundColor DarkGray
         continue
     }
 

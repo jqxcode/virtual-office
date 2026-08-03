@@ -461,6 +461,27 @@ Assert-True ($registeredHere -contains "VO-mAuditor-legacy-nohost") "Registers e
 Assert-True ($registeredHere -notcontains "VO-pBugKiller-scan-and-fix") "Skips AI0001-declared scan-and-fix"
 Assert-True ($registeredHere -notcontains "VO-pResearcher-scan-mentions-and-draft") "Skips AI0001-declared scan-mentions-and-draft"
 
+# ========================================
+# TC83: Multi-host declared entry registers on BOTH machines
+# ========================================
+Write-Host "`nTC83: Multi-host (host list) registration filter" -ForegroundColor Cyan
+# A schedule declared for both AI0001 and AI0003 must be registered on each.
+$dualEntry = @{ agent = "mPoster"; job = "shared-report"; cron = "0 9 * * *"; host = @("AI0001", "AI0003") }
+function Test-HostRegisters([hashtable]$Entry, [string]$Machine) {
+    $eHosts = @()
+    if ($Entry.ContainsKey("host") -and $Entry["host"]) { $eHosts = @($Entry["host"]) }
+    return ($eHosts.Count -eq 0 -or $eHosts -contains $Machine)
+}
+Assert-True (Test-HostRegisters $dualEntry "AI0001") "Multi-host entry registers on AI0001"
+Assert-True (Test-HostRegisters $dualEntry "AI0003") "Multi-host entry registers on AI0003"
+Assert-True (-not (Test-HostRegisters $dualEntry "AI9999")) "Multi-host entry skipped on a machine not in the list"
+$singleEntry = @{ agent = "mApprover"; job = "approve-FFv2"; cron = "0 6 * * *"; host = "AI0003" }
+Assert-True (Test-HostRegisters $singleEntry "AI0003") "Single-host string still registers on its machine"
+Assert-True (-not (Test-HostRegisters $singleEntry "AI0001")) "Single-host string skipped elsewhere"
+$noHostEntry = @{ agent = "mAuditor"; job = "legacy"; cron = "0 3 * * *" }
+Assert-True (Test-HostRegisters $noHostEntry "AI0001") "No-host entry registers everywhere (AI0001)"
+Assert-True (Test-HostRegisters $noHostEntry "AI0003") "No-host entry registers everywhere (AI0003)"
+
 # --- Summary ---
 Write-Host "`n========================================" -ForegroundColor White
 Write-Host "Test-ScheduleRegistration: $script:Passed passed, $script:Failed failed" -ForegroundColor $(if ($script:Failed -gt 0) { "Red" } else { "Green" })

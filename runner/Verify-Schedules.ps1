@@ -86,11 +86,13 @@ foreach ($entry in $schedules) {
     } else {
         $taskName = "${TASK_PREFIX}$agentName-$jobName-$occurrence"
     }
-    $entryHost = if ($entry.ContainsKey("host")) { $entry["host"] } else { $null }
-    if ($entryHost) { $declaredHostByTask[$taskName] = $entryHost }
+    $entryHosts = @()
+    if ($entry.ContainsKey("host") -and $entry["host"]) { $entryHosts = @($entry["host"]) }
+    if ($entryHosts.Count -gt 0) { $declaredHostByTask[$taskName] = $entryHosts }
     # Only entries declared for THIS machine (or with no declared host) are expected to be
     # live here. Agents are synced across machines; only recurring jobs differ per host.
-    if ($entryHost -and $entryHost -ne $env:COMPUTERNAME) { continue }
+    # host may be a single name or a list of machines (multi-host jobs).
+    if ($entryHosts.Count -gt 0 -and $entryHosts -notcontains $env:COMPUTERNAME) { continue }
     $expectedTaskNames[$taskName] = @{
         agent = $agentName
         job   = $jobName
@@ -272,11 +274,11 @@ Show-Check -Title "Check 3: no orphan live VO-* tasks (all are in schedules.json
 $crossHostTasks = @()
 foreach ($name in ($liveTasks.Keys | Sort-Object)) {
     if ($declaredHostByTask.ContainsKey($name)) {
-        $declared = $declaredHostByTask[$name]
-        if ($declared -ne $env:COMPUTERNAME) {
+        $declared = @($declaredHostByTask[$name])
+        if ($declared -notcontains $env:COMPUTERNAME) {
             $crossHostTasks += [PSCustomObject]@{
                 TaskName     = $name
-                DeclaredHost = $declared
+                DeclaredHost = ($declared -join ", ")
                 ThisHost     = $env:COMPUTERNAME
             }
         }

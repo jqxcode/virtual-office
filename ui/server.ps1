@@ -453,13 +453,13 @@ try {
                     foreach ($entry in $schedulesObj.schedules) {
                         $desc = ""
                         if ($entry.PSObject.Properties["description"]) { $desc = $entry.description }
-                        $declaredHost = ""
-                        if ($entry.PSObject.Properties["host"]) { $declaredHost = $entry.host }
+                        $declaredHosts = @()
+                        if ($entry.PSObject.Properties["host"] -and $entry.host) { $declaredHosts = @($entry.host) }
                         $schedulesList += [PSCustomObject]@{
                             agent       = $entry.agent
                             job         = $entry.job
                             cron        = $entry.cron
-                            host        = $declaredHost
+                            hosts       = $declaredHosts
                             description = $desc
                         }
                     }
