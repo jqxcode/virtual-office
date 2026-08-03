@@ -1,4 +1,4 @@
-﻿#Requires -Version 7.0
+#Requires -Version 7.0
 # Test-InvokeAgentJob.ps1 -- Tests for the core Invoke-AgentJob runner logic
 # Run: pwsh -File tests/Test-InvokeAgentJob.ps1
 
@@ -251,7 +251,7 @@ try {
         Assert-True ($counter["count"] -eq 1) "Counter shows 1 after first run"
     }
 
-    $lockFile = Join-Path $stateDir "lock"
+    $lockFile = Join-Path (Split-Path $stateDir -Parent) "lock"  # agent-level lock
     Assert-True (-not (Test-Path $lockFile)) "Lock file is removed after run"
 
     # Check audit entry exists
@@ -273,9 +273,9 @@ try {
 
     # Pre-create lock file to simulate a running job
     $stateDir = Ensure-StateDir -AgentName "test-agent" -JobName "test-job"
-    $lockFile = Join-Path $stateDir "lock"
+    $lockFile = Join-Path (Split-Path $stateDir -Parent) "lock"  # agent-level lock
     $queueFile = Join-Path $stateDir "queue"
-    Set-Content -Path $lockFile -Value (Get-Date -Format "o") -Encoding UTF8
+    Set-Content -Path $lockFile -Value ((@{ ts=(Get-Date -Format "o"); job="test-job"; pid=999999; run_id="tc2" }|ConvertTo-Json -Compress)) -Encoding UTF8
 
     $result = Invoke-Runner -Root $root
     Assert-True ($result.ExitCode -eq 0) "Runner exits cleanly when locked"
@@ -468,7 +468,7 @@ try {
 
     # Pre-create lock file with a timestamp 3 hours ago
     $stateDir = Ensure-StateDir -AgentName "test-agent" -JobName "test-job"
-    $lockFile = Join-Path $stateDir "lock"
+    $lockFile = Join-Path (Split-Path $stateDir -Parent) "lock"  # agent-level lock
     $staleTime = (Get-Date).AddHours(-3).ToString("o")
     Set-Content -Path $lockFile -Value $staleTime -Encoding ASCII
 
@@ -503,9 +503,9 @@ try {
 
     # Pre-create lock file with a timestamp 30 minutes ago (within default 120m timeout)
     $stateDir = Ensure-StateDir -AgentName "test-agent" -JobName "test-job"
-    $lockFile = Join-Path $stateDir "lock"
+    $lockFile = Join-Path (Split-Path $stateDir -Parent) "lock"  # agent-level lock
     $freshTime = (Get-Date).AddMinutes(-30).ToString("o")
-    Set-Content -Path $lockFile -Value $freshTime -Encoding ASCII
+    Set-Content -Path $lockFile -Value ((@{ ts=$freshTime; job="test-job"; pid=999999; run_id="tc76" }|ConvertTo-Json -Compress)) -Encoding ASCII
 
     $result = Invoke-Runner -Root $root
     Assert-True ($result.ExitCode -eq 0) "Runner exits cleanly when lock is fresh"
@@ -552,7 +552,7 @@ try {
 
     # Pre-create lock file with a timestamp 45 minutes ago (stale with 30m timeout)
     $stateDir = Ensure-StateDir -AgentName "test-agent" -JobName "test-job"
-    $lockFile = Join-Path $stateDir "lock"
+    $lockFile = Join-Path (Split-Path $stateDir -Parent) "lock"  # agent-level lock
     $staleTime = (Get-Date).AddMinutes(-45).ToString("o")
     Set-Content -Path $lockFile -Value $staleTime -Encoding ASCII
 
@@ -587,7 +587,7 @@ try {
 
     # Pre-create lock file with invalid timestamp content
     $stateDir = Ensure-StateDir -AgentName "test-agent" -JobName "test-job"
-    $lockFile = Join-Path $stateDir "lock"
+    $lockFile = Join-Path (Split-Path $stateDir -Parent) "lock"  # agent-level lock
     Set-Content -Path $lockFile -Value "invalid-timestamp" -Encoding ASCII
 
     $result = Invoke-Runner -Root $root

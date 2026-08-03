@@ -771,6 +771,15 @@ if (Test-Path $lockFile) {
 # leaves an orphaned lock file that blocks the agent until TTL expires.
 # See: https://github.com/jqxcode/virtual-office/issues/61
 $keepRunning = $true
+# Initialize outcome vars before the loop so the maxRuns-skip path (which breaks
+# out before the invocation block sets them) leaves them defined for the
+# post-loop dashboard block under StrictMode. Without this, a job at its maxRuns
+# limit crashes with "variable $exitCode/$relOutputPath cannot be retrieved".
+$output = ""
+$exitCode = 0
+$costData = $null
+$relOutputPath = $null
+$outputWriteTime = $null
 try {
 while ($keepRunning) {
     # Record the lock timestamp (lock file is written atomically with PID after process starts)
