@@ -188,7 +188,8 @@ WIQL_CHECK8_COMMITTED_OUTSIDE = (
     "SELECT [System.Id], [System.Title], [System.IterationPath], [System.AreaPath] "
     "FROM workitems "
     "WHERE [System.WorkItemType] = 'Feature' "
-    "AND [System.State] = 'Committed' "
+    "AND [Custom.CommittedTargettedCut] = 'Committed' "
+    "AND [System.State] NOT IN ('Closed', 'Removed') "
     "AND NOT [System.IterationPath] UNDER '{semester}' "
     "AND [System.AreaPath] UNDER '{area}'"
 )
@@ -779,6 +780,11 @@ def detect_order_inversions(rows):
     running_max = -1
     running_item = None
     for r in enriched:
+        if r["stackRank"] is None:
+            # No StackRank = no defined backlog position, so it cannot be "out of order".
+            # These are typically transient auto-created items (e.g. Feature-Flag rollout
+            # Exceptions from teams-ff-ado-background-prod-sp) that are never manually ranked.
+            continue
         if r["state"] in EXEMPT_ORDER_STATES:
             # Wildcard in-flight state (e.g. Blocked): may sit anywhere between Active
             # and RollingOut, so it never triggers nor receives an inversion flag.
@@ -2153,7 +2159,7 @@ def _build_check8_section(res):
     return _section_html(
         "Check 8: Committed Features Outside Current Semester",
         "{0} flagged".format(len(items)),
-        "Features in Committed state must belong to the current semester. Summary posted to Teams.",
+        "Features that are funding-Committed (Custom.CommittedTargettedCut) must belong to the current semester. Summary posted to Teams.",
         ["Feature ID", "Title", "Owner", "Iteration", "Area"],
         rows,
         _query_link(ids, "Open all {0} items in ADO query".format(len(items))),

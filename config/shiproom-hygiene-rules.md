@@ -211,12 +211,13 @@ Comment-only checks (4, 7-14, 17, 18, 20) follow the same area list.
 
 ## Check 8: Committed Features Outside Current Semester
 
-**Goal**: Features in Committed state must belong to the current semester (H1 2026).
+**Goal**: Features that are funding-**Committed** must belong to the current semester. (Corrected 2026-08-03: "Committed" is the funding value `Custom.CommittedTargettedCut`, NOT `System.State` — the old `[System.State]='Committed'` matched 0 items, so this check was silently dead.)
 
 1. WIQL per area:
    ```
    WHERE [System.WorkItemType] = 'Feature'
-     AND [System.State] = 'Committed'
+     AND [Custom.CommittedTargettedCut] = 'Committed'
+     AND [System.State] NOT IN ('Closed', 'Removed')
      AND NOT [System.IterationPath] UNDER '<current_semester>'
      AND [System.AreaPath] UNDER '<area>'
    ```

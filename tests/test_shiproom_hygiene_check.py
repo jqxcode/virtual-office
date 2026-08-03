@@ -415,15 +415,14 @@ class TestDetectOrderInversions(unittest.TestCase):
         self.assertEqual([r["id"] for r in suggested], [1, 2])
 
     def test_handles_none_stackrank(self):
+        # Corrected 2026-08-03: an item with no StackRank has no backlog position, so it is
+        # SKIPPED (never flagged) -- e.g. transient auto-created Feature-Flag rollout Exceptions.
         rows = [
             {"id": 1, "state": "RollingOut", "tags": "", "owner": "a", "stackRank": None},
             {"id": 2, "state": "Proposed", "tags": "", "owner": "b", "stackRank": 50},
         ]
         flagged, suggested = shc.detect_order_inversions(rows)
-        # None StackRank sorts last -> ordered [Proposed(50), RollingOut(None)];
-        # RollingOut tier 1 < Proposed tier 4 -> inversion on id 1.
-        self.assertEqual(len(flagged), 1)
-        self.assertEqual(flagged[0]["id"], 1)
+        self.assertEqual(len(flagged), 0)
 
 
 if __name__ == "__main__":
