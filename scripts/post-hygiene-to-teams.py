@@ -22,6 +22,10 @@ CHANNEL_ID = "19:183d481e40af45d09aac7322433fc7ab@thread.tacv2"
 # the cap we tag EVERY name occurrence (per EM request: "every name should be tagged"); above
 # it we dedupe to one @mention per unique user so the message still renders and notifies.
 MAX_RENDER_MENTIONS = 30
+# The standing CC recipient (Josh Xu). When the message is deduped, this user's tag is kept
+# on their LAST occurrence -- the "CC: ..." line, where they look for their @mention -- rather
+# than an arbitrary earlier table row. Fixes "even the cc did not tag me" (2026-08-03).
+CC_USER_ID = "90b98fe6-a80b-46e1-9209-b5ebcdf6da6b"
 
 
 def get_token() -> str:
@@ -51,25 +55,43 @@ def reindex_mentions(payload: dict, dedupe="auto") -> dict:
     mentions = payload.get("mentions", [])
     mention_map = {str(m["id"]): m for m in mentions}
 
-    if dedupe == "auto":
-        tag_count = len(re.findall(r'<at id="\d+">', body))
-        dedupe = tag_count > MAX_RENDER_MENTIONS
-        print(f"reindex_mentions: {tag_count} raw tags, dedupe={dedupe} "
-              f"(cap={MAX_RENDER_MENTIONS})")
-
-    new_mentions: list = []
-    seen_user: dict = {}   # aad user id -> assigned new mention id
-    counter = {"n": 0}
-
-    def _user_id(m):
+    def _user_id(old_id):
+        m = mention_map.get(old_id)
         return ((m or {}).get("mentioned") or {}).get("user", {}).get("id")
 
+    tags = re.findall(r'<at id="(\d+)">(.*?)</at>', body)
+    if dedupe == "auto":
+        dedupe = len(tags) > MAX_RENDER_MENTIONS
+        print(f"reindex_mentions: {len(tags)} raw tags, dedupe={dedupe} "
+              f"(cap={MAX_RENDER_MENTIONS})")
+
+    # When deduping, keep exactly one tag per unique user. For the CC user keep their LAST
+    # occurrence (the "CC: ..." line); for everyone else keep their FIRST occurrence.
+    keep_idx: dict = {}   # occurrence index -> kept as a tag
+    if dedupe:
+        first_idx: dict = {}
+        last_idx: dict = {}
+        for i, (oid, _name) in enumerate(tags):
+            u = _user_id(oid)
+            if u is None:
+                continue
+            first_idx.setdefault(u, i)
+            last_idx[u] = i
+        for u, fi in first_idx.items():
+            keep_idx[last_idx[u] if u == CC_USER_ID else fi] = True
+
+    occ = {"i": 0}
+    counter = {"n": 0}
+    new_mentions: list = []
+
     def _repl(match):
+        idx = occ["i"]
+        occ["i"] += 1
         old_id, display_name = match.group(1), match.group(2)
         m = mention_map.get(old_id)
-        uid = _user_id(m)
-        # Duplicate mention of an already-mentioned user -> plain text.
-        if dedupe and uid is not None and uid in seen_user:
+        uid = _user_id(old_id)
+        # When deduping, occurrences not chosen as the kept tag become plain text.
+        if dedupe and uid is not None and not keep_idx.get(idx):
             return display_name
         new_id = counter["n"]
         counter["n"] += 1
@@ -77,8 +99,6 @@ def reindex_mentions(payload: dict, dedupe="auto") -> dict:
             mm = json.loads(json.dumps(m))  # deep copy
             mm["id"] = new_id
             new_mentions.append(mm)
-            if uid is not None:
-                seen_user[uid] = new_id
         else:
             print(f"WARNING: no mention entry for at id={old_id} ({display_name})")
         return f'<at id="{new_id}">{display_name}</at>'
