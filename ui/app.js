@@ -3309,7 +3309,7 @@ function renderTeamTab() {
   schedules.forEach(function(s) {
     if (!scheduleLookup[s.agent]) scheduleLookup[s.agent] = {};
     if (!scheduleLookup[s.agent][s.job]) scheduleLookup[s.agent][s.job] = [];
-    scheduleLookup[s.agent][s.job].push({ cron: s.cron, description: s.description || "" });
+    scheduleLookup[s.agent][s.job].push({ cron: s.cron, description: s.description || "", host: s.host || "" });
   });
   var overviewEl = document.getElementById("team-overview");
   var hooksCount = 0;
@@ -3354,7 +3354,7 @@ function renderTeamTab() {
       sl.textContent = "Skills"; card.appendChild(sl);
       var tbl = document.createElement("table"); tbl.className = "team-skills-table";
       var thd = document.createElement("thead"); var thr = document.createElement("tr");
-      ["Job", "Schedule", "Description"].forEach(function(h) { var th = document.createElement("th"); th.textContent = h; thr.appendChild(th); });
+      ["Host", "Job", "Schedule", "Description"].forEach(function(h) { var th = document.createElement("th"); th.textContent = h; thr.appendChild(th); });
       thd.appendChild(thr); tbl.appendChild(thd);
       var tbd = document.createElement("tbody");
       jobNames.forEach(function(jobName) {
@@ -3373,14 +3373,24 @@ function renderTeamTab() {
           });
           td.appendChild(sp); return td;
         }
+        function mkHostCell(hostVal) {
+          var td = document.createElement("td");
+          var badge = document.createElement("span");
+          if (hostVal) { badge.className = "host-badge"; badge.textContent = hostVal; }
+          else { badge.className = "host-badge host-none"; badge.textContent = "\u2014"; }
+          td.appendChild(badge); return td;
+        }
         if (se.length === 0) {
-          var tr = document.createElement("tr"); tr.appendChild(mkNameCell(jobName));
+          var tr = document.createElement("tr");
+          tr.appendChild(mkHostCell(""));
+          tr.appendChild(mkNameCell(jobName));
           var ts = document.createElement("td"); ts.className = "team-skill-schedule"; ts.textContent = "manual"; tr.appendChild(ts);
           var td = document.createElement("td"); td.className = "team-skill-desc"; td.textContent = desc; td.title = desc; tr.appendChild(td);
           tbd.appendChild(tr);
         } else {
           se.forEach(function(sched, idx) {
             var tr = document.createElement("tr");
+            tr.appendChild(mkHostCell(sched.host));
             if (idx === 0) tr.appendChild(mkNameCell(jobName)); else tr.appendChild(document.createElement("td"));
             var ts = document.createElement("td"); ts.className = "team-skill-schedule"; ts.textContent = cronToShortHuman(sched.cron); ts.title = sched.cron;
             tr.appendChild(ts);
@@ -4353,6 +4363,7 @@ function renderScheduleV2Tab() {
     var job = sched.job || "";
     var cron = sched.cron || "";
     var description = sched.description || "";
+    var host = sched.host || "";
     var cronHuman = cronToHuman(cron);
 
     if (agentFilter && agent !== agentFilter) return;
@@ -4362,7 +4373,7 @@ function renderScheduleV2Tab() {
     fires.forEach(function(fireTime) {
       allItems.push({
         fireTime: fireTime, agent: agent, job: job,
-        cronHuman: cronHuman, description: description
+        cronHuman: cronHuman, description: description, host: host
       });
     });
   });
@@ -4412,6 +4423,14 @@ function renderScheduleV2Tab() {
     tdJob.textContent = item.job;
     tdJob.style.color = "#9ca3af";
     tr.appendChild(tdJob);
+
+    // Host (declared machine)
+    var tdHost = document.createElement("td");
+    var hostBadge = document.createElement("span");
+    if (item.host) { hostBadge.className = "host-badge"; hostBadge.textContent = item.host; }
+    else { hostBadge.className = "host-badge host-none"; hostBadge.textContent = "\u2014"; }
+    tdHost.appendChild(hostBadge);
+    tr.appendChild(tdHost);
 
     // Schedule
     var tdSchedule = document.createElement("td");
