@@ -4,7 +4,13 @@ All VO agent jobs MUST follow these rules when generating reports. Read this fil
 
 ## 0. Design System (HIGHEST PRIORITY)
 
-All HTML reports MUST follow `${SRC_ROOT}/DESIGN.md` (Stripe-inspired design system). Use `--stripe-*` CSS custom properties exclusively. NEVER hardcode hex colors. NEVER use the old `--vo-*` dark theme variables. If a template still uses `--vo-*` tokens, you MUST convert them to `--stripe-*` equivalents from DESIGN.md before generating the report.
+All HTML reports MUST follow the report design system at `${SRC_ROOT}/DESIGN.md` (titled "Design System Inspired by Stripe"). Use `--stripe-*` CSS custom properties exclusively. NEVER hardcode hex colors. NEVER use the old `--vo-*` dark theme variables. If a template still uses `--vo-*` tokens, you MUST convert them to `--stripe-*` equivalents from `${SRC_ROOT}/DESIGN.md` before generating the report.
+
+IMPORTANT -- do not confuse the two DESIGN.md files:
+- `${SRC_ROOT}/DESIGN.md` (repo root, "Design System Inspired by Stripe") -- the report design system. This is the ONLY DESIGN.md this rule refers to. It defines the `--stripe-*` tokens.
+- `virtual-office/DESIGN.md` ("Virtual Office -- Design Document") -- the product/UX design document for the VO app and dashboard. It uses the older Linear `--vo-*` theme and is NOT the report design system. Do NOT source report CSS tokens from this file.
+
+If you find `${SRC_ROOT}/DESIGN.md` uses `--vo-*` (or does not define `--stripe-*`), do NOT fabricate tokens or silently fall back to the product DESIGN.md -- flag the mismatch instead.
 
 ## 1. Fixed Template
 
