@@ -204,7 +204,9 @@ function Invoke-Runner {
     param(
         [string]$Root,
         [string]$AgentName = "test-agent",
-        [string]$JobName = "test-job"
+        [string]$JobName = "test-job",
+        [string]$MockOutput = "mock agent output",
+        [int]$MockExit = 0
     )
     # Copy the real runner, but mock the agent CLI via the VO_CLI_MOCK_OUTPUT env seam
     $realRunner = Join-Path $PSScriptRoot ".." "runner" "Invoke-AgentJob.ps1"
@@ -215,17 +217,25 @@ function Invoke-Runner {
     $testConstants = Join-Path $Root "runner/constants.ps1"
     $runnerContent = $runnerContent -replace '\. \(Join-Path \$PSScriptRoot "constants\.ps1"\)', ". '$testConstants'"
 
-    # Mock the agent CLI via the runner's VO_CLI_MOCK_OUTPUT test seam (inherited by the child pwsh).
-    $env:VO_CLI_MOCK_OUTPUT = "mock agent output"
-
     $testRunner = Join-Path $Root "runner/test-runner.ps1"
     Set-Content -Path $testRunner -Value $runnerContent -Encoding UTF8
 
-    $result = pwsh -NoProfile -File $testRunner -Agent $AgentName -Job $JobName 2>&1 | Out-String
-    $env:VO_CLI_MOCK_OUTPUT = $null
+    # Mock the agent CLI via the runner's VO_CLI_MOCK_* test seam inherited by
+    # the child pwsh. Restore any caller values even if the child fails.
+    $oldMockOutput = $env:VO_CLI_MOCK_OUTPUT
+    $oldMockExit = $env:VO_CLI_MOCK_EXIT
+    try {
+        $env:VO_CLI_MOCK_OUTPUT = $MockOutput
+        $env:VO_CLI_MOCK_EXIT = "$MockExit"
+        $result = pwsh -NoProfile -File $testRunner -Agent $AgentName -Job $JobName 2>&1 | Out-String
+        $runnerExitCode = $LASTEXITCODE
+    } finally {
+        $env:VO_CLI_MOCK_OUTPUT = $oldMockOutput
+        $env:VO_CLI_MOCK_EXIT = $oldMockExit
+    }
     return @{
         Output   = $result
-        ExitCode = $LASTEXITCODE
+        ExitCode = $runnerExitCode
     }
 }
 
@@ -693,6 +703,35 @@ Write-AuditEntry -Action 'started' -AgentName 'tc79-child' -JobName 'tc79-job' -
     }
 } finally {
     if ($blockingStream) { try { $blockingStream.Close() } catch {} }
+    Remove-TestRoot -Root $root
+}
+
+# ========================================
+# TC80: JSONL model-change event records the actual Copilot-selected model
+# ========================================
+Write-Host "`nTC80: Actual Copilot model is recorded from JSONL" -ForegroundColor Cyan
+$root = New-TestRoot
+try {
+    Write-TestConstants -Root $root
+    Write-TestConfig -Root $root -MaxRuns 0
+
+    $mockJsonl = @(
+        '{"type":"session.model_change","data":{"newModel":"test-supported-model"}}'
+        '{"type":"assistant.message","data":{"content":"mock model-aware output","outputTokens":7}}'
+        '{"type":"result","sessionId":"tc80-session","exitCode":0,"usage":{"premiumRequests":1,"sessionDurationMs":12,"totalApiDurationMs":5}}'
+    ) -join "`n"
+
+    $result = Invoke-Runner -Root $root -MockOutput $mockJsonl
+    Assert-True ($result.ExitCode -eq 0) "Runner exits 0 with model-change JSONL"
+
+    $dashboard = Get-Content (Join-Path $root "state/dashboard.json") -Raw | ConvertFrom-Json -AsHashtable
+    $recordedModel = $dashboard["agents"]["test-agent"]["test-job"]["lastCost"]["model"]
+    Assert-True ($recordedModel -eq "test-supported-model") "Dashboard records the actual model from session.model_change"
+
+    $auditFile = Join-Path $root "output/audit/$(Get-Date -Format 'yyyy-MM').jsonl"
+    $auditText = Get-Content $auditFile -Raw
+    Assert-True ($auditText -match '"model":"test-supported-model"') "Audit records the actual Copilot-selected model"
+} finally {
     Remove-TestRoot -Root $root
 }
 

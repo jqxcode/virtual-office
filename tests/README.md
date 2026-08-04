@@ -19,6 +19,7 @@ Get-ChildItem tests/Test-*.ps1 | ForEach-Object { pwsh -File $_ }
 | File | Coverage |
 |------|----------|
 | Test-InvokeAgentJob.ps1 | Core runner: locking, counter, maxRuns, disabled jobs, invalid agents |
+| Test-NoForcedModel.ps1 | Model-agnostic launcher regression: no model/effort overrides, required operational flags, shared runner paths |
 | Test-QueueDrain.ps1 | Queue increment, drain loop, maxRuns interaction |
 | Test-AuditLog.ps1 | Audit entry creation, monthly partitioning, required fields |
 | Test-ScheduleRegistration.ps1 | Schedule parsing, task name generation, invalid cron handling |

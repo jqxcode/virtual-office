@@ -861,16 +861,12 @@ while ($keepRunning) {
             $lockContent = @{ ts = $lockTs; job = $Job; pid = $PID; run_id = $runId } | ConvertTo-Json -Compress
             Write-AtomicFile -Path $lockFile -Content $lockContent
         } else {
-            # Invoke the agent via 'agc' (agency.exe copilot). Mirrors the user's profile agc,
-            # but WITHOUT '--effort max': that flag is rejected by valid Sonnet models
-            # (e.g. claude-sonnet-4.5 -> "does not support reasoning effort configuration"),
-            # which crashed poster/pemailer once agc actually ran headless. Per the user's own
-            # note (reference_agency_copilot_cli), opus+max+long_context is the slowest combo;
-            # dropping --effort max also cuts latency for these unattended batch jobs.
-            #   agency.exe copilot -- --model claude-opus-4.8 --context long_context <args>
+            # Invoke Copilot without selecting a model. Model availability is controlled by
+            # the Copilot backend and changes over time; unattended VO automation must use
+            # Copilot's supported default rather than copying a personal interactive alias.
             # -p runs non-interactively; --allow-all lets the agent use tools without prompts;
             # --output-format json emits JSONL (one event per line) which we parse below.
-            $copilotArgs = @("copilot", "--", "--model", "claude-opus-4.8", "--context", "long_context", "--output-format", "json", "--allow-all")
+            $copilotArgs = @("copilot", "--", "--context", "long_context", "--output-format", "json", "--allow-all")
             if ($agentName2) { $copilotArgs += @("--agent", $agentName2) }
             $copilotArgs += @("-p", $prompt)
 
@@ -900,7 +896,7 @@ while ($keepRunning) {
         try {
             $assistantParts = New-Object System.Collections.Generic.List[string]
             $outputTokensSum = 0
-            $modelName = "claude-opus-4.8"
+            $modelName = "unknown"
             $resultEvent = $null
             foreach ($line in ($rawOutput -split "`n")) {
                 $t = $line.Trim()
@@ -908,7 +904,12 @@ while ($keepRunning) {
                 $obj = $null
                 try { $obj = $t | ConvertFrom-Json -AsHashtable } catch { continue }
                 if (-not ($obj -is [hashtable]) -or -not $obj.ContainsKey("type")) { continue }
-                if ($obj["type"] -eq "assistant.message") {
+                if ($obj["type"] -eq "session.model_change") {
+                    $d = $obj["data"]
+                    if ($d -and $d.ContainsKey("newModel") -and $d["newModel"]) {
+                        $modelName = [string]$d["newModel"]
+                    }
+                } elseif ($obj["type"] -eq "assistant.message") {
                     $d = $obj["data"]
                     if ($d -and $d.ContainsKey("content") -and $d["content"]) { $assistantParts.Add([string]$d["content"]) }
                     if ($d -and $d.ContainsKey("outputTokens")) { $outputTokensSum += [int]$d["outputTokens"] }
