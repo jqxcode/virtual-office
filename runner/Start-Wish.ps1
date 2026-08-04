@@ -67,8 +67,9 @@ Wish ID: $($wish.id)
 When we make progress, update the wish-list.json with new status and next steps.
 "@
 
-# agc = agency.exe copilot wrapper (mirrors the user's profile 'agc' function so this launcher works even without the profile loaded)
-function agc { agency.exe copilot -- --model claude-opus-4.8 --effort max --context long_context @args }
+# Model-agnostic Copilot wrapper. VO intentionally delegates model selection and
+# reasoning effort to the currently supported Copilot defaults.
+function agc { agency.exe copilot -- --context long_context @args }
 
 # Try to resume the named session first; if none exists, start a fresh named interactive session seeded with the wish context.
 Write-Host "Trying to resume session '$name'..." -ForegroundColor DarkGray
