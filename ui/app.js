@@ -1957,190 +1957,8 @@ function renderScheduleFilterIndicator() {
 }
 
 function renderScheduleTable() {
-  renderScheduleFilterIndicator();
-  if (!scheduleData) return;
-  var schedules = scheduleData.schedules || [];
-  var now = new Date();
-  var allItems = [];
-
-  schedules.forEach(function(sched) {
-    var agent = sched.agent || "";
-    var job = sched.job || "";
-    var cron = sched.cron || "";
-    var description = sched.description || "";
-    var cronHuman = cronToHuman(cron);
-    var fires = getNextCronFires(cron, now, 10);
-
-    fires.forEach(function(fireTime) {
-      allItems.push({
-        fireTime: fireTime,
-        agent: agent,
-        job: job,
-        cron: cron,
-        cronHuman: cronHuman,
-        description: description,
-        status: "scheduled"
-      });
-    });
-  });
-
-  // Cross-reference with merged agent state (same source as Agents tab)
-  var mergedAgents = scheduleData.merged || {};
-  var runningMarked = {};
-  var queuedMarked = {};
-
-  allItems.forEach(function(item) {
-    var key = item.agent + "/" + item.job;
-    var agentData = mergedAgents[item.agent];
-    if (!agentData) return;
-
-    // Find the matching job in the merged jobs array
-    var matchedJob = null;
-    (agentData.jobs || []).forEach(function(j) {
-      if (j.name === item.job) matchedJob = j;
-    });
-    if (!matchedJob) return;
-
-    if (matchedJob.status === "running" && !runningMarked[key]) {
-      item.status = "running";
-      runningMarked[key] = true;
-    } else if (matchedJob.queueDepth > 0 && !queuedMarked[key]) {
-      var queuedCount = queuedMarked[key + "_count"] || 0;
-      if (queuedCount < matchedJob.queueDepth) {
-        item.status = "queued";
-        queuedMarked[key + "_count"] = queuedCount + 1;
-      }
-    }
-  });
-
-  // Sort: disabled at end, then by fireTime ascending
-  allItems.sort(function(a, b) {
-    if (!a.fireTime && !b.fireTime) return 0;
-    if (!a.fireTime) return 1;
-    if (!b.fireTime) return -1;
-    return a.fireTime.getTime() - b.fireTime.getTime();
-  });
-
-  // Apply agent filter if active
-  if (selectedAgentFilter) {
-    allItems = allItems.filter(function(item) {
-      return item.agent === selectedAgentFilter;
-    });
-  }
-
-  var totalCount = allItems.length;
-  var displayItems = allItems.slice(0, MAX_SCHEDULE_ROWS);
-
-  var tbody = document.getElementById("schedule-tbody");
-  if (!tbody) return;
-  tbody.innerHTML = "";
-
-  displayItems.forEach(function(item) {
-    var tr = document.createElement("tr");
-    if (item.status === "running") tr.className = "running-row";
-    else if (item.status === "queued") tr.className = "queued-row";
-    else if (item.status === "disabled") tr.className = "disabled-row";
-
-    // Next Run
-    var tdTime = document.createElement("td");
-    if (item.fireTime) {
-      tdTime.textContent = item.fireTime.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }) + ", " + item.fireTime.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
-    } else {
-      tdTime.textContent = "--";
-    }
-    tr.appendChild(tdTime);
-
-    // Agent
-    var tdAgent = document.createElement("td");
-    tdAgent.style.color = getAgentColor(item.agent);
-    tdAgent.style.fontWeight = "bold";
-    tdAgent.textContent = item.agent;
-    tr.appendChild(tdAgent);
-
-    // Job
-    var tdJob = document.createElement("td");
-    var tdJobSpan = document.createElement("span");
-    tdJobSpan.textContent = item.job;
-    tdJobSpan.style.color = "#9ca3af";
-    makeClickToCopy(tdJobSpan);
-    tdJob.appendChild(tdJobSpan);
-    tr.appendChild(tdJob);
-
-    // Schedule
-    var tdSchedule = document.createElement("td");
-    tdSchedule.textContent = item.cronHuman;
-    tdSchedule.title = item.cron;
-    tr.appendChild(tdSchedule);
-
-    // Status
-    var tdStatus = document.createElement("td");
-    var badge = document.createElement("span");
-    badge.className = "schedule-status-badge " + item.status;
-    badge.textContent = item.status;
-    tdStatus.appendChild(badge);
-    tr.appendChild(tdStatus);
-
-    // Action
-    var tdAction = document.createElement("td");
-    if (item.status === "running") {
-      var stopBtn = document.createElement("button");
-      stopBtn.className = "force-stop-btn";
-      stopBtn.textContent = "Force Stop";
-      stopBtn.addEventListener("click", function() {
-        if (stopBtn.classList.contains("confirming")) {
-          fetch(CONFIG.API_BASE + "/api/job/stop", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ agent: item.agent, job: item.job })
-          }).then(function() {
-            scheduleData = null;
-            loadScheduleData();
-          });
-        } else {
-          stopBtn.classList.add("confirming");
-          stopBtn.textContent = "Click again to stop";
-          setTimeout(function() {
-            stopBtn.classList.remove("confirming");
-            stopBtn.textContent = "Force Stop";
-          }, 3000);
-        }
-      });
-      tdAction.appendChild(stopBtn);
-    } else if (item.status === "queued") {
-      var cancelBtn = document.createElement("button");
-      cancelBtn.className = "cancel-btn";
-      cancelBtn.textContent = "Cancel";
-      cancelBtn.addEventListener("click", function() {
-        fetch(CONFIG.API_BASE + "/api/queue/cancel", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ agent: item.agent, job: item.job })
-        }).then(function() {
-          scheduleData = null;
-          loadScheduleData();
-        });
-      });
-      tdAction.appendChild(cancelBtn);
-    }
-    tr.appendChild(tdAction);
-
-    tbody.appendChild(tr);
-  });
-
-  // Update count badge
-  var countEl = document.getElementById("schedule-count");
-  if (countEl) countEl.textContent = totalCount;
-
-  // Overflow message
-  var overflowEl = document.getElementById("schedule-overflow");
-  if (overflowEl) {
-    if (totalCount > MAX_SCHEDULE_ROWS) {
-      overflowEl.style.display = "";
-      overflowEl.textContent = "Showing " + MAX_SCHEDULE_ROWS + " of " + totalCount + " upcoming tasks";
-    } else {
-      overflowEl.style.display = "none";
-    }
-  }
+  // Dead code removed: #schedule-tbody was removed from index.html, so this never rendered. Kept as a no-op
+  // stub because its call sites are entangled in live handlers/promise chains.
 }
 
 function renderQueueCards() {
@@ -2940,116 +2758,8 @@ function getV2UpcomingItems() {
 }
 
 function renderV2UpcomingSchedule() {
-  var allItems = getV2UpcomingItems();
-  var totalCount = allItems.length;
-  var showCount = v2UpcomingPageSize * (v2UpcomingPage + 1);
-  var displayItems = allItems.slice(0, showCount);
-
-  var tbody = document.getElementById("v2-upcoming-tbody");
-  if (!tbody) return;
-  tbody.innerHTML = "";
-
-  displayItems.forEach(function(item) {
-    var tr = document.createElement("tr");
-    if (item.status === "running") tr.className = "running-row";
-    else if (item.status === "queued") tr.className = "queued-row";
-    else if (item.status === "disabled") tr.className = "disabled-row";
-
-    // Next Run
-    var tdTime = document.createElement("td");
-    if (item.fireTime) {
-      tdTime.textContent = item.fireTime.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }) + ", " + item.fireTime.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
-    } else {
-      tdTime.textContent = "--";
-    }
-    tr.appendChild(tdTime);
-
-    // Agent
-    var tdAgent = document.createElement("td");
-    tdAgent.style.color = getAgentColor(item.agent);
-    tdAgent.style.fontWeight = "bold";
-    tdAgent.textContent = item.agent;
-    tr.appendChild(tdAgent);
-
-    // Job
-    var tdJob = document.createElement("td");
-    var tdJobSpan = document.createElement("span");
-    tdJobSpan.textContent = item.job;
-    tdJobSpan.style.color = "#9ca3af";
-    makeClickToCopy(tdJobSpan);
-    tdJob.appendChild(tdJobSpan);
-    tr.appendChild(tdJob);
-
-    // Schedule
-    var tdSchedule = document.createElement("td");
-    tdSchedule.textContent = item.cronHuman;
-    tdSchedule.title = item.cron;
-    tr.appendChild(tdSchedule);
-
-    // Status
-    var tdStatus = document.createElement("td");
-    var badge = document.createElement("span");
-    badge.className = "schedule-status-badge " + item.status;
-    badge.textContent = item.status;
-    tdStatus.appendChild(badge);
-    tr.appendChild(tdStatus);
-
-    // Action
-    var tdAction = document.createElement("td");
-    if (item.status === "running") {
-      var stopBtn = document.createElement("button");
-      stopBtn.className = "force-stop-btn";
-      stopBtn.textContent = "Force Stop";
-      stopBtn.addEventListener("click", function() {
-        if (stopBtn.classList.contains("confirming")) {
-          fetch(CONFIG.API_BASE + "/api/job/stop", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ agent: item.agent, job: item.job })
-          }).then(function() {
-            scheduleData = null;
-            loadScheduleData().then(function() { renderV2UpcomingSchedule(); });
-          });
-        } else {
-          stopBtn.classList.add("confirming");
-          stopBtn.textContent = "Click again to stop";
-          setTimeout(function() {
-            stopBtn.classList.remove("confirming");
-            stopBtn.textContent = "Force Stop";
-          }, 3000);
-        }
-      });
-      tdAction.appendChild(stopBtn);
-    } else if (item.status === "queued") {
-      var cancelBtn = document.createElement("button");
-      cancelBtn.className = "cancel-btn";
-      cancelBtn.textContent = "Cancel";
-      cancelBtn.addEventListener("click", function() {
-        fetch(CONFIG.API_BASE + "/api/queue/cancel", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ agent: item.agent, job: item.job })
-        }).then(function() {
-          scheduleData = null;
-          loadScheduleData().then(function() { renderV2UpcomingSchedule(); });
-        });
-      });
-      tdAction.appendChild(cancelBtn);
-    }
-    tr.appendChild(tdAction);
-
-    tbody.appendChild(tr);
-  });
-
-  // Update count badge
-  var countEl = document.getElementById("v2-upcoming-count");
-  if (countEl) countEl.textContent = totalCount;
-
-  // Show/hide "Show more" button
-  var showMoreEl = document.getElementById("v2-upcoming-show-more");
-  if (showMoreEl) {
-    showMoreEl.style.display = (showCount < totalCount) ? "" : "none";
-  }
+  // Dead code removed: #v2-upcoming-content was removed from index.html, so this never rendered. Kept as a no-op
+  // stub because its call sites are entangled in live handlers/promise chains.
 }
 
 function getV2PastFilteredEvents() {
@@ -3114,97 +2824,8 @@ function buildJobOutputLookup() {
 }
 
 function renderV2PastSchedule() {
-  var filtered = getV2PastFilteredEvents();
-  var totalCount = filtered.length;
-  var showCount = v2PastPageSize * (v2PastPage + 1);
-  var log = document.getElementById("v2-past-log");
-
-  // Update count badge
-  var countEl = document.getElementById("v2-past-count");
-  if (countEl) {
-    countEl.textContent = totalCount + " event" + (totalCount !== 1 ? "s" : "");
-  }
-
-  if (!filtered || filtered.length === 0) {
-    if (log) log.innerHTML = '<div class="placeholder-message">No events match filters</div>';
-    var showMoreEl = document.getElementById("v2-past-show-more");
-    if (showMoreEl) showMoreEl.style.display = "none";
-    return;
-  }
-
-  if (log) log.innerHTML = "";
-
-  // Build job->output lookup from merged dashboard state
-  var jobOutputLookup = buildJobOutputLookup();
-
-  // Show newest first, paginated
-  var reversed = filtered.slice().reverse();
-  var displayItems = reversed.slice(0, showCount);
-
-  displayItems.forEach(function(evt) {
-    var row = document.createElement("div");
-    row.className = "event-row";
-
-    var time = document.createElement("span");
-    time.className = "event-time";
-    time.textContent = formatTimestamp(evt.timestamp || evt.ts || evt.time);
-    row.appendChild(time);
-
-    var evtType = evt.type || evt.event || "info";
-    var type = document.createElement("span");
-    type.className = "event-type " + eventTypeClass(evtType);
-    type.textContent = evtType;
-    row.appendChild(type);
-
-    var agent = document.createElement("span");
-    agent.className = "event-agent";
-    var evtAgentName = canonicalAgentName(evt.agent || "");
-    agent.textContent = evtAgentName;
-    agent.style.color = getAgentColor(evtAgentName);
-    row.appendChild(agent);
-
-    var job = document.createElement("span");
-    job.className = "event-job-name";
-    job.textContent = evt.job || "";
-    row.appendChild(job);
-
-    var detail = document.createElement("span");
-    detail.className = "event-detail";
-    var detailParts = [];
-    if (evt.details) {
-      if (evt.details.run_id) detailParts.push("run:" + evt.details.run_id);
-      if (evt.details.duration) detailParts.push(evt.details.duration);
-      if (evt.details.exit_code !== undefined) detailParts.push("exit:" + evt.details.exit_code);
-      if (evt.details.queue_depth !== undefined) detailParts.push("queue:" + evt.details.queue_depth);
-    }
-    detail.textContent = detailParts.join(" | ");
-    detail.title = JSON.stringify(evt.details || {});
-    row.appendChild(detail);
-
-    // Report link for completed events - use lastOutput from dashboard state
-    if (evtType === "completed") {
-      var outputKey = evtAgentName + "/" + (evt.job || "");
-      var lastOutput = jobOutputLookup[outputKey];
-      if (lastOutput) {
-        var reportLink = document.createElement("a");
-        reportLink.className = "report-link";
-        reportLink.href = getReportHref(lastOutput);
-        reportLink.target = "_blank";
-        reportLink.textContent = "Report";
-        reportLink.title = lastOutput;
-        reportLink.addEventListener("click", function(e) { e.stopPropagation(); });
-        row.appendChild(reportLink);
-      }
-    }
-
-    log.appendChild(row);
-  });
-
-  // Show/hide "Show more" button
-  var showMoreEl = document.getElementById("v2-past-show-more");
-  if (showMoreEl) {
-    showMoreEl.style.display = (showCount < totalCount) ? "" : "none";
-  }
+  // Dead code removed: #v2-past-content was removed from index.html, so this never rendered. Kept as a no-op
+  // stub because its call sites are entangled in live handlers/promise chains.
 }
 
 function populateV2PastAgentFilter() {
@@ -3287,6 +2908,13 @@ function initTeamDragDrop() {
     try { localStorage.setItem("vo-team-order", JSON.stringify(no)); } catch (e2) {}
   });
 }
+// Normalize a declared host value (string | array | empty) to an array of host names.
+function toHostList(v) {
+  if (Array.isArray(v)) return v.filter(function(x) { return x; });
+  if (v === undefined || v === null || v === "") return [];
+  return [v];
+}
+
 function renderTeamTab() {
   if (!agentConfig || !agentConfig.agents) return;
   var config = agentConfig;
@@ -3309,7 +2937,7 @@ function renderTeamTab() {
   schedules.forEach(function(s) {
     if (!scheduleLookup[s.agent]) scheduleLookup[s.agent] = {};
     if (!scheduleLookup[s.agent][s.job]) scheduleLookup[s.agent][s.job] = [];
-    scheduleLookup[s.agent][s.job].push({ cron: s.cron, description: s.description || "" });
+    scheduleLookup[s.agent][s.job].push({ cron: s.cron, description: s.description || "", hosts: toHostList(s.hosts !== undefined ? s.hosts : s.host) });
   });
   var overviewEl = document.getElementById("team-overview");
   var hooksCount = 0;
@@ -3354,7 +2982,7 @@ function renderTeamTab() {
       sl.textContent = "Skills"; card.appendChild(sl);
       var tbl = document.createElement("table"); tbl.className = "team-skills-table";
       var thd = document.createElement("thead"); var thr = document.createElement("tr");
-      ["Job", "Schedule", "Description"].forEach(function(h) { var th = document.createElement("th"); th.textContent = h; thr.appendChild(th); });
+      ["Host", "Job", "Schedule", "Description"].forEach(function(h) { var th = document.createElement("th"); th.textContent = h; thr.appendChild(th); });
       thd.appendChild(thr); tbl.appendChild(thd);
       var tbd = document.createElement("tbody");
       jobNames.forEach(function(jobName) {
@@ -3373,14 +3001,33 @@ function renderTeamTab() {
           });
           td.appendChild(sp); return td;
         }
+        function mkHostCell(hostList) {
+          var td = document.createElement("td");
+          var list = toHostList(hostList);
+          if (list.length === 0) {
+            var dash = document.createElement("span");
+            dash.className = "host-badge host-none"; dash.textContent = "\u2014";
+            td.appendChild(dash);
+          } else {
+            list.forEach(function(h) {
+              var badge = document.createElement("span");
+              badge.className = "host-badge"; badge.textContent = h;
+              td.appendChild(badge);
+            });
+          }
+          return td;
+        }
         if (se.length === 0) {
-          var tr = document.createElement("tr"); tr.appendChild(mkNameCell(jobName));
+          var tr = document.createElement("tr");
+          tr.appendChild(mkHostCell([]));
+          tr.appendChild(mkNameCell(jobName));
           var ts = document.createElement("td"); ts.className = "team-skill-schedule"; ts.textContent = "manual"; tr.appendChild(ts);
           var td = document.createElement("td"); td.className = "team-skill-desc"; td.textContent = desc; td.title = desc; tr.appendChild(td);
           tbd.appendChild(tr);
         } else {
           se.forEach(function(sched, idx) {
             var tr = document.createElement("tr");
+            tr.appendChild(mkHostCell(sched.hosts));
             if (idx === 0) tr.appendChild(mkNameCell(jobName)); else tr.appendChild(document.createElement("td"));
             var ts = document.createElement("td"); ts.className = "team-skill-schedule"; ts.textContent = cronToShortHuman(sched.cron); ts.title = sched.cron;
             tr.appendChild(ts);
@@ -4353,6 +4000,7 @@ function renderScheduleV2Tab() {
     var job = sched.job || "";
     var cron = sched.cron || "";
     var description = sched.description || "";
+    var hosts = toHostList(sched.hosts !== undefined ? sched.hosts : sched.host);
     var cronHuman = cronToHuman(cron);
 
     if (agentFilter && agent !== agentFilter) return;
@@ -4362,7 +4010,7 @@ function renderScheduleV2Tab() {
     fires.forEach(function(fireTime) {
       allItems.push({
         fireTime: fireTime, agent: agent, job: job,
-        cronHuman: cronHuman, description: description
+        cronHuman: cronHuman, description: description, hosts: hosts
       });
     });
   });
@@ -4412,6 +4060,21 @@ function renderScheduleV2Tab() {
     tdJob.textContent = item.job;
     tdJob.style.color = "#9ca3af";
     tr.appendChild(tdJob);
+
+    // Host(s) (declared machine(s))
+    var tdHost = document.createElement("td");
+    if (item.hosts && item.hosts.length) {
+      item.hosts.forEach(function(h) {
+        var hb = document.createElement("span");
+        hb.className = "host-badge"; hb.textContent = h;
+        tdHost.appendChild(hb);
+      });
+    } else {
+      var hbNone = document.createElement("span");
+      hbNone.className = "host-badge host-none"; hbNone.textContent = "\u2014";
+      tdHost.appendChild(hbNone);
+    }
+    tr.appendChild(tdHost);
 
     // Schedule
     var tdSchedule = document.createElement("td");

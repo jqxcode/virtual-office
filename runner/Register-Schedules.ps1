@@ -19,6 +19,7 @@ $ErrorActionPreference = "Stop"
 
 $TASK_PREFIX = "VO-"
 $VBS_PATH = Join-Path $PSScriptRoot "Run-Hidden.vbs"
+$REGISTERED_HOST = $env:COMPUTERNAME
 
 # --- Cron parser ---
 
@@ -173,6 +174,11 @@ $schedules = Get-Content -Path $schedulesFile -Raw | ConvertFrom-Json -AsHashtab
 $registered = @()
 $expectedTaskNames = @{}
 
+# Per-machine registration map (taskName -> {agent, job, cron, registeredHost, registeredAt}),
+# persisted to state/registrations.<host>.json so the portal can show which machine each
+# scheduled task is registered on. Only tasks actually registered on THIS host are recorded.
+$registrations = [ordered]@{}
+
 # Track occurrence count per agent+job key to handle duplicate cron entries
 $taskNameCount = @{}
 
@@ -191,6 +197,18 @@ foreach ($entry in $schedules["schedules"]) {
         $taskName = "${TASK_PREFIX}$agentName-$jobName"
     } else {
         $taskName = "${TASK_PREFIX}$agentName-$jobName-$occurrence"
+    }
+
+    # Declared-host filter: each schedule entry may declare which machine(s) it runs on.
+    # Agents are synced identically across machines; only recurring jobs differ, so host
+    # is a per-entry property. host may be a single name ("AI0003") or a list
+    # (["AI0001","AI0003"]) for jobs that run on multiple machines. Register here only if
+    # this machine is in the declared set. No declared host = register everywhere (back-compat).
+    $entryHosts = @()
+    if ($entry.ContainsKey("host") -and $entry["host"]) { $entryHosts = @($entry["host"]) }
+    if ($entryHosts.Count -gt 0 -and $entryHosts -notcontains $REGISTERED_HOST) {
+        Write-Host "Skipping (declared hosts '$($entryHosts -join ", ")' exclude '$REGISTERED_HOST'): $taskName" -ForegroundColor DarkGray
+        continue
     }
 
     $expectedTaskNames[$taskName] = $true
@@ -236,9 +254,10 @@ foreach ($entry in $schedules["schedules"]) {
             job           = $jobName
             event         = "schedule_registered"
             details       = @{
-                cron        = $cron
-                taskName    = $taskName
-                description = $description
+                cron           = $cron
+                taskName       = $taskName
+                description    = $description
+                registeredHost = $REGISTERED_HOST
             }
             systemVersion = $SYSTEM_VERSION
         } | ConvertTo-Json -Compress
@@ -252,14 +271,23 @@ foreach ($entry in $schedules["schedules"]) {
             runId         = "N/A"
             systemVersion = $SYSTEM_VERSION
             details       = @{
-                cron     = $cron
-                taskName = $taskName
+                cron           = $cron
+                taskName       = $taskName
+                registeredHost = $REGISTERED_HOST
             }
         } | ConvertTo-Json -Compress
         $auditFile = Join-Path $AUDIT_DIR $monthFileName
         Add-Content -Path $auditFile -Value $auditEntry -Encoding ASCII
 
         Write-Host "  Registered: $taskName"
+    }
+
+    $registrations[$taskName] = [ordered]@{
+        agent          = $agentName
+        job            = $jobName
+        cron           = $cron
+        registeredHost = $REGISTERED_HOST
+        registeredAt   = (Get-Date -Format "o")
     }
 
     $registered += [PSCustomObject]@{
@@ -293,8 +321,50 @@ if ($orphans.Count -eq 0) {
         } else {
             Unregister-ScheduledTask -TaskName $orphan -Confirm:$false
             Write-Host "  Unregistered orphan: $orphan" -ForegroundColor Yellow
+
+            # Log orphan removal (event + audit) so multi-machine reconciles are traceable.
+            $nowIso = Get-Date -Format "o"
+            $monthFileName = "$(Get-Date -Format 'yyyy-MM').jsonl"
+            if (-not (Test-Path $STATE_DIR)) { New-Item -ItemType Directory -Path $STATE_DIR -Force | Out-Null }
+            if (-not (Test-Path $AUDIT_DIR)) { New-Item -ItemType Directory -Path $AUDIT_DIR -Force | Out-Null }
+            $removedEvent = @{
+                ts            = $nowIso
+                event         = "schedule_removed"
+                details       = @{
+                    taskName       = $orphan
+                    reason         = "orphan (not a schedules.json entry for host $REGISTERED_HOST)"
+                    registeredHost = $REGISTERED_HOST
+                }
+                systemVersion = $SYSTEM_VERSION
+            } | ConvertTo-Json -Compress
+            Add-Content -Path $EVENTS_FILE -Value $removedEvent -Encoding ASCII
+            $removedAudit = @{
+                ts            = $nowIso
+                action        = "schedule_removed"
+                runId         = "N/A"
+                systemVersion = $SYSTEM_VERSION
+                details       = @{
+                    taskName       = $orphan
+                    reason         = "orphan (not a schedules.json entry for host $REGISTERED_HOST)"
+                    registeredHost = $REGISTERED_HOST
+                }
+            } | ConvertTo-Json -Compress
+            Add-Content -Path (Join-Path $AUDIT_DIR $monthFileName) -Value $removedAudit -Encoding ASCII
         }
     }
+}
+
+# --- Persist per-machine registration map ---
+
+if (-not $DryRun) {
+    if (-not (Test-Path $STATE_DIR)) { New-Item -ItemType Directory -Path $STATE_DIR -Force | Out-Null }
+    $regFile = Join-Path $STATE_DIR "registrations.$REGISTERED_HOST.json"
+    ($registrations | ConvertTo-Json -Depth 5) | Set-Content -Path $regFile -Encoding UTF8
+    Write-Host ""
+    Write-Host "Wrote host registration map: $regFile ($($registrations.Count) task(s) on $REGISTERED_HOST)"
+} else {
+    Write-Host ""
+    Write-Host "[DRY RUN] Would write state/registrations.$REGISTERED_HOST.json ($($registrations.Count) task(s))." -ForegroundColor Cyan
 }
 
 # --- Summary ---

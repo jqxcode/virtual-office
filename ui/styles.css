@@ -2836,3 +2836,7 @@ body {
   opacity: 0.6;
 }
 
+
+/* Host badges -- which machine a recurring job is registered on (Schedule tab + About Us skills table) */
+.host-badge { display:inline-block; padding:1px 6px; margin:0 3px 2px 0; border-radius:8px; font-size:11px; font-weight:600; background:rgba(31,111,235,0.20); color:#58a6ff; border:1px solid rgba(31,111,235,0.35); white-space:nowrap; }
+.host-badge.host-none { background:rgba(110,118,129,0.20); color:#8b949e; border-color:rgba(110,118,129,0.35); }
