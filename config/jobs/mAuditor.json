@@ -23,6 +23,12 @@
       "maxRuns": 0,
       "saveOutput": true,
       "description": "Daily guard: reconcile live scheduled tasks vs config (Verify-Schedules) and flag any weekday-scheduled job with no 'started' event in events.jsonl within ~26h"
+    },
+    "brain-weekly-maintenance": {
+      "prompt": "Run the brain-weekly-maintenance job. Working directory is ${REPO_PERSONAL}/agent-brain. Execute the canonical, idempotent weekly maintenance pipeline that chains archive -> compile -> compress -> push: run `python ${REPO_PERSONAL}/agent-brain/scripts/weekly_brain_maintenance.py` and capture its full stdout and exit code. The script archives completed sessions, compiles knowledge cards, compresses/prunes stale memories, and pushes the brain repo. Do NOT run the individual steps by hand -- the single script is the supported entry point and is safe to re-run. If the script exits non-zero, report the failing step and its output; do not attempt manual recovery. OUTPUT: a concise plain-text summary of each step's result and a one-line verdict. Do NOT generate an HTML report for this job.",
+      "maxRuns": 0,
+      "saveOutput": true,
+      "description": "Weekly brain maintenance: archive sessions, compile knowledge, compress, push (Sunday 10pm) via agent-brain/scripts/weekly_brain_maintenance.py"
     }
   }
 }

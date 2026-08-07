@@ -55,7 +55,11 @@ Assert-True (Test-Path $dashFile) "Dashboard state file exists"
 
 if (Test-Path $dashFile) {
     $dash = Get-Content -Path $dashFile -Raw | ConvertFrom-Json -AsHashtable
-    Assert-True ($dash["agents"].ContainsKey("mAuditor")) "Dashboard has 'mAuditor' agent entry"
+    # mAuditor is host-pinned (AI0001) so it may be absent from a given host's runtime
+    # dashboard.json. Assert the canonical rename in agents.json (host-independent) for
+    # the positive case, and require only that the dashboard is free of the OLD names.
+    $agentsCfg = (Get-Content -Path (Join-Path $ProjectRoot "config" "agents.json") -Raw | ConvertFrom-Json -AsHashtable)["agents"]
+    Assert-True ($agentsCfg.ContainsKey("mAuditor")) "agents.json has 'mAuditor' agent (renamed from checker)"
     Assert-True (-not $dash["agents"].ContainsKey("checker")) "Dashboard does NOT have 'checker' (old name)"
     Assert-True (-not $dash["agents"].ContainsKey("memo-checker")) "Dashboard does NOT have 'memo-checker' (old name)"
 }
@@ -74,24 +78,23 @@ if (Test-Path $smJobsFile) {
 
     Assert-True ($smJobs.ContainsKey("bug-autopilot-meeting-join")) "mScrumMaster has 'bug-autopilot-meeting-join' job"
     Assert-True (-not $smJobs.ContainsKey("bug-autopilot")) "mScrumMaster does NOT have bare 'bug-autopilot' job"
-    Assert-True (-not $smJobs.ContainsKey("TODO-sprint-progress")) "mScrumMaster does NOT have 'TODO-sprint-progress' (moved to mAuditor)"
-    Assert-True (-not $smJobs.ContainsKey("TODO-compare-runs")) "mScrumMaster does NOT have 'TODO-compare-runs' (moved to mAuditor)"
+    Assert-True (-not $smJobs.ContainsKey("TODO-sprint-progress")) "mScrumMaster does NOT have 'TODO-sprint-progress' (moved to mPoster)"
+    Assert-True (-not $smJobs.ContainsKey("TODO-compare-runs")) "mScrumMaster does NOT have 'TODO-compare-runs' (removed)"
 }
 
 # ========================================
-# TC88: mAuditor.json HAS the TODO-sprint-progress and TODO-compare-runs jobs
+# TC88: TODO-sprint-progress moved to mPoster.json (TODO-compare-runs was removed)
 # ========================================
-Write-Host "`nTC88: mAuditor.json has the moved jobs" -ForegroundColor Cyan
+Write-Host "`nTC88: mPoster.json has the moved TODO-sprint-progress job" -ForegroundColor Cyan
 
-$mAuditorJobsFile = Join-Path $ProjectRoot "config" "jobs" "mAuditor.json"
-Assert-True (Test-Path $mAuditorJobsFile) "mAuditor.json exists"
+$mPosterJobsFile = Join-Path $ProjectRoot "config" "jobs" "mPoster.json"
+Assert-True (Test-Path $mPosterJobsFile) "mPoster.json exists"
 
-if (Test-Path $mAuditorJobsFile) {
-    $mAuditorJobsRaw = Get-Content -Path $mAuditorJobsFile -Raw | ConvertFrom-Json -AsHashtable
-    $mAuditorJobs = if ($mAuditorJobsRaw.ContainsKey("jobs")) { $mAuditorJobsRaw["jobs"] } else { $mAuditorJobsRaw }
+if (Test-Path $mPosterJobsFile) {
+    $mPosterJobsRaw = Get-Content -Path $mPosterJobsFile -Raw | ConvertFrom-Json -AsHashtable
+    $mPosterJobs = if ($mPosterJobsRaw.ContainsKey("jobs")) { $mPosterJobsRaw["jobs"] } else { $mPosterJobsRaw }
 
-    Assert-True ($mAuditorJobs.ContainsKey("TODO-sprint-progress")) "mAuditor has 'TODO-sprint-progress' job"
-    Assert-True ($mAuditorJobs.ContainsKey("TODO-compare-runs")) "mAuditor has 'TODO-compare-runs' job"
+    Assert-True ($mPosterJobs.ContainsKey("TODO-sprint-progress")) "mPoster has 'TODO-sprint-progress' job"
 }
 
 # ========================================

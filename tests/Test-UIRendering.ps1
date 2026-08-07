@@ -186,8 +186,8 @@ Write-Host "`nTC35: HTML structure valid" -ForegroundColor Cyan
 
 Assert-True ($HtmlContent -match 'id="agent-grid"') "index.html contains id=""agent-grid"""
 Assert-True ($HtmlContent -match 'id="event-log-full"') "index.html contains id=""event-log-full"""
-Assert-True ($HtmlContent -match 'href="styles\.css"') "index.html links to styles.css"
-Assert-True ($HtmlContent -match 'src="app\.js"') "index.html links to app.js"
+Assert-True ($HtmlContent -match 'href="styles\.css(\?v=\d+)?"') "index.html links to styles.css"
+Assert-True ($HtmlContent -match 'src="app\.js(\?v=\d+)?"') "index.html links to app.js"
 
 # ========================================
 # TC54: app.js handles flat dashboard format
@@ -235,14 +235,14 @@ if (-not (Test-Path $AppJsFile)) {
 # ========================================
 # TC56: Busy status dot is red
 # ========================================
-Write-Host "`nTC56: Busy status dot is red" -ForegroundColor Cyan
+Write-Host "`nTC56: Busy status dot is blue" -ForegroundColor Cyan
 
 $statusDotBusyBlock = Get-CssRuleBlock -Css $CssContent -Selector ".status-dot.busy"
-$dotBusyHasRed = $false
-if ($statusDotBusyBlock -and ($statusDotBusyBlock -match "#ef4444")) {
-    $dotBusyHasRed = $true
+$dotBusyHasBlue = $false
+if ($statusDotBusyBlock -and ($statusDotBusyBlock -match "#3b82f6")) {
+    $dotBusyHasBlue = $true
 }
-Assert-True $dotBusyHasRed ".status-dot.busy contains red (#ef4444)"
+Assert-True $dotBusyHasBlue ".status-dot.busy contains blue (#3b82f6)"
 
 # ========================================
 # TC57: Busy card stays neutral (not red)
@@ -541,20 +541,20 @@ if (-not (Test-Path $AppJsFile)) {
 # ========================================
 Write-Host "`nTC79: Scrum-master agent prompt includes Fundamentals area path filter" -ForegroundColor Cyan
 
-$ScrumMasterFile = "C:/Users/qitxu/.claude/agents/mScrumMaster.md"
+$ScrumMasterFile = Join-Path $HOME ".copilot/agents/scrum-master.agent.md"
 if (-not (Test-Path $ScrumMasterFile)) {
-    Write-Host "ERROR: Cannot find mScrumMaster.md at $ScrumMasterFile" -ForegroundColor Red
+    Write-Host "ERROR: Cannot find scrum-master agent at $ScrumMasterFile" -ForegroundColor Red
     $script:Failed++
 } else {
     $ScrumMasterContent = Get-Content -Path $ScrumMasterFile -Raw
 
     # The sprint-progress section should mention Fundamentals
     $hasFundamentals = $ScrumMasterContent -match "Fundamentals"
-    Assert-True $hasFundamentals "mScrumMaster.md contains 'Fundamentals' in sprint-progress section"
+    Assert-True $hasFundamentals "scrum-master agent contains 'Fundamentals' in sprint-progress section"
 
-    # Should have an instruction to exclude other sub-areas
-    $hasExcludeInstruction = $ScrumMasterContent -match "Exclude items from other sub-areas"
-    Assert-True $hasExcludeInstruction "mScrumMaster.md contains instruction to exclude other sub-areas"
+    # Should restrict Meeting Join to Fundamentals only (i.e. exclude other sub-areas)
+    $hasExcludeInstruction = $ScrumMasterContent -match "Only.*Fundamentals.*items belong"
+    Assert-True $hasExcludeInstruction "scrum-master agent restricts Meeting Join to Fundamentals (excludes other sub-areas)"
 }
 
 # ========================================

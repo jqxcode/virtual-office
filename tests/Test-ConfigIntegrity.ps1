@@ -136,14 +136,14 @@ Write-Host "`nTC7: Agent file paths in agentFile field actually exist on disk" -
 
 foreach ($agentName in ($agents.Keys | Sort-Object)) {
     $rawPath = $agents[$agentName]["agentFile"]
-    $resolvedPath = $null
-    if ($rawPath.StartsWith("~/")) {
-        $resolvedPath = Join-Path $HOME $rawPath.Substring(2)
-    } else {
-        $resolvedPath = Join-Path $ProjectRoot $rawPath
-    }
+    # The runner resolves agents by NAME from ~/.copilot/agents/<basename>.agent.md.
+    # agents.json still stores legacy ~/.claude/agents/<name>.md paths (vestigial), so
+    # mirror Invoke-AgentJob.ps1's actual resolution and assert the file the runtime
+    # truly loads exists on disk.
+    $basename = [System.IO.Path]::GetFileNameWithoutExtension($rawPath)
+    $resolvedPath = Join-Path $HOME ".copilot/agents/$basename.agent.md"
     $exists = Test-Path $resolvedPath
-    Assert-True $exists "Agent '$agentName' agentFile '$rawPath' exists on disk (resolved: $resolvedPath)"
+    Assert-True $exists "Agent '$agentName' Copilot agent file exists on disk (agentFile '$rawPath' -> $resolvedPath)"
 }
 
 # ========================================
