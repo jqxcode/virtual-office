@@ -303,7 +303,17 @@ foreach ($entry in $schedules["schedules"]) {
 Write-Host ""
 Write-Host "=== Checking for orphan tasks ==="
 
-$allVOTasks = Get-ScheduledTask | Where-Object { $_.TaskName -like "${TASK_PREFIX}*" -and $_.TaskName -notlike "${TASK_PREFIX}oneoff-*" }
+$allVOTasks = Get-ScheduledTask | Where-Object {
+    if ($_.TaskName -notlike "${TASK_PREFIX}*" -or $_.TaskName -like "${TASK_PREFIX}oneoff-*") {
+        return $false
+    }
+
+    # Infrastructure tasks such as VO-Portal-Server also use the VO- prefix but
+    # are not schedules.json entries. Only reconcile tasks that invoke an agent job.
+    return @($_.Actions | Where-Object {
+        $_.Arguments -like "*Invoke-AgentJob.ps1*"
+    }).Count -gt 0
+}
 $orphans = @()
 foreach ($task in $allVOTasks) {
     if (-not $expectedTaskNames.ContainsKey($task.TaskName)) {

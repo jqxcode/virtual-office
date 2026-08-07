@@ -482,6 +482,34 @@ $noHostEntry = @{ agent = "mAuditor"; job = "legacy"; cron = "0 3 * * *" }
 Assert-True (Test-HostRegisters $noHostEntry "AI0001") "No-host entry registers everywhere (AI0001)"
 Assert-True (Test-HostRegisters $noHostEntry "AI0003") "No-host entry registers everywhere (AI0003)"
 
+# ========================================
+# TC84: Orphan cleanup excludes VO infrastructure tasks
+# ========================================
+Write-Host "`nTC84: Orphan cleanup task classification" -ForegroundColor Cyan
+function Test-IsRecurringAgentTask([object]$Task) {
+    if ($Task.TaskName -notlike "VO-*" -or $Task.TaskName -like "VO-oneoff-*") {
+        return $false
+    }
+    return @($Task.Actions | Where-Object {
+        $_.Arguments -like "*Invoke-AgentJob.ps1*"
+    }).Count -gt 0
+}
+$agentTask = [PSCustomObject]@{
+    TaskName = "VO-pBugKiller-scan-and-fix"
+    Actions  = @([PSCustomObject]@{ Arguments = '-File "runner\Invoke-AgentJob.ps1" -Agent "pBugKiller" -Job "scan-and-fix"' })
+}
+$portalTask = [PSCustomObject]@{
+    TaskName = "VO-Portal-Server"
+    Actions  = @([PSCustomObject]@{ Arguments = '-File "ui\server.ps1" -Port 8400' })
+}
+$oneoffTask = [PSCustomObject]@{
+    TaskName = "VO-oneoff-pBugKiller-scan-and-fix-20260806220000"
+    Actions  = @([PSCustomObject]@{ Arguments = '-File "runner\Invoke-AgentJob.ps1" -Agent "pBugKiller" -Job "scan-and-fix"' })
+}
+Assert-True (Test-IsRecurringAgentTask $agentTask) "Recurring Invoke-AgentJob task is eligible for orphan cleanup"
+Assert-True (-not (Test-IsRecurringAgentTask $portalTask)) "VO infrastructure task is excluded from orphan cleanup"
+Assert-True (-not (Test-IsRecurringAgentTask $oneoffTask)) "VO one-off task remains excluded from orphan cleanup"
+
 # --- Summary ---
 Write-Host "`n========================================" -ForegroundColor White
 Write-Host "Test-ScheduleRegistration: $script:Passed passed, $script:Failed failed" -ForegroundColor $(if ($script:Failed -gt 0) { "Red" } else { "Green" })
