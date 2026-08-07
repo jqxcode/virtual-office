@@ -49,6 +49,7 @@ function Write-TestConstants {
 `$EVENTS_FILE = Join-Path `$STATE_DIR "events.jsonl"
 `$ERRORS_FILE = Join-Path `$STATE_DIR "errors.jsonl"
 `$DASHBOARD_FILE = Join-Path `$STATE_DIR "dashboard.json"
+`$DEFAULT_STALE_LOCK_TIMEOUT_MINUTES = 120
 "@
     Set-Content -Path (Join-Path $Root "runner/constants.ps1") -Value $content -Encoding ASCII
 }
@@ -90,6 +91,7 @@ function Import-RunnerFunctions {
     $global:EVENTS_FILE = $EVENTS_FILE
     $global:ERRORS_FILE = $ERRORS_FILE
     $global:DASHBOARD_FILE = $DASHBOARD_FILE
+    $global:DEFAULT_STALE_LOCK_TIMEOUT_MINUTES = $DEFAULT_STALE_LOCK_TIMEOUT_MINUTES
 
     function global:Write-AtomicFile {
         param([string]$Path, [string]$Content)
@@ -472,7 +474,10 @@ try {
         Assert-True ($null -ne $jobState["lastOutput"]) "lastOutput is set"
         Assert-True ($jobState["lastOutput"] -match "output/test-agent/test-job-") "lastOutput path looks correct"
         Assert-True ($null -ne $jobState["lastOutputTime"]) "lastOutputTime is set"
-        Assert-True ($jobState["lastOutputTime"] -match "^\d{4}-\d{2}-\d{2}T") "lastOutputTime is ISO format"
+        # Assert ISO-8601 against the raw on-disk JSON: ConvertFrom-Json auto-coerces
+        # ISO date strings into [datetime], whose culture-specific ToString() would not
+        # match this regex even though the runner wrote a valid `Get-Date -Format o` value.
+        Assert-True ((Get-Content -Path $dashFile -Raw) -match '"lastOutputTime"\s*:\s*"\d{4}-\d{2}-\d{2}T') "lastOutputTime is ISO format"
     }
 } finally {
     Remove-TestRoot -Root $root

@@ -46,7 +46,9 @@ function Write-TestConstants {
 `$OUTPUT_DIR = Join-Path `$PROJECT_ROOT "output"
 `$AUDIT_DIR = Join-Path `$OUTPUT_DIR "audit"
 `$EVENTS_FILE = Join-Path `$STATE_DIR "events.jsonl"
+`$ERRORS_FILE = Join-Path `$STATE_DIR "errors.jsonl"
 `$DASHBOARD_FILE = Join-Path `$STATE_DIR "dashboard.json"
+`$DEFAULT_STALE_LOCK_TIMEOUT_MINUTES = 120
 "@
     Set-Content -Path (Join-Path $Root "runner/constants.ps1") -Value $content -Encoding ASCII
 }
@@ -70,6 +72,17 @@ function Write-TestConfig {
 function Import-RunnerFunctions {
     param([string]$Root)
     . (Join-Path $Root "runner/constants.ps1")
+    # Promote constants to global scope so global functions can see them
+    $global:SYSTEM_VERSION = $SYSTEM_VERSION
+    $global:PROJECT_ROOT = $PROJECT_ROOT
+    $global:CONFIG_DIR = $CONFIG_DIR
+    $global:STATE_DIR = $STATE_DIR
+    $global:OUTPUT_DIR = $OUTPUT_DIR
+    $global:AUDIT_DIR = $AUDIT_DIR
+    $global:EVENTS_FILE = $EVENTS_FILE
+    $global:ERRORS_FILE = $ERRORS_FILE
+    $global:DASHBOARD_FILE = $DASHBOARD_FILE
+    $global:DEFAULT_STALE_LOCK_TIMEOUT_MINUTES = $DEFAULT_STALE_LOCK_TIMEOUT_MINUTES
 
     function global:Write-AtomicFile {
         param([string]$Path, [string]$Content)
@@ -140,11 +153,11 @@ try {
     Assert-True ($result.ExitCode -eq 0) "Runner completes successfully"
 
     $auditDir = Join-Path $root "output/audit"
-    $auditFiles = Get-ChildItem -Path $auditDir -Filter "*.jsonl" -ErrorAction SilentlyContinue
-    Assert-True ($null -ne $auditFiles -and $auditFiles.Count -gt 0) "At least one audit log file exists"
+    $auditFiles = @(Get-ChildItem -Path $auditDir -Filter "*.jsonl" -ErrorAction SilentlyContinue)
+    Assert-True ($auditFiles.Count -gt 0) "At least one audit log file exists"
 
-    if ($auditFiles) {
-        $lines = Get-Content -Path $auditFiles[0].FullName
+    if ($auditFiles.Count -gt 0) {
+        $lines = @(Get-Content -Path $auditFiles[0].FullName)
         Assert-True ($lines.Count -ge 2) "Audit log has at least 2 entries (started + completed)"
 
         # Parse and check we see both started and completed actions
@@ -194,7 +207,7 @@ try {
     Assert-True (Test-Path $auditFile) "Audit file exists"
 
     if (Test-Path $auditFile) {
-        $line = (Get-Content -Path $auditFile)[0]
+        $line = @(Get-Content -Path $auditFile)[0]
         $entry = $line | ConvertFrom-Json -AsHashtable
 
         $requiredFields = @("timestamp", "action", "agent", "job", "run_id", "system_version")
