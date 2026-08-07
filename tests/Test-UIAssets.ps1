@@ -41,14 +41,14 @@ Assert-True (Test-Path $HtmlFile) "index.html exists"
 if (Test-Path $HtmlFile) {
     $htmlContent = Get-Content -Path $HtmlFile -Raw
 
-    $hasAgentsTab = $htmlContent -match 'data-tab="agents"'
-    Assert-True $hasAgentsTab "index.html contains agents tab (data-tab=""agents"")"
+    $hasTeamTab = $htmlContent -match 'data-tab="team"'
+    Assert-True $hasTeamTab "index.html contains team tab (data-tab=""team"")"
 
-    $hasEventsTab = $htmlContent -match 'data-tab="events"'
-    Assert-True $hasEventsTab "index.html contains events tab (data-tab=""events"")"
+    $hasHistoryTab = $htmlContent -match 'data-tab="history"'
+    Assert-True $hasHistoryTab "index.html contains history tab (data-tab=""history"")"
 
-    $hasQueueTab = $htmlContent -match 'data-tab="queue"'
-    Assert-True $hasQueueTab "index.html contains queue tab (data-tab=""queue"")"
+    $hasOfficeTab = $htmlContent -match 'data-tab="office"'
+    Assert-True $hasOfficeTab "index.html contains office tab (data-tab=""office"")"
 
     $hasAgentGrid = $htmlContent -match 'id="agent-grid"'
     Assert-True $hasAgentGrid "index.html contains agent-grid element"

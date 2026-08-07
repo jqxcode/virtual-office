@@ -117,16 +117,16 @@ Assert-True ($HtmlContent -match 'id="view-schedule"') "index.html contains view
 Assert-True ($HtmlContent -match 'id="schedule-v2-tbody"') "index.html contains schedule-v2-tbody"
 
 # ========================================
-# TC98: V1 tabs still exist (backward compat)
+# TC98: V1 tabs/sections removed (replaced by team/office/history/schedule/costs/board)
 # ========================================
-Write-Host "`nTC98: V1 tabs still exist (backward compat)" -ForegroundColor Cyan
+Write-Host "`nTC98: V1 tabs/sections removed (superseded by V2 redesign)" -ForegroundColor Cyan
 
-Assert-True ($HtmlContent -match 'data-tab="agents"') "V1 agents tab still exists"
-Assert-True ($HtmlContent -match 'data-tab="queue"') "V1 queue tab still exists"
-Assert-True ($HtmlContent -match 'data-tab="events"') "V1 events tab still exists"
-Assert-True ($HtmlContent -match 'id="view-agents"') "V1 view-agents section still exists"
-Assert-True ($HtmlContent -match 'id="view-events"') "V1 view-events section still exists"
-Assert-True ($HtmlContent -match 'id="view-queue"') "V1 view-queue section still exists"
+Assert-True (-not ($HtmlContent -match 'data-tab="agents"')) "V1 agents tab removed"
+Assert-True (-not ($HtmlContent -match 'data-tab="queue"')) "V1 queue tab removed"
+Assert-True (-not ($HtmlContent -match 'data-tab="events"')) "V1 events tab removed"
+Assert-True (-not ($HtmlContent -match 'id="view-agents"')) "V1 view-agents section removed"
+Assert-True (-not ($HtmlContent -match 'id="view-events"')) "V1 view-events section removed"
+Assert-True (-not ($HtmlContent -match 'id="view-queue"')) "V1 view-queue section removed"
 
 # ========================================
 # TC99: Old V2 stubs removed
