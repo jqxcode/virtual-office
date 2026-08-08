@@ -79,13 +79,6 @@
     },
     {
       "agent": "mPoster",
-      "job": "ICM-daily-summary-Notes",
-      "cron": "30 12 * * 1-5",
-      "host": "AI0001",
-      "description": "Notes customer ICM daily summary to Teams at 12:30pm weekdays"
-    },
-    {
-      "agent": "mPoster",
       "job": "ICM-daily-summary-Join",
       "cron": "0 9 * * 1-5",
       "host": "AI0001",
