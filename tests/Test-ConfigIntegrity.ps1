@@ -191,6 +191,30 @@ if ($shcScheduledCount -ge 1) {
     Assert-True $runsWeekdays "mAuditor/schedule-health-check cron '$shcCron' runs on weekdays (dow field '$shcDow')"
 }
 
+# ========================================
+# TC10: AAP posting uses its fixed template
+# ========================================
+Write-Host "`nTC10: mPoster/AAP-report-posting uses its fixed template" -ForegroundColor Cyan
+
+$hasAapJob = $allJobs.ContainsKey("mPoster") -and $allJobs["mPoster"].ContainsKey("AAP-report-posting")
+Assert-True $hasAapJob "Job 'mPoster/AAP-report-posting' exists in config/jobs/mPoster.json"
+
+$aapTemplateRelativePath = "templates/mPoster-aap-report-posting.html"
+$aapTemplatePath = Join-Path $ProjectRoot $aapTemplateRelativePath
+if ($hasAapJob) {
+    $aapPrompt = $allJobs["mPoster"]["AAP-report-posting"]["prompt"]
+    Assert-True ($aapPrompt -like "*$aapTemplateRelativePath*") "AAP-report-posting prompt requires the fixed template"
+}
+
+$hasAapTemplate = Test-Path $aapTemplatePath
+Assert-True $hasAapTemplate "AAP-report-posting fixed template exists"
+if ($hasAapTemplate) {
+    $aapTemplate = Get-Content -Path $aapTemplatePath -Raw
+    foreach ($placeholder in @("SHARE_URL", "TOTAL", "UPDATED", "NO_CHANGE", "FEATURE_ROWS", "GENERATED_AT_PST")) {
+        Assert-True ($aapTemplate.Contains("{{$placeholder}}")) "AAP template contains {{$placeholder}}"
+    }
+}
+
 # --- Summary ---
 Write-Host "`n========================================" -ForegroundColor White
 Write-Host "Test-ConfigIntegrity: $script:Passed passed, $script:Failed failed" -ForegroundColor $(if ($script:Failed -gt 0) { "Red" } else { "Green" })
