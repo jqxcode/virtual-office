@@ -18,6 +18,12 @@
       "maxRuns": 0,
       "saveOutput": true,
       "description": "Approve one or more Azure DevOps pull requests by ID or URL (on demand)"
+    },
+    "reapprove-stale-PR": {
+      "prompt": "Re-review and (risk-tiered) re-approve GitHub PRs whose YOUR (qitxu_microsoft) approval was dismissed by a later push. Extra args (may be empty): [{{EXTRA_ARGS}}] -- an optional repo (owner/name; default teams-microsoft/bug-autopilot) and/or --dry-run (review + report only, never approve). Follow the 'reapprove-stale-PR' job in your agent instructions exactly: (0) switch gh to the qitxu_microsoft keyring account (Remove GH_TOKEN/GITHUB_TOKEN env, then $env:GH_TOKEN=(gh auth token --hostname github.com --user qitxu_microsoft); verify gh api user login == qitxu_microsoft -- the default jqxcode token cannot access teams-microsoft/*); (1) find open PRs you reviewed via `gh pr list --search reviewed-by:qitxu_microsoft`, and for each keep only those where your latest review is APPROVED at commit C, C != headRefOid, reviewDecision != APPROVED, PR open, not draft, not yours; (2) review ONLY the incremental delta with `gh api repos/<repo>/compare/C...head` -- read the actual patch, classify files (safe = docs/tests/config; production = runtime src/), and reason about correctness (bugs, secrets, scope creep); (3) risk-tier: AUTO re-approve only if delta touches ONLY safe files AND <=50 changed lines AND <=3 files AND no issues; CONFIRM first (present review + risk, wait for explicit user go) if it touches production code OR exceeds the size guardrail; STOP + report on any real problem regardless of size; --dry-run forces report-only for all tiers; (4) approve with `gh pr review <N> --repo <repo> --approve --body \"Re-reviewed delta C..head: <conclusion>...\"`; (5) verify your review now shows APPROVED at the head SHA and report a per-PR table (PR | approved-SHA | head-SHA | delta | tier | action | conclusion) plus a summary. You MUST run the gh commands now via powershell -- there is no prior turn. Never blindly approve; only ever re-approve PRs you had previously approved; never merge; never widen scope beyond the target repo.",
+      "maxRuns": 0,
+      "saveOutput": true,
+      "description": "Re-review dismissed-approval GitHub PRs (delta since your approval) and risk-tier re-approve (on demand, GitHub)"
     }
   }
 }
