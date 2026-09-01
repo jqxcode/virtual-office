@@ -1,0 +1,59 @@
+<!--
+  Poster Template: AAP-report-posting
+  Used by: mPoster agent, AAP-report-posting job
+  Target: Teams Graph API message body.content (HTML fragment, not full page)
+
+  Variables (replace when generating):
+    {{SHARE_URL}}    - SharePoint URL for the complete report
+    {{TOTAL}}        - Total features analyzed
+    {{UPDATED}}      - Features updated
+    {{NO_CHANGE}}    - Features with no change
+    {{FEATURE_ROWS}} - Updated feature rows (see row template below)
+    {{VO_SUBTITLE}}  - Agent: Poster | Job: AAP-report-posting | Generated: YYYY-MM-DD HH:MM PST
+
+  Feature row template (one per updated feature):
+    <tr style="{{ROW_STYLE}}">
+      <td style="padding:6px;border:1px solid #ddd;"><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/{{ID}}">{{ID}}</a></td>
+      <td style="padding:6px;border:1px solid #ddd;font-size:12px;">{{AREA}}</td>
+      <td style="padding:6px;border:1px solid #ddd;">{{TITLE}}</td>
+      <td style="padding:6px;border:1px solid #ddd;">{{OWNER}}</td>
+      <td style="padding:6px;border:1px solid #ddd;font-size:12px;">{{TWEET}}</td>
+    </tr>
+
+  ROW_STYLE values:
+    Odd row:  background-color:#f0f0f0;
+    Even row: (empty)
+
+  Required mentions:
+    Josh Xu:             90b98fe6-a80b-46e1-9209-b5ebcdf6da6b
+    Varun Venkatesh:     4d6765eb-0d36-4713-98e7-f6e8e7e509d1
+    Naveen Shrivastava:  d2b05ba9-ce0d-4190-97a9-844af4b15cce
+-->
+<h3>ADO Autopilot - Daily Status Report</h3>
+<p><a href="{{SHARE_URL}}">View Full Report on SharePoint</a></p>
+<table border="1" style="border-collapse:collapse;width:100%;">
+  <tr style="background-color:#1a1a2e;color:white;">
+    <th style="padding:8px;">Total</th>
+    <th style="padding:8px;">Updated</th>
+    <th style="padding:8px;">No Change</th>
+  </tr>
+  <tr style="text-align:center;font-size:18px;font-weight:bold;">
+    <td style="padding:8px;">{{TOTAL}}</td>
+    <td style="padding:8px;">{{UPDATED}}</td>
+    <td style="padding:8px;">{{NO_CHANGE}}</td>
+  </tr>
+</table>
+<h3>Feature Details</h3>
+<table border="1" style="border-collapse:collapse;width:100%;">
+  <tr style="background-color:#1a1a2e;color:white;">
+    <th style="padding:6px;">ID</th>
+    <th style="padding:6px;">Area</th>
+    <th style="padding:6px;">Feature</th>
+    <th style="padding:6px;">Owner</th>
+    <th style="padding:6px;">Tweet</th>
+  </tr>
+  {{FEATURE_ROWS}}
+</table>
+<br/>
+<p>CC: <at id="0">Josh Xu</at> <at id="1">Varun Venkatesh</at> <at id="2">Naveen Shrivastava</at></p>
+<p style="color:#f0f0f0;font-size:1px;line-height:1px;">{{VO_SUBTITLE}}</p>
