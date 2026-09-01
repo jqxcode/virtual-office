@@ -523,6 +523,13 @@ function Set-QueueDepth {
     }
 }
 
+function Add-RunnerSafetyRule {
+    param([string]$Prompt)
+
+    $rule = "RUNNER SAFETY: This agent is already running inside Invoke-AgentJob.ps1. Never poll or wait for this job's Invoke-AgentJob.ps1 process, lock file, or its own completed/failed audit or event record; those can only finish after this agent exits. Wait only for child operations started to perform the job."
+    return "$Prompt`n`n$rule"
+}
+
 # --- Main flow ---
 
 # Step 0: Startup log -- written before anything else so we know pwsh actually started.
@@ -618,7 +625,7 @@ if (-not $prompt) {
     Write-Error "Job '$Job' has no prompt defined."
     exit 1
 }
-$prompt = $prompt.Replace("{{EXTRA_ARGS}}", $ExtraArgs)
+$prompt = Add-RunnerSafetyRule -Prompt $prompt.Replace("{{EXTRA_ARGS}}", $ExtraArgs)
 Write-Breadcrumb "step3_done"
 
 # Ensure state directory
@@ -1103,7 +1110,7 @@ while ($keepRunning) {
                 if ($otherJobDef) {
                     $Job = $otherJobName
                     $jobDef = $otherJobDef
-                    $prompt = ([string]$otherJobDef["prompt"]).Replace("{{EXTRA_ARGS}}", "")
+                    $prompt = Add-RunnerSafetyRule -Prompt ([string]$otherJobDef["prompt"]).Replace("{{EXTRA_ARGS}}", "")
                     $stateDir = Ensure-StateDir -AgentName $Agent -JobName $Job
                     $queueFile = Join-Path $stateDir "queue"
                     $counterFile = Join-Path $stateDir "counter.json"
