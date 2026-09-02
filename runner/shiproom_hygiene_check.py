@@ -415,7 +415,7 @@ class MutationController:
 
     def record(self, entry):
         # type: (Dict[str, Any]) -> None
-        """Append an executed PATCH to the audit log and bump the counter."""
+        """Append an executed mutation to the audit log and bump the counter."""
         entry = dict(entry)
         entry.setdefault("timestamp", datetime.now(PST).isoformat())
         entry.setdefault("dryRun", self.dry_run)
@@ -2601,7 +2601,7 @@ def parse_args(argv=None):
     p.add_argument("--limit-checks", default="",
                    help="Comma-separated list of check IDs to run (e.g. 1,2,3). Default: all.")
     p.add_argument("--cap", type=int, default=DEFAULT_MUTATION_CAP,
-                   help="Per-run PATCH cap (default {0}).".format(DEFAULT_MUTATION_CAP))
+                   help="Per-run API mutation cap (default {0}).".format(DEFAULT_MUTATION_CAP))
     p.add_argument("--today", default="",
                    help="Override 'today' for testing (YYYY-MM-DD).")
     p.add_argument("--output-dir", default=OUTPUT_DIR,
