@@ -12,11 +12,11 @@ config/shiproom-hygiene-rules.md:
      [System.AreaPath] UNDER '<allowed-area>'. validate_wiql_has_area_filter()
      verifies this at runtime; a missing filter aborts the check.
   2. Per-item area_path_allowed() re-check before EVERY PATCH.
-  3. Per-run mutation cap (default 50 PATCH calls).
+  3. Per-run mutation cap (default 50 API writes).
   4. Plan log (output/mScrumMaster/hygiene-patch-plan-<ts>.jsonl) is
      written BEFORE the mutation executes.
   5. Audit log (output/mScrumMaster/hygiene-mutations-<YYYY-MM-DD>.jsonl)
-     records every executed PATCH.
+     records every executed PATCH and comment.
   6. Allowed areas computed at runtime: Notes is dropped on/after
      2026-06-01 (compute_allowed_areas()).
 
@@ -76,9 +76,20 @@ PST = timezone(timedelta(hours=-7))
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUTPUT_DIR = os.path.join(REPO_ROOT, "output", "mScrumMaster")
 TEMPLATE_PATH = os.path.join(REPO_ROOT, "templates", "mScrumMaster-shiproom-hygiene.html")
+CONSTANTS_PATH = os.path.join(REPO_ROOT, "runner", "constants.ps1")
+
+with open(CONSTANTS_PATH, "r", encoding="ascii") as constants_file:
+    version_match = re.search(
+        r'^\$SYSTEM_VERSION\s*=\s*"([^"]+)"',
+        constants_file.read(),
+        re.MULTILINE,
+    )
+if not version_match:
+    raise RuntimeError("SYSTEM_VERSION not found in runner/constants.ps1")
+SYSTEM_VERSION = version_match.group(1)
 
 # Mutating check IDs (referenced by safety policy)
-MUTATING_CHECKS = {"1", "2", "3", "5", "6"}
+MUTATING_CHECKS = {"1", "2", "3", "4", "5", "6", "15", "17", "18"}
 
 # Mutating checks must contain the workitems area filter literally.
 # Check 1 is a workitemLinks query which uses [Source].[System.AreaPath].
@@ -368,8 +379,7 @@ class MutationController:
 
     Every mutating check MUST call plan() before issuing the API write
     and record() after it returns. plan() returns False when the cap
-    is exhausted; the check must then skip the mutation and continue
-    in comment-only mode.
+    is exhausted; the check must then skip the mutation.
     """
 
     def __init__(self, plan_path, audit_path, cap=DEFAULT_MUTATION_CAP, dry_run=False):
@@ -415,6 +425,8 @@ class MutationController:
     @staticmethod
     def _append(path, entry):
         # type: (str, Dict[str, Any]) -> None
+        entry = dict(entry)
+        entry.setdefault("systemVersion", SYSTEM_VERSION)
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "a", encoding="utf-8") as f:
             f.write(json.dumps(entry, ensure_ascii=False) + "\n")
@@ -559,6 +571,36 @@ def add_comment(wid, html, token):
         "{0}/_apis/wit/workItems/{1}/comments?api-version=7.1-preview.4".format(PROJECT, wid),
         token, "POST", {"text": html},
     )
+
+
+def controlled_comment(wid, html, token, check, mc, context=None):
+    # type: (int, str, str, str, MutationController, Optional[Dict[str, Any]]) -> str
+    """Plan, cap, execute, and audit one ADO comment mutation."""
+    metadata = dict(context or {})
+    plan_entry = {
+        "event": "plan_comment",
+        "mutationType": "comment",
+        "check": check,
+        "id": wid,
+        "comment": html,
+    }
+    plan_entry.update(metadata)
+    if not mc.plan(plan_entry):
+        return "skipped (cap)"
+    if mc.dry_run:
+        return "would-comment (dry-run)"
+
+    result = add_comment(wid, html, token)
+    audit_entry = {
+        "event": "comment",
+        "mutationType": "comment",
+        "check": check,
+        "id": wid,
+        "ok": bool(result),
+    }
+    audit_entry.update(metadata)
+    mc.record(audit_entry)
+    return "commented" if result else "comment-failed"
 
 
 def get_owner_name(wi):
@@ -905,11 +947,6 @@ def check1(token, allowed_areas, mc, dry_run):
                     },
                 }]
                 r2 = patch_work_item(child_id, related_ops, token)
-                add_comment(child_id, (
-                    "{0} The parent link on this task was changed to a Related link. "
-                    "Tasks should not be parented under another Task; use a User Story or "
-                    "Feature as the parent instead."
-                ).format(mention_html(child)), token)
                 mc.record({
                     "check": "check1",
                     "id": child_id,
@@ -918,6 +955,11 @@ def check1(token, allowed_areas, mc, dry_run):
                     "after": {"relatedId": parent_id},
                     "ok": bool(r1 and r2),
                 })
+                controlled_comment(child_id, (
+                    "{0} The parent link on this task was changed to a Related link. "
+                    "Tasks should not be parented under another Task; use a User Story or "
+                    "Feature as the parent instead."
+                ).format(mention_html(child)), token, "check1", mc, {"areaPath": child_area})
                 action = "fixed"
             elif plan_ok and dry_run:
                 action = "would-fix (dry-run)"
@@ -969,17 +1011,17 @@ def check2(token, allowed_areas, mc, dry_run):
                 r = patch_work_item(wid, [
                     {"op": "add", "path": "/fields/System.State", "value": "Closed"},
                 ], token)
-                add_comment(wid, (
-                    "{0} This item was Resolved and has been auto-closed by shiproom hygiene. "
-                    "If this was premature, reopen and move to a more accurate state. "
-                    "Questions: reach out to Josh Xu (qitxu@microsoft.com)."
-                ).format(mention_html(wi)), token)
                 mc.record({
                     "check": "check2", "id": wid, "areaPath": ap,
                     "before": {"state": "Resolved"},
                     "after": {"state": "Closed"},
                     "ok": bool(r),
                 })
+                controlled_comment(wid, (
+                    "{0} This item was Resolved and has been auto-closed by shiproom hygiene. "
+                    "If this was premature, reopen and move to a more accurate state. "
+                    "Questions: reach out to Josh Xu (qitxu@microsoft.com)."
+                ).format(mention_html(wi)), token, "check2", mc, {"areaPath": ap})
                 action = "closed" if r else "patch_failed"
             elif plan_ok and dry_run:
                 action = "would-close (dry-run)"
@@ -1053,12 +1095,12 @@ def check3(token, allowed_areas, mc, dry_run, current_iter, prev_iter, grace_per
                 mc.plan({"event": "skip_area_mismatch", "check": "check3", "id": wid, "areaPath": ap})
                 continue
             if grace_period:
-                if not dry_run:
-                    add_comment(wid, (
-                        "{0} This item is still in Sprint {1} but not closed. "
-                        "Please close it or move it to a more appropriate sprint."
-                    ).format(mention_html(wi), prev_name), token)
-                action = "commented (grace, {0}d left)".format(grace_days)
+                action = controlled_comment(wid, (
+                    "{0} This item is still in Sprint {1} but not closed. "
+                    "Please close it or move it to a more appropriate sprint."
+                ).format(mention_html(wi), prev_name), token, "check3", mc, {"areaPath": ap})
+                if action == "commented":
+                    action = "commented (grace, {0}d left)".format(grace_days)
             else:
                 plan_ok = mc.plan({
                     "event": "plan_patch",
@@ -1071,16 +1113,17 @@ def check3(token, allowed_areas, mc, dry_run, current_iter, prev_iter, grace_per
                     r = patch_work_item(wid, [
                         {"op": "add", "path": "/fields/System.IterationPath", "value": curr_path},
                     ], token)
-                    add_comment(wid, (
-                        "{0} This item was left over from Sprint {1} and has been auto-moved "
-                        "to the current sprint ({2}). Please close it or reassign if no longer relevant."
-                    ).format(mention_html(wi), prev_name, curr_name), token)
                     mc.record({
                         "check": "check3", "id": wid, "areaPath": ap,
                         "before": {"iterationPath": prev_path},
                         "after": {"iterationPath": curr_path},
                         "ok": bool(r),
                     })
+                    controlled_comment(wid, (
+                        "{0} This item was left over from Sprint {1} and has been auto-moved "
+                        "to the current sprint ({2}). Please close it or reassign if no longer relevant."
+                    ).format(mention_html(wi), prev_name, curr_name),
+                                       token, "check3", mc, {"areaPath": ap})
                     action = "moved" if r else "move-failed"
                 elif plan_ok and dry_run:
                     action = "would-move (dry-run)"
@@ -1097,8 +1140,8 @@ def check3(token, allowed_areas, mc, dry_run, current_iter, prev_iter, grace_per
     return {"items": items, "count": len(items)}
 
 
-def check4(token, allowed_areas, current_iter, dry_run):
-    # type: (str, List[str], Dict[str, Any], bool) -> Dict[str, Any]
+def check4(token, allowed_areas, current_iter, mc):
+    # type: (str, List[str], Dict[str, Any], MutationController) -> Dict[str, Any]
     print("Check 4: Current Sprint Tasks - Estimates + Parent")
     items = []
     curr_path = current_iter["path"]
@@ -1132,10 +1175,9 @@ def check4(token, allowed_areas, current_iter, dry_run):
             if not missing:
                 continue
             issue = ", ".join(missing)
-            if not dry_run:
-                add_comment(wid, (
-                    "{0} This Task is missing: {1}. Please update before sprint mid-point."
-                ).format(mention_html(wi), issue), token)
+            action = controlled_comment(wid, (
+                "{0} This Task is missing: {1}. Please update before sprint mid-point."
+            ).format(mention_html(wi), issue), token, "check4", mc, {"areaPath": ap})
             items.append({
                 "id": wid,
                 "title": f.get("System.Title", ""),
@@ -1143,7 +1185,7 @@ def check4(token, allowed_areas, current_iter, dry_run):
                 "owner": get_owner_name(wi),
                 "area": AREA_SHORT.get(ap, ap),
                 "issue": issue,
-                "action": "commented" if not dry_run else "would-comment (dry-run)",
+                "action": action,
             })
     return {"items": items, "count": len(items)}
 
@@ -1184,17 +1226,17 @@ def check5(token, allowed_areas, mc, dry_run, current_iter):
                 r = patch_work_item(wid, [
                     {"op": "add", "path": "/fields/System.IterationPath", "value": curr_path},
                 ], token)
-                add_comment(wid, (
-                    "{0} This Bug was open but not in the current sprint, and has been auto-moved "
-                    "to {1}. Please close it if it's no longer active, or reassign if it needs "
-                    "different handling."
-                ).format(mention_html(wi), curr_name), token)
                 mc.record({
                     "check": "check5", "id": wid, "areaPath": ap,
                     "before": {"iterationPath": prev_path},
                     "after": {"iterationPath": curr_path},
                     "ok": bool(r),
                 })
+                controlled_comment(wid, (
+                    "{0} This Bug was open but not in the current sprint, and has been auto-moved "
+                    "to {1}. Please close it if it's no longer active, or reassign if it needs "
+                    "different handling."
+                ).format(mention_html(wi), curr_name), token, "check5", mc, {"areaPath": ap})
                 action = "moved" if r else "move-failed"
             elif plan_ok and dry_run:
                 action = "would-move (dry-run)"
@@ -1248,12 +1290,13 @@ def check6(token, allowed_areas, mc, dry_run, current_iter, prev_iter, sem_iters
             if not finish or finish >= today:
                 continue
             if grace_period:
-                if not dry_run:
-                    add_comment(wid, (
-                        "{0} This Task is still in Sprint {1}, which has already ended. "
-                        "Please close it or move it to an active sprint."
-                    ).format(mention_html(wi), iter_path.split("\\")[-1]), token)
-                action = "commented (grace, {0}d left)".format(grace_days)
+                action = controlled_comment(wid, (
+                    "{0} This Task is still in Sprint {1}, which has already ended. "
+                    "Please close it or move it to an active sprint."
+                ).format(mention_html(wi), iter_path.split("\\")[-1]),
+                                            token, "check6", mc, {"areaPath": ap})
+                if action == "commented":
+                    action = "commented (grace, {0}d left)".format(grace_days)
             else:
                 plan_ok = mc.plan({
                     "event": "plan_patch",
@@ -1266,17 +1309,18 @@ def check6(token, allowed_areas, mc, dry_run, current_iter, prev_iter, sem_iters
                     r = patch_work_item(wid, [
                         {"op": "add", "path": "/fields/System.IterationPath", "value": curr_path},
                     ], token)
-                    add_comment(wid, (
-                        "{0} This Task was stuck in Sprint {1} (already ended) and has been "
-                        "auto-moved to the current sprint ({2}). Please close it or reassign "
-                        "if no longer relevant."
-                    ).format(mention_html(wi), iter_path.split("\\")[-1], curr_name), token)
                     mc.record({
                         "check": "check6", "id": wid, "areaPath": ap,
                         "before": {"iterationPath": iter_path},
                         "after": {"iterationPath": curr_path},
                         "ok": bool(r),
                     })
+                    controlled_comment(wid, (
+                        "{0} This Task was stuck in Sprint {1} (already ended) and has been "
+                        "auto-moved to the current sprint ({2}). Please close it or reassign "
+                        "if no longer relevant."
+                    ).format(mention_html(wi), iter_path.split("\\")[-1], curr_name),
+                                       token, "check6", mc, {"areaPath": ap})
                     action = "moved" if r else "move-failed"
                 elif plan_ok and dry_run:
                     action = "would-move (dry-run)"
@@ -1746,17 +1790,18 @@ def check15(token, allowed_areas, mc, dry_run, current_iter, today):
                 r = patch_work_item(wid, [
                     {"op": "add", "path": "/fields/System.IterationPath", "value": month},
                 ], token)
-                add_comment(wid, (
-                    "{0} This Feature is '{1}' but was not in the current month. Per Madhu's "
-                    "backlog rule (2026-06-29 EM Sync), rolling-out/active items must be in the "
-                    "current month, so it was auto-moved to {2}."
-                ).format(mention_html(wi), f.get("System.State", ""), month), token)
                 mc.record({
                     "check": "check15", "id": wid, "areaPath": ap,
                     "before": {"iterationPath": prev_path},
                     "after": {"iterationPath": month},
                     "ok": bool(r),
                 })
+                controlled_comment(wid, (
+                    "{0} This Feature is '{1}' but was not in the current month. Per Madhu's "
+                    "backlog rule (2026-06-29 EM Sync), rolling-out/active items must be in the "
+                    "current month, so it was auto-moved to {2}."
+                ).format(mention_html(wi), f.get("System.State", ""), month),
+                                   token, "check15", mc, {"areaPath": ap})
                 action = "moved" if r else "move-failed"
             elif plan_ok and dry_run:
                 action = "would-move (dry-run)"
@@ -1773,8 +1818,8 @@ def check15(token, allowed_areas, mc, dry_run, current_iter, today):
     return {"items": items, "count": len(items)}
 
 
-def check17(token, allowed_areas, dry_run):
-    # type: (str, List[str], bool) -> Dict[str, Any]
+def check17(token, allowed_areas, mc):
+    # type: (str, List[str], MutationController) -> Dict[str, Any]
     print("Check 17: Zero RemainingWork on Active items (Madhu req 6/29)")
     items = []
     for area in allowed_areas:
@@ -1795,25 +1840,24 @@ def check17(token, allowed_areas, dry_run):
             if not area_path_allowed(ap, allowed_areas):
                 continue
             wid = wi["id"]
-            if not dry_run:
-                add_comment(wid, (
-                    "{0} This Active item shows 0 Remaining Work. Per Madhu's backlog rule "
-                    "(2026-06-29 EM Sync), an active item with work left must not show 0 - "
-                    "please set a realistic Remaining Work value or close it."
-                ).format(mention_html(wi)), token)
+            action = controlled_comment(wid, (
+                "{0} This Active item shows 0 Remaining Work. Per Madhu's backlog rule "
+                "(2026-06-29 EM Sync), an active item with work left must not show 0 - "
+                "please set a realistic Remaining Work value or close it."
+            ).format(mention_html(wi)), token, "check17", mc, {"areaPath": ap})
             items.append({
                 "id": wid,
                 "title": f.get("System.Title", ""),
                 "state": f.get("System.State", ""),
                 "owner": get_owner_name(wi),
                 "area": AREA_SHORT.get(ap, ap),
-                "action": "commented" if not dry_run else "would-comment (dry-run)",
+                "action": action,
             })
     return {"items": items, "count": len(items)}
 
 
-def check18(token, allowed_areas, dry_run, today):
-    # type: (str, List[str], bool, date) -> Dict[str, Any]
+def check18(token, allowed_areas, mc, today):
+    # type: (str, List[str], MutationController, date) -> Dict[str, Any]
     print("Check 18: Stale RemainingWork > {0}d (Madhu req 6/29)".format(STALE_REMAINING_DAYS))
     items = []
     for area in allowed_areas:
@@ -1838,12 +1882,12 @@ def check18(token, allowed_areas, dry_run, today):
             changed = _parse_iter_date(f.get("System.ChangedDate"))
             days = (today - changed).days if changed else None
             rw = f.get("Microsoft.VSTS.Scheduling.RemainingWork")
-            if not dry_run:
-                add_comment(wid, (
-                    "{0} This item has {1} Remaining Work but hasn't been updated in {2} days. "
-                    "Per Madhu's backlog rule (2026-06-29 EM Sync), Remaining Work must reflect "
-                    "reality - please refresh the estimate or close it."
-                ).format(mention_html(wi), rw, days if days is not None else "30+"), token)
+            action = controlled_comment(wid, (
+                "{0} This item has {1} Remaining Work but hasn't been updated in {2} days. "
+                "Per Madhu's backlog rule (2026-06-29 EM Sync), Remaining Work must reflect "
+                "reality - please refresh the estimate or close it."
+            ).format(mention_html(wi), rw, days if days is not None else "30+"),
+                                        token, "check18", mc, {"areaPath": ap})
             items.append({
                 "id": wid,
                 "title": f.get("System.Title", ""),
@@ -1852,7 +1896,7 @@ def check18(token, allowed_areas, dry_run, today):
                 "area": AREA_SHORT.get(ap, ap),
                 "remainingWork": rw,
                 "daysSinceChanged": days,
-                "action": "commented" if not dry_run else "would-comment (dry-run)",
+                "action": action,
             })
     return {"items": items, "count": len(items)}
 
@@ -2652,7 +2696,7 @@ def main(argv=None):
         results["check3"] = check3(ado_token, allowed_areas, mc, args.dry_run,
                                    current_iter, prev_iter, grace_period, grace_days)
     if should_run("4"):
-        results["check4"] = check4(ado_token, allowed_areas, current_iter, args.dry_run)
+        results["check4"] = check4(ado_token, allowed_areas, current_iter, mc)
     if should_run("5"):
         results["check5"] = check5(ado_token, allowed_areas, mc, args.dry_run, current_iter)
     if should_run("6"):
@@ -2678,9 +2722,9 @@ def main(argv=None):
     if should_run("15"):
         results["check15"] = check15(ado_token, allowed_areas, mc, args.dry_run, current_iter, today)
     if should_run("17"):
-        results["check17"] = check17(ado_token, allowed_areas, args.dry_run)
+        results["check17"] = check17(ado_token, allowed_areas, mc)
     if should_run("18"):
-        results["check18"] = check18(ado_token, allowed_areas, args.dry_run, today)
+        results["check18"] = check18(ado_token, allowed_areas, mc, today)
     if should_run("20"):
         results["check20"] = check20(ado_token, allowed_areas)
 

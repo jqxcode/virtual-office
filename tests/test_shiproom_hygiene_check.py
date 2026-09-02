@@ -16,6 +16,7 @@ import tempfile
 import unittest
 from datetime import date
 from typing import List
+from unittest.mock import patch
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(REPO_ROOT, "runner"))
@@ -252,6 +253,45 @@ class TestMutationCap(unittest.TestCase):
         mc.plan({"event": "plan_patch", "id": 2})
         mc.record({"id": 2})
         self.assertFalse(mc.can_patch())
+
+    def test_controlled_comment_plans_audits_and_consumes_cap(self):
+        mc, plan_path, audit_path = self._make_controller(cap=1, dry_run=False)
+        response = {"id": 123}
+
+        with patch.object(shc, "add_comment", return_value=response) as add:
+            action = shc.controlled_comment(
+                42, "Please update this item.", "token", "check4", mc,
+                {"areaPath": shc.AREA_MJ},
+            )
+
+        self.assertEqual(action, "commented")
+        self.assertEqual(mc.count, 1)
+        add.assert_called_once_with(42, "Please update this item.", "token")
+        with open(plan_path, "r", encoding="utf-8") as f:
+            plan = f.read()
+        with open(audit_path, "r", encoding="utf-8") as f:
+            audit = f.read()
+        self.assertIn('"event": "plan_comment"', plan)
+        self.assertIn('"mutationType": "comment"', plan)
+        self.assertIn('"event": "comment"', audit)
+        self.assertIn('"ok": true', audit)
+        self.assertIn('"systemVersion": "{0}"'.format(shc.SYSTEM_VERSION), plan)
+        self.assertIn('"systemVersion": "{0}"'.format(shc.SYSTEM_VERSION), audit)
+
+    def test_controlled_comment_skips_when_cap_is_exhausted(self):
+        mc, plan_path, audit_path = self._make_controller(cap=0, dry_run=False)
+
+        with patch.object(shc, "add_comment") as add:
+            action = shc.controlled_comment(
+                42, "Please update this item.", "token", "check4", mc,
+            )
+
+        self.assertEqual(action, "skipped (cap)")
+        self.assertEqual(mc.count, 0)
+        add.assert_not_called()
+        self.assertFalse(os.path.exists(audit_path))
+        with open(plan_path, "r", encoding="utf-8") as f:
+            self.assertIn('"event": "cap_reached"', f.read())
 
 
 # ---------------------------------------------------------------------------
