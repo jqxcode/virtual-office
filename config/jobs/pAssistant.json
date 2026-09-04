@@ -1,0 +1,11 @@
+{
+  "jobs": {
+    "flight-prices": {
+      "displayName": "Flight Prices",
+      "prompt": "Use the flight-prices skill (~/.copilot/skills/flight-prices/SKILL.md), following it VERBATIM, to answer this flight query: {{EXTRA_ARGS}}. ALWAYS use REAL scraped data via the browsergflights provider in C:\\src\\jqxcode\\sea-asia-flight-monitor (venv .\\.venv\\Scripts\\python.exe, set PYTHONIOENCODING=utf-8); never guess from memory. Run HEADLESS only -- never a foreground browser. Before and after, clean up leftover automation Edge by PID (match 'edge-monitor-profile' or 'remote-debugging-port'; never touch the user's main Edge). If a price looks implausible, verify it against the raw result row before reporting. Deliver a concise, accurate answer (a table when comparing dates/cabins/cities) and note it is live scraped data.",
+      "requiresInput": true,
+      "inputPrompt": "What flight query? (e.g., 'cheapest SEA->NRT business in September', 'Delta date matrix SEA-HND one-way', 'compare Taipei vs Tokyo Sept', 'which China cities can Delta fly from SEA')",
+      "schedule": "manual"
+    }
+  }
+}

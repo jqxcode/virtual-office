@@ -1,0 +1,314 @@
+{
+  "@odata.context": "https://graph.microsoft.com/v1.0/$metadata#teams('31ee74d6-0a8f-41a6-b0da-c4d9e3a1db3b')/channels('19%3A183d481e40af45d09aac7322433fc7ab%40thread.tacv2')/messages/$entity",
+  "id": "1787846289719",
+  "replyToId": null,
+  "etag": "1787846289719",
+  "messageType": "message",
+  "createdDateTime": "2026-08-27T15:58:09.719Z",
+  "lastModifiedDateTime": "2026-08-27T15:58:09.719Z",
+  "lastEditedDateTime": null,
+  "deletedDateTime": null,
+  "subject": "Shiproom Hygiene Summary - 2026-08-27",
+  "summary": null,
+  "chatId": null,
+  "importance": "normal",
+  "locale": "en-us",
+  "webUrl": "https://teams.microsoft.com/l/message/19%3A183d481e40af45d09aac7322433fc7ab%40thread.tacv2/1787846289719?groupId=31ee74d6-0a8f-41a6-b0da-c4d9e3a1db3b&tenantId=72f988bf-86f1-41af-91ab-2d7cd011db47&createdTime=1787846289719&parentMessageId=1787846289719",
+  "policyViolation": null,
+  "eventDetail": null,
+  "from": {
+    "application": null,
+    "device": null,
+    "user": {
+      "@odata.type": "#microsoft.graph.teamworkUserIdentity",
+      "id": "90b98fe6-a80b-46e1-9209-b5ebcdf6da6b",
+      "displayName": "Josh Xu",
+      "userIdentityType": "aadUser",
+      "tenantId": "72f988bf-86f1-41af-91ab-2d7cd011db47"
+    }
+  },
+  "body": {
+    "contentType": "html",
+    "content": "<p><b>Shiproom Hygiene Summary - 2026-08-27</b></p>\n\n\n<p style=\"color:gray; font-size:12px\">Agent: Poster | Job: mPoster-hygiene-teams-summary | Start: 2026-08-27 08:57:52 PDT | Complete: 2026-08-27 08:57:52 PDT</p>\n\n\n\n\n\n\n<p><b>Tasks Missing Estimates or Parent (1)</b></p>\n<p>Current sprint tasks missing Original Estimate, Remaining Work, or parent link:</p>\n<table border=\"1\" style=\"border-collapse:collapse; width:100%\">\n<tbody>\n<tr>\n<th>Task</th>\n<th>Title</th>\n<th>Owner</th>\n<th>Issue</th>\n</tr>\n<tr>\n<td><a href=\"https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/5673310\">5673310</a></td>\n<td>Joined a Meet Now (from group chat) while in a meeting. Meeting put on hold and I joined the Meet Now but I have no stage for the Meet Now. There is no way to exit.</td>\n<td><at id=\"0\">Paresh Mewada</at></td>\n<td>RemainingWork, parent link</td>\n</tr>\n</tbody>\n</table>\n\n\n\n\n\n\n\n\n\n\n<p><b>Proposed Bugs &gt; 24 Hours (2)</b></p>\n<p>These bugs have been in Proposed state for more than 24 hours and need triage (Active or Closed):</p>\n<table border=\"1\" style=\"border-collapse:collapse; width:100%\">\n<tbody>\n<tr>\n<th>Bug</th>\n<th>Title</th>\n<th>Owner</th>\n<th>Last Changed</th>\n</tr>\n<tr>\n<td><a href=\"https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/5734026\">5734026</a></td>\n<td>[Flight Blocker] [FF]Aug known bots 2</td>\n<td><at id=\"1\">Varun Venkatesh</at></td>\n<td>2026-08-25</td>\n</tr>\n<tr>\n<td><a href=\"https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/5741090\">5741090</a></td>\n<td>Deeplink meeting join: deeplink_into_meeting hangs at fire-calling-intent handoff and times out (120s) before the join scenario starts</td>\n<td><at id=\"2\">Juan Zepeda Salvatierra</at></td>\n<td>2026-08-25</td>\n</tr>\n</tbody>\n</table>\n\n\n\n\n\n\n\n\n\n\n\n\n\n<p><b>Missing Sign-Offs (8)</b></p>\n<p>Active Features missing required governance sign-offs:</p>\n<table border=\"1\" style=\"border-collapse:collapse; width:100%\">\n<tbody>\n<tr>\n<th>Feature</th>\n<th>Title</th>\n<th>Owner</th>\n<th>Missing</th>\n</tr>\n<tr>\n<td><a href=\"https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/5348890\">5348890</a></td>\n<td>[ThreadedChats] Meet Now Support - Meet Now</td>\n<td><at id=\"3\">Paresh Mewada</at></td>\n<td>Compliance</td>\n</tr>\n<tr>\n<td><a href=\"https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/5452882\">5452882</a></td>\n<td>[Eng Fundamentals] Bug fixing, CiFx &amp; ZBB - Meeting Join (US)</td>\n<td><at id=\"4\">Varun Venkatesh</at></td>\n<td>Compliance</td>\n</tr>\n<tr>\n<td><a href=\"https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/5452883\">5452883</a></td>\n<td>[Eng Fundamentals] Live site &amp; DRI support - Meeting Join (US)</td>\n<td><at id=\"5\">Varun Venkatesh</at></td>\n<td>Compliance</td>\n</tr>\n<tr>\n<td><a href=\"https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/5461620\">5461620</a></td>\n<td>[OCV] Fix call cleanup and incompletes</td>\n<td><at id=\"6\">Mauricio Juanes Laviada</at></td>\n<td>Accessibility, Privacy, Compliance</td>\n</tr>\n<tr>\n<td><a href=\"https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/5461630\">5461630</a></td>\n<td>[OCV] Slimcore hangs tracking</td>\n<td><at id=\"7\">Mauricio Juanes Laviada</at></td>\n<td>Accessibility, Privacy, Compliance</td>\n</tr>\n<tr>\n<td><a href=\"https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/5500166\">5500166</a></td>\n<td>[External Recording Detection] TAC external recording detection</td>\n<td><at id=\"8\">Varun Venkatesh</at></td>\n<td>Compliance</td>\n</tr>\n<tr>\n<td><a href=\"https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/5540671\">5540671</a></td>\n<td>AI PR Reviewer - configurable per-area AI review of Pull Requests</td>\n<td><at id=\"9\">Paresh Mewada</at></td>\n<td>Privacy</td>\n</tr>\n<tr>\n<td><a href=\"https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/5560556\">5560556</a></td>\n<td>[Reliability][TFL][Win][create_meetup] - [Current] 99.48% -&gt; [Target] 99.50%</td>\n<td><at id=\"10\">Paresh Mewada</at></td>\n<td>Accessibility</td>\n</tr>\n</tbody>\n</table>\n\n\n\n\n<p><b>Invalid Ring Date Ordering (2)</b></p>\n<p>Ring 4 must be after Ring 0. These Features have R0 missing or R4 &lt;= R0:</p>\n<table border=\"1\" style=\"border-collapse:collapse; width:100%\">\n<tbody>\n<tr>\n<th>Feature</th>\n<th>Title</th>\n<th>Owner</th>\n<th>Ring0</th>\n<th>Ring4</th>\n<th>Issue</th>\n</tr>\n<tr>\n<td><a href=\"https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/5560288\">5560288</a></td>\n<td>[Reliability][TFW][Web][calling_lobby_admit] - [Current] 99.87% -&gt; [Target] 99.90%</td>\n<td><at id=\"11\">Juan Zepeda Salvatierra</at></td>\n<td>2027-01-01</td>\n<td>2026-12-31</td>\n<td>R4 before R0</td>\n</tr>\n<tr>\n<td><a href=\"https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/5560557\">5560557</a></td>\n<td>[Reliability][TFL][Win][Interop][calling_lobby_admit] - [Current] 99.48% -&gt; [Target] 99.50%</td>\n<td><at id=\"12\">Juan Zepeda Salvatierra</at></td>\n<td>2027-01-01</td>\n<td>2026-12-31</td>\n<td>R4 before R0</td>\n</tr>\n</tbody>\n</table>\n\n\n\n\n<p><b>Upcoming Required Training by Due Date (1)</b></p>\n<p>Team members with incomplete required trainings due within 15 days:</p>\n<table border=\"1\" style=\"border-collapse:collapse; width:100%\">\n<tbody>\n<tr>\n<th>Name</th>\n<th>Course</th>\n<th>Due Date</th>\n</tr>\n<tr>\n<td><at id=\"13\">Rachita Bansal</at></td>\n<td><a href=\"https://vivalearning.microsoft.com/l/entity/2e3a628d-6f54-4100-9e7a-f00bc3621a85/MyLearning?context={&quot;subEntityId&quot;:{&quot;providerId&quot;:&quot;2554aeea-f58b-4c6c-a5fe-9b91f8a967cc&quot;,&quot;itemId&quot;:&quot;SuccessFactors_s9314664&quot;,&quot;language&quot;:&quot;en-us&quot;}}\">Security Foundations:\n Being Threat Aware</a></td>\n<td>2026-08-31</td>\n</tr>\n</tbody>\n</table>\n\n\n\n\n\n\n\n\n\n\n\n\n<p><b>Stale RemainingWork (&gt;30d untouched) (1)</b></p>\n<p>Madhu requirement (6/29 EM Sync): Active items with Remaining Work unchanged for more than 30 days:</p>\n<table border=\"1\" style=\"border-collapse:collapse; width:100%\">\n<tbody>\n<tr>\n<th>Item</th>\n<th>Title</th>\n<th>Owner</th>\n<th>State</th>\n<th>Area</th>\n<th>Remaining Work</th>\n<th>Days Since Changed</th>\n<th>Action</th>\n</tr>\n<tr>\n<td><a href=\"https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/5496501\">5496501</a></td>\n<td>DRI Story for Holiday Season</td>\n<td><at id=\"14\">Mauricio Juanes Laviada</at></td>\n<td>Proposed</td>\n<td>MeetingJoin</td>\n<td>0.5</td>\n<td>31</td>\n<td>commented</td>\n</tr>\n</tbody>\n</table>\n\n<br>\n<p>CC: <at id=\"15\">Josh Xu</at></p>"
+  },
+  "channelIdentity": {
+    "teamId": "31ee74d6-0a8f-41a6-b0da-c4d9e3a1db3b",
+    "channelId": "19:183d481e40af45d09aac7322433fc7ab@thread.tacv2"
+  },
+  "attachments": [],
+  "mentions": [
+    {
+      "id": 0,
+      "mentionText": "Paresh Mewada",
+      "mentioned": {
+        "application": null,
+        "device": null,
+        "conversation": null,
+        "tag": null,
+        "user": {
+          "@odata.type": "#microsoft.graph.teamworkUserIdentity",
+          "id": "fdea2635-c751-4112-8174-05ba00730daf",
+          "displayName": "Paresh Mewada",
+          "userIdentityType": "aadUser",
+          "tenantId": "72f988bf-86f1-41af-91ab-2d7cd011db47"
+        }
+      }
+    },
+    {
+      "id": 1,
+      "mentionText": "Varun Venkatesh",
+      "mentioned": {
+        "application": null,
+        "device": null,
+        "conversation": null,
+        "tag": null,
+        "user": {
+          "@odata.type": "#microsoft.graph.teamworkUserIdentity",
+          "id": "4d6765eb-0d36-4713-98e7-f6e8e7e509d1",
+          "displayName": "Varun Venkatesh",
+          "userIdentityType": "aadUser",
+          "tenantId": "72f988bf-86f1-41af-91ab-2d7cd011db47"
+        }
+      }
+    },
+    {
+      "id": 2,
+      "mentionText": "Juan Zepeda Salvatierra",
+      "mentioned": {
+        "application": null,
+        "device": null,
+        "conversation": null,
+        "tag": null,
+        "user": {
+          "@odata.type": "#microsoft.graph.teamworkUserIdentity",
+          "id": "e00f17bc-e351-4a4e-b789-72a1fe04c107",
+          "displayName": "Juan Zepeda Salvatierra",
+          "userIdentityType": "aadUser",
+          "tenantId": "72f988bf-86f1-41af-91ab-2d7cd011db47"
+        }
+      }
+    },
+    {
+      "id": 3,
+      "mentionText": "Paresh Mewada",
+      "mentioned": {
+        "application": null,
+        "device": null,
+        "conversation": null,
+        "tag": null,
+        "user": {
+          "@odata.type": "#microsoft.graph.teamworkUserIdentity",
+          "id": "fdea2635-c751-4112-8174-05ba00730daf",
+          "displayName": "Paresh Mewada",
+          "userIdentityType": "aadUser",
+          "tenantId": "72f988bf-86f1-41af-91ab-2d7cd011db47"
+        }
+      }
+    },
+    {
+      "id": 4,
+      "mentionText": "Varun Venkatesh",
+      "mentioned": {
+        "application": null,
+        "device": null,
+        "conversation": null,
+        "tag": null,
+        "user": {
+          "@odata.type": "#microsoft.graph.teamworkUserIdentity",
+          "id": "4d6765eb-0d36-4713-98e7-f6e8e7e509d1",
+          "displayName": "Varun Venkatesh",
+          "userIdentityType": "aadUser",
+          "tenantId": "72f988bf-86f1-41af-91ab-2d7cd011db47"
+        }
+      }
+    },
+    {
+      "id": 5,
+      "mentionText": "Varun Venkatesh",
+      "mentioned": {
+        "application": null,
+        "device": null,
+        "conversation": null,
+        "tag": null,
+        "user": {
+          "@odata.type": "#microsoft.graph.teamworkUserIdentity",
+          "id": "4d6765eb-0d36-4713-98e7-f6e8e7e509d1",
+          "displayName": "Varun Venkatesh",
+          "userIdentityType": "aadUser",
+          "tenantId": "72f988bf-86f1-41af-91ab-2d7cd011db47"
+        }
+      }
+    },
+    {
+      "id": 6,
+      "mentionText": "Mauricio Juanes Laviada",
+      "mentioned": {
+        "application": null,
+        "device": null,
+        "conversation": null,
+        "tag": null,
+        "user": {
+          "@odata.type": "#microsoft.graph.teamworkUserIdentity",
+          "id": "c19890c3-f551-4d53-b8dd-16fe907bfe14",
+          "displayName": "Mauricio Juanes Laviada",
+          "userIdentityType": "aadUser",
+          "tenantId": "72f988bf-86f1-41af-91ab-2d7cd011db47"
+        }
+      }
+    },
+    {
+      "id": 7,
+      "mentionText": "Mauricio Juanes Laviada",
+      "mentioned": {
+        "application": null,
+        "device": null,
+        "conversation": null,
+        "tag": null,
+        "user": {
+          "@odata.type": "#microsoft.graph.teamworkUserIdentity",
+          "id": "c19890c3-f551-4d53-b8dd-16fe907bfe14",
+          "displayName": "Mauricio Juanes Laviada",
+          "userIdentityType": "aadUser",
+          "tenantId": "72f988bf-86f1-41af-91ab-2d7cd011db47"
+        }
+      }
+    },
+    {
+      "id": 8,
+      "mentionText": "Varun Venkatesh",
+      "mentioned": {
+        "application": null,
+        "device": null,
+        "conversation": null,
+        "tag": null,
+        "user": {
+          "@odata.type": "#microsoft.graph.teamworkUserIdentity",
+          "id": "4d6765eb-0d36-4713-98e7-f6e8e7e509d1",
+          "displayName": "Varun Venkatesh",
+          "userIdentityType": "aadUser",
+          "tenantId": "72f988bf-86f1-41af-91ab-2d7cd011db47"
+        }
+      }
+    },
+    {
+      "id": 9,
+      "mentionText": "Paresh Mewada",
+      "mentioned": {
+        "application": null,
+        "device": null,
+        "conversation": null,
+        "tag": null,
+        "user": {
+          "@odata.type": "#microsoft.graph.teamworkUserIdentity",
+          "id": "fdea2635-c751-4112-8174-05ba00730daf",
+          "displayName": "Paresh Mewada",
+          "userIdentityType": "aadUser",
+          "tenantId": "72f988bf-86f1-41af-91ab-2d7cd011db47"
+        }
+      }
+    },
+    {
+      "id": 10,
+      "mentionText": "Paresh Mewada",
+      "mentioned": {
+        "application": null,
+        "device": null,
+        "conversation": null,
+        "tag": null,
+        "user": {
+          "@odata.type": "#microsoft.graph.teamworkUserIdentity",
+          "id": "fdea2635-c751-4112-8174-05ba00730daf",
+          "displayName": "Paresh Mewada",
+          "userIdentityType": "aadUser",
+          "tenantId": "72f988bf-86f1-41af-91ab-2d7cd011db47"
+        }
+      }
+    },
+    {
+      "id": 11,
+      "mentionText": "Juan Zepeda Salvatierra",
+      "mentioned": {
+        "application": null,
+        "device": null,
+        "conversation": null,
+        "tag": null,
+        "user": {
+          "@odata.type": "#microsoft.graph.teamworkUserIdentity",
+          "id": "e00f17bc-e351-4a4e-b789-72a1fe04c107",
+          "displayName": "Juan Zepeda Salvatierra",
+          "userIdentityType": "aadUser",
+          "tenantId": "72f988bf-86f1-41af-91ab-2d7cd011db47"
+        }
+      }
+    },
+    {
+      "id": 12,
+      "mentionText": "Juan Zepeda Salvatierra",
+      "mentioned": {
+        "application": null,
+        "device": null,
+        "conversation": null,
+        "tag": null,
+        "user": {
+          "@odata.type": "#microsoft.graph.teamworkUserIdentity",
+          "id": "e00f17bc-e351-4a4e-b789-72a1fe04c107",
+          "displayName": "Juan Zepeda Salvatierra",
+          "userIdentityType": "aadUser",
+          "tenantId": "72f988bf-86f1-41af-91ab-2d7cd011db47"
+        }
+      }
+    },
+    {
+      "id": 13,
+      "mentionText": "Rachita Bansal",
+      "mentioned": {
+        "application": null,
+        "device": null,
+        "conversation": null,
+        "tag": null,
+        "user": {
+          "@odata.type": "#microsoft.graph.teamworkUserIdentity",
+          "id": "88835fef-c7cd-4933-b2c0-6a40cbf86bdd",
+          "displayName": "Rachita Bansal",
+          "userIdentityType": "aadUser",
+          "tenantId": "72f988bf-86f1-41af-91ab-2d7cd011db47"
+        }
+      }
+    },
+    {
+      "id": 14,
+      "mentionText": "Mauricio Juanes Laviada",
+      "mentioned": {
+        "application": null,
+        "device": null,
+        "conversation": null,
+        "tag": null,
+        "user": {
+          "@odata.type": "#microsoft.graph.teamworkUserIdentity",
+          "id": "c19890c3-f551-4d53-b8dd-16fe907bfe14",
+          "displayName": "Mauricio Juanes Laviada",
+          "userIdentityType": "aadUser",
+          "tenantId": "72f988bf-86f1-41af-91ab-2d7cd011db47"
+        }
+      }
+    },
+    {
+      "id": 15,
+      "mentionText": "Josh Xu",
+      "mentioned": {
+        "application": null,
+        "device": null,
+        "conversation": null,
+        "tag": null,
+        "user": {
+          "@odata.type": "#microsoft.graph.teamworkUserIdentity",
+          "id": "90b98fe6-a80b-46e1-9209-b5ebcdf6da6b",
+          "displayName": "Josh Xu",
+          "userIdentityType": "aadUser",
+          "tenantId": "72f988bf-86f1-41af-91ab-2d7cd011db47"
+        }
+      }
+    }
+  ],
+  "reactions": []
+}

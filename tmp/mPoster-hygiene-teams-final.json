@@ -1,0 +1,185 @@
+{
+  "subject": "Shiproom Hygiene Summary - 2026-08-27",
+  "body": {
+    "contentType": "html",
+    "content": "<p><b>Shiproom Hygiene Summary - 2026-08-27</b></p>\n<p style='color:gray;font-size:12px;'>Agent: Poster | Job: mPoster-hygiene-teams-summary | Start: 2026-08-27 08:57:52 PDT | Complete: 2026-08-27 08:57:52 PDT</p>\n\n\n\n\n<p><b>Tasks Missing Estimates or Parent (1)</b></p><p>Current sprint tasks missing Original Estimate, Remaining Work, or parent link:</p><table border='1' style='border-collapse:collapse;width:100%;'><tr><th>Task</th><th>Title</th><th>Owner</th><th>Issue</th></tr><tr><td><a href=\"https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/5673310\">5673310</a></td><td>Joined a Meet Now (from group chat) while in a meeting. Meeting put on hold and I joined the Meet Now but I have no stage for the Meet Now. There is no way to exit.</td><td><at id=\"0\">Paresh Mewada</at></td><td>RemainingWork, parent link</td></tr></table>\n\n\n\n\n\n\n\n\n<p><b>Proposed Bugs &gt; 24 Hours (2)</b></p><p>These bugs have been in Proposed state for more than 24 hours and need triage (Active or Closed):</p><table border='1' style='border-collapse:collapse;width:100%;'><tr><th>Bug</th><th>Title</th><th>Owner</th><th>Last Changed</th></tr><tr><td><a href=\"https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/5734026\">5734026</a></td><td>[Flight Blocker] [FF]Aug known bots 2</td><td><at id=\"1\">Varun Venkatesh</at></td><td>2026-08-25</td></tr><tr><td><a href=\"https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/5741090\">5741090</a></td><td>Deeplink meeting join: deeplink_into_meeting hangs at fire-calling-intent handoff and times out (120s) before the join scenario starts</td><td><at id=\"2\">Juan Zepeda Salvatierra</at></td><td>2026-08-25</td></tr></table>\n\n\n\n\n\n\n\n\n\n\n\n<p><b>Missing Sign-Offs (8)</b></p><p>Active Features missing required governance sign-offs:</p><table border='1' style='border-collapse:collapse;width:100%;'><tr><th>Feature</th><th>Title</th><th>Owner</th><th>Missing</th></tr><tr><td><a href=\"https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/5348890\">5348890</a></td><td>[ThreadedChats] Meet Now Support - Meet Now</td><td><at id=\"3\">Paresh Mewada</at></td><td>Compliance</td></tr><tr><td><a href=\"https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/5452882\">5452882</a></td><td>[Eng Fundamentals] Bug fixing, CiFx &amp; ZBB - Meeting Join (US)</td><td><at id=\"4\">Varun Venkatesh</at></td><td>Compliance</td></tr><tr><td><a href=\"https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/5452883\">5452883</a></td><td>[Eng Fundamentals] Live site &amp; DRI support - Meeting Join (US)</td><td><at id=\"5\">Varun Venkatesh</at></td><td>Compliance</td></tr><tr><td><a href=\"https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/5461620\">5461620</a></td><td>[OCV] Fix call cleanup and incompletes</td><td><at id=\"6\">Mauricio Juanes Laviada</at></td><td>Accessibility, Privacy, Compliance</td></tr><tr><td><a href=\"https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/5461630\">5461630</a></td><td>[OCV] Slimcore hangs tracking</td><td><at id=\"7\">Mauricio Juanes Laviada</at></td><td>Accessibility, Privacy, Compliance</td></tr><tr><td><a href=\"https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/5500166\">5500166</a></td><td>[External Recording Detection] TAC external recording detection</td><td><at id=\"8\">Varun Venkatesh</at></td><td>Compliance</td></tr><tr><td><a href=\"https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/5540671\">5540671</a></td><td>AI PR Reviewer - configurable per-area AI review of Pull Requests</td><td><at id=\"9\">Paresh Mewada</at></td><td>Privacy</td></tr><tr><td><a href=\"https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/5560556\">5560556</a></td><td>[Reliability][TFL][Win][create_meetup] - [Current] 99.48% -&gt; [Target] 99.50%</td><td><at id=\"10\">Paresh Mewada</at></td><td>Accessibility</td></tr></table>\n\n\n<p><b>Invalid Ring Date Ordering (2)</b></p><p>Ring 4 must be after Ring 0. These Features have R0 missing or R4 <= R0:</p><table border='1' style='border-collapse:collapse;width:100%;'><tr><th>Feature</th><th>Title</th><th>Owner</th><th>Ring0</th><th>Ring4</th><th>Issue</th></tr><tr><td><a href=\"https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/5560288\">5560288</a></td><td>[Reliability][TFW][Web][calling_lobby_admit] - [Current] 99.87% -&gt; [Target] 99.90%</td><td><at id=\"11\">Juan Zepeda Salvatierra</at></td><td>2027-01-01</td><td>2026-12-31</td><td>R4 before R0</td></tr><tr><td><a href=\"https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/5560557\">5560557</a></td><td>[Reliability][TFL][Win][Interop][calling_lobby_admit] - [Current] 99.48% -&gt; [Target] 99.50%</td><td><at id=\"12\">Juan Zepeda Salvatierra</at></td><td>2027-01-01</td><td>2026-12-31</td><td>R4 before R0</td></tr></table>\n\n\n<p><b>Upcoming Required Training by Due Date (1)</b></p><p>Team members with incomplete required trainings due within 15 days:</p><table border='1' style='border-collapse:collapse;width:100%;'><tr><th>Name</th><th>Course</th><th>Due Date</th></tr><tr><td><at id=\"13\">Rachita Bansal</at></td><td><a href=\"https://vivalearning.microsoft.com/l/entity/2e3a628d-6f54-4100-9e7a-f00bc3621a85/MyLearning?context={&quot;subEntityId&quot;:{&quot;providerId&quot;:&quot;2554aeea-f58b-4c6c-a5fe-9b91f8a967cc&quot;,&quot;itemId&quot;:&quot;SuccessFactors_s9314664&quot;,&quot;language&quot;:&quot;en-us&quot;}}\">Security Foundations: Being Threat Aware</a></td><td>2026-08-31</td></tr></table>\n\n\n\n\n\n\n\n\n\n\n<p><b>Stale RemainingWork (&gt;30d untouched) (1)</b></p><p>Madhu requirement (6/29 EM Sync): Active items with Remaining Work unchanged for more than 30 days:</p><table border='1' style='border-collapse:collapse;width:100%;'><tr><th>Item</th><th>Title</th><th>Owner</th><th>State</th><th>Area</th><th>Remaining Work</th><th>Days Since Changed</th><th>Action</th></tr><tr><td><a href=\"https://domoreexp.visualstudio.com/MSTeams/_workitems/edit/5496501\">5496501</a></td><td>DRI Story for Holiday Season</td><td><at id=\"14\">Mauricio Juanes Laviada</at></td><td>Proposed</td><td>MeetingJoin</td><td>0.5</td><td>31</td><td>commented</td></tr></table>\n<br/><p>CC: <at id=\"15\">Josh Xu</at></p>"
+  },
+  "mentions": [
+    {
+      "id": 0,
+      "mentionText": "Paresh Mewada",
+      "mentioned": {
+        "user": {
+          "displayName": "Paresh Mewada",
+          "id": "fdea2635-c751-4112-8174-05ba00730daf",
+          "userIdentityType": "aadUser"
+        }
+      }
+    },
+    {
+      "id": 1,
+      "mentionText": "Varun Venkatesh",
+      "mentioned": {
+        "user": {
+          "displayName": "Varun Venkatesh",
+          "id": "4d6765eb-0d36-4713-98e7-f6e8e7e509d1",
+          "userIdentityType": "aadUser"
+        }
+      }
+    },
+    {
+      "id": 2,
+      "mentionText": "Juan Zepeda Salvatierra",
+      "mentioned": {
+        "user": {
+          "displayName": "Juan Zepeda Salvatierra",
+          "id": "e00f17bc-e351-4a4e-b789-72a1fe04c107",
+          "userIdentityType": "aadUser"
+        }
+      }
+    },
+    {
+      "id": 3,
+      "mentionText": "Paresh Mewada",
+      "mentioned": {
+        "user": {
+          "displayName": "Paresh Mewada",
+          "id": "fdea2635-c751-4112-8174-05ba00730daf",
+          "userIdentityType": "aadUser"
+        }
+      }
+    },
+    {
+      "id": 4,
+      "mentionText": "Varun Venkatesh",
+      "mentioned": {
+        "user": {
+          "displayName": "Varun Venkatesh",
+          "id": "4d6765eb-0d36-4713-98e7-f6e8e7e509d1",
+          "userIdentityType": "aadUser"
+        }
+      }
+    },
+    {
+      "id": 5,
+      "mentionText": "Varun Venkatesh",
+      "mentioned": {
+        "user": {
+          "displayName": "Varun Venkatesh",
+          "id": "4d6765eb-0d36-4713-98e7-f6e8e7e509d1",
+          "userIdentityType": "aadUser"
+        }
+      }
+    },
+    {
+      "id": 6,
+      "mentionText": "Mauricio Juanes Laviada",
+      "mentioned": {
+        "user": {
+          "displayName": "Mauricio Juanes Laviada",
+          "id": "c19890c3-f551-4d53-b8dd-16fe907bfe14",
+          "userIdentityType": "aadUser"
+        }
+      }
+    },
+    {
+      "id": 7,
+      "mentionText": "Mauricio Juanes Laviada",
+      "mentioned": {
+        "user": {
+          "displayName": "Mauricio Juanes Laviada",
+          "id": "c19890c3-f551-4d53-b8dd-16fe907bfe14",
+          "userIdentityType": "aadUser"
+        }
+      }
+    },
+    {
+      "id": 8,
+      "mentionText": "Varun Venkatesh",
+      "mentioned": {
+        "user": {
+          "displayName": "Varun Venkatesh",
+          "id": "4d6765eb-0d36-4713-98e7-f6e8e7e509d1",
+          "userIdentityType": "aadUser"
+        }
+      }
+    },
+    {
+      "id": 9,
+      "mentionText": "Paresh Mewada",
+      "mentioned": {
+        "user": {
+          "displayName": "Paresh Mewada",
+          "id": "fdea2635-c751-4112-8174-05ba00730daf",
+          "userIdentityType": "aadUser"
+        }
+      }
+    },
+    {
+      "id": 10,
+      "mentionText": "Paresh Mewada",
+      "mentioned": {
+        "user": {
+          "displayName": "Paresh Mewada",
+          "id": "fdea2635-c751-4112-8174-05ba00730daf",
+          "userIdentityType": "aadUser"
+        }
+      }
+    },
+    {
+      "id": 11,
+      "mentionText": "Juan Zepeda Salvatierra",
+      "mentioned": {
+        "user": {
+          "displayName": "Juan Zepeda Salvatierra",
+          "id": "e00f17bc-e351-4a4e-b789-72a1fe04c107",
+          "userIdentityType": "aadUser"
+        }
+      }
+    },
+    {
+      "id": 12,
+      "mentionText": "Juan Zepeda Salvatierra",
+      "mentioned": {
+        "user": {
+          "displayName": "Juan Zepeda Salvatierra",
+          "id": "e00f17bc-e351-4a4e-b789-72a1fe04c107",
+          "userIdentityType": "aadUser"
+        }
+      }
+    },
+    {
+      "id": 13,
+      "mentionText": "Rachita Bansal",
+      "mentioned": {
+        "user": {
+          "displayName": "Rachita Bansal",
+          "id": "88835fef-c7cd-4933-b2c0-6a40cbf86bdd",
+          "userIdentityType": "aadUser"
+        }
+      }
+    },
+    {
+      "id": 14,
+      "mentionText": "Mauricio Juanes Laviada",
+      "mentioned": {
+        "user": {
+          "displayName": "Mauricio Juanes Laviada",
+          "id": "c19890c3-f551-4d53-b8dd-16fe907bfe14",
+          "userIdentityType": "aadUser"
+        }
+      }
+    },
+    {
+      "id": 15,
+      "mentionText": "Josh Xu",
+      "mentioned": {
+        "user": {
+          "displayName": "Josh Xu",
+          "id": "90b98fe6-a80b-46e1-9209-b5ebcdf6da6b",
+          "userIdentityType": "aadUser"
+        }
+      }
+    }
+  ]
+}

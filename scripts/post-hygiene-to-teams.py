@@ -6,17 +6,28 @@ mentions correctly), saves response.
 """
 from __future__ import annotations
 import json
+import os
 import re
 import subprocess
 import sys
+from datetime import datetime
+from pathlib import Path
+from zoneinfo import ZoneInfo
 
 sys.stdout.reconfigure(encoding="utf-8")
 
-PAYLOAD_IN = "Q:/src/tmp/mPoster-hygiene-teams.json"
-PAYLOAD_OUT = "Q:/src/tmp/mPoster-hygiene-teams-final.json"
-RESPONSE_OUT = "Q:/src/tmp/mPoster-hygiene-teams-response.json"
+REPO_ROOT = Path(__file__).resolve().parent.parent
+SRC_ROOT = Path(os.environ.get("SRC_ROOT", REPO_ROOT.parent.parent))
+PAYLOAD_IN = SRC_ROOT / "tmp" / "mPoster-hygiene-teams.json"
+PAYLOAD_OUT = SRC_ROOT / "tmp" / "mPoster-hygiene-teams-final.json"
+RESPONSE_OUT = SRC_ROOT / "tmp" / "mPoster-hygiene-teams-response.json"
+AUDIT_DIR = REPO_ROOT / "output" / "audit"
 TEAM_ID = "31ee74d6-0a8f-41a6-b0da-c4d9e3a1db3b"
 CHANNEL_ID = "19:183d481e40af45d09aac7322433fc7ab@thread.tacv2"
+CHANNEL_NAME = "Meeting US (PRODUCTION)"
+AGENT_NAME = "mPoster"
+JOB_NAME = "hygiene-teams-summary"
+SYSTEM_VERSION = "0.4.0"
 # Teams renders @mentions reliably only up to ~this many per channel message. Observed:
 # 29 rendered fine (2026-07-02); 68 did NOT (2026-07-23, one owner repeated 35x). At or below
 # the cap we tag EVERY name occurrence (per EM request: "every name should be tagged"); above
@@ -36,6 +47,34 @@ def get_token() -> str:
         "powershell", "-NoProfile", "-Command",
         "az account get-access-token --resource https://graph.microsoft.com --query accessToken -o tsv"
     ]).decode().strip()
+
+
+def append_audit(payload: dict, status_code: int) -> None:
+    now = datetime.now(ZoneInfo("America/Los_Angeles"))
+    mentions = [
+        item.get("mentionText", "")
+        for item in payload.get("mentions", [])
+        if item.get("mentionText")
+    ]
+    entry = {
+        "action": "teams_post",
+        "agent": AGENT_NAME,
+        "job": JOB_NAME,
+        "run_id": now.strftime("%Y%m%d-%H%M%S"),
+        "timestamp": now.isoformat(),
+        "system_version": SYSTEM_VERSION,
+        "details": {
+            "channel_id": CHANNEL_ID,
+            "channel_name": CHANNEL_NAME,
+            "message_subject": payload.get("subject", ""),
+            "mentions": mentions,
+            "http_status": status_code,
+        },
+    }
+    AUDIT_DIR.mkdir(parents=True, exist_ok=True)
+    audit_path = AUDIT_DIR / f"{now:%Y-%m}.jsonl"
+    with audit_path.open("a", encoding="utf-8", newline="\n") as audit_file:
+        audit_file.write(json.dumps(entry, ensure_ascii=True) + "\n")
 
 
 def reindex_mentions(payload: dict, dedupe=False) -> dict:
@@ -139,6 +178,7 @@ def main():
     )
 
     print(f"HTTP {resp.status_code}")
+    append_audit(payload, resp.status_code)
 
     if resp.status_code == 201:
         result = resp.json()
