@@ -398,6 +398,116 @@ function Stop-RunProcessTree {
     return $result
 }
 
+function Get-CopilotProgress {
+    param(
+        [Parameter(Mandatory)]
+        [hashtable]$Event
+    )
+
+    if (-not $Event.ContainsKey("type")) {
+        return $null
+    }
+
+    $eventType = [string]$Event["type"]
+    $data = if ($Event.ContainsKey("data") -and $Event["data"] -is [hashtable]) {
+        $Event["data"]
+    } else {
+        @{}
+    }
+
+    $progress = @{
+        phase           = $null
+        outstandingTool = $null
+        toolCallId      = $null
+        description     = $null
+        lastEventType   = $eventType
+    }
+
+    switch ($eventType) {
+        "tool.execution_start" {
+            $progress["phase"] = "tool_running"
+            if ($data.ContainsKey("toolName")) {
+                $progress["outstandingTool"] = [string]$data["toolName"]
+            }
+            if ($data.ContainsKey("toolCallId")) {
+                $progress["toolCallId"] = [string]$data["toolCallId"]
+            }
+            if ($data.ContainsKey("arguments") -and $data["arguments"] -is [hashtable]) {
+                $arguments = $data["arguments"]
+                if ($arguments.ContainsKey("description")) {
+                    $progress["description"] = [string]$arguments["description"]
+                }
+            }
+        }
+        "tool.execution_complete" {
+            $progress["phase"] = "reasoning"
+        }
+        "assistant.turn_start" {
+            $progress["phase"] = "reasoning"
+        }
+        "assistant.message" {
+            $progress["phase"] = "responding"
+        }
+        "assistant.turn_end" {
+            $progress["phase"] = "waiting"
+        }
+        "session.usage_checkpoint" {
+            $progress["phase"] = "waiting"
+        }
+        "session.shutdown" {
+            $progress["phase"] = "shutdown"
+        }
+        "result" {
+            $progress["phase"] = "completed"
+        }
+        default {
+            return $null
+        }
+    }
+
+    return $progress
+}
+
+function Write-RunProgress {
+    param(
+        [Parameter(Mandatory)]
+        [string]$Path,
+
+        [Parameter(Mandatory)]
+        [string]$AgentName,
+
+        [Parameter(Mandatory)]
+        [string]$JobName,
+
+        [Parameter(Mandatory)]
+        [string]$RunId,
+
+        [Parameter(Mandatory)]
+        [hashtable]$Progress
+    )
+
+    $record = @{
+        timestamp       = (Get-Date -Format "o")
+        agent           = $AgentName
+        job             = $JobName
+        runId           = $RunId
+        phase           = $Progress["phase"]
+        outstandingTool = $Progress["outstandingTool"]
+        toolCallId      = $Progress["toolCallId"]
+        description     = $Progress["description"]
+        lastEventType   = $Progress["lastEventType"]
+        systemVersion   = $SYSTEM_VERSION
+    }
+    Write-AtomicFile -Path $Path -Content ($record | ConvertTo-Json -Depth 4)
+    Write-AuditEntry -Action "progress_updated" -AgentName $AgentName -JobName $JobName -RunId $RunId -Details @{
+        phase           = $record["phase"]
+        outstandingTool = $record["outstandingTool"]
+        toolCallId      = $record["toolCallId"]
+        description     = $record["description"]
+        lastEventType   = $record["lastEventType"]
+    }
+}
+
 function Wait-CopilotProcess {
     <#
     .SYNOPSIS
@@ -412,7 +522,9 @@ function Wait-CopilotProcess {
         [Parameter(Mandatory)]
         [System.Diagnostics.Process]$Process,
 
-        [int]$PostResultShutdownTimeoutSeconds = 30
+        [int]$PostResultShutdownTimeoutSeconds = 30,
+
+        [scriptblock]$OnEvent = $null
     )
 
     if ($PostResultShutdownTimeoutSeconds -lt 1) {
@@ -436,17 +548,23 @@ function Wait-CopilotProcess {
 
             $stdoutLines.Add($line)
             $trimmed = $line.Trim()
-            if ($null -eq $resultSeenAt -and $trimmed.StartsWith("{")) {
+            if ($trimmed.StartsWith("{")) {
+                $event = $null
                 try {
                     $event = $trimmed | ConvertFrom-Json -AsHashtable
-                    if ($event -is [hashtable] -and $event["type"] -eq "result") {
+                } catch {
+                    # Non-JSON output is preserved and parsed by the caller later.
+                }
+                if ($event -is [hashtable]) {
+                    if ($OnEvent) {
+                        & $OnEvent $event
+                    }
+                    if ($null -eq $resultSeenAt -and $event["type"] -eq "result") {
                         $resultSeenAt = Get-Date
                         if ($event.ContainsKey("exitCode")) {
                             $resultExitCode = [int]$event["exitCode"]
                         }
                     }
-                } catch {
-                    # Non-JSON output is preserved and parsed by the caller later.
                 }
             }
 
@@ -988,7 +1106,30 @@ while ($keepRunning) {
             Write-AtomicFile -Path $lockFile -Content $lockContent
 
             $postResultShutdownTimeoutSeconds = 30
-            $processResult = Wait-CopilotProcess -Process $proc -PostResultShutdownTimeoutSeconds $postResultShutdownTimeoutSeconds
+            $progressFile = Join-Path $agentStateDir "progress.json"
+            $progressTracker = @{ signature = "" }
+            $onCopilotEvent = {
+                param([hashtable]$CliEvent)
+                $progress = Get-CopilotProgress -Event $CliEvent
+                if ($null -eq $progress) {
+                    return
+                }
+                $signature = @(
+                    $progress["phase"],
+                    $progress["outstandingTool"],
+                    $progress["toolCallId"],
+                    $progress["description"],
+                    $progress["lastEventType"]
+                ) -join "|"
+                if ($signature -eq $progressTracker["signature"]) {
+                    return
+                }
+                Write-RunProgress -Path $progressFile -AgentName $Agent -JobName $Job -RunId $runId -Progress $progress
+                $progressTracker["signature"] = $signature
+            }.GetNewClosure()
+            $processResult = Wait-CopilotProcess -Process $proc `
+                -PostResultShutdownTimeoutSeconds $postResultShutdownTimeoutSeconds `
+                -OnEvent $onCopilotEvent
             $rawOutput = $processResult["rawOutput"]
             $errOutput = $processResult["errorOutput"]
             $exitCode = $processResult["exitCode"]

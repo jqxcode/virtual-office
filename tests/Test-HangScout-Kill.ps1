@@ -11,7 +11,8 @@
 #   1. Stop-RunProcessTree returns already_gone=true for a dead PID.
 #   2. Stop-RunProcessTree kills a real child process spawned for the test.
 #   3. Wait-CopilotProcess bounds shutdown after a final result event.
-#   4. The stale-lock branch of Invoke-AgentJob.ps1 emits both
+#   4. Copilot JSONL events expose the current phase and outstanding tool.
+#   5. The stale-lock branch of Invoke-AgentJob.ps1 emits both
 #      kill_initiated and force_killed events with the right run_id / pid.
 #
 # Run: pwsh -File tests/Test-HangScout-Kill.ps1
@@ -119,6 +120,9 @@ $lingerScript = Join-Path $env:TEMP "vo-lingering-result-$PID.ps1"
 try {
     $lingerSource = @'
 Write-Output '{"type":"assistant.message","data":{"content":"done"}}'
+Write-Output '{"type":"tool.execution_start","data":{"toolCallId":"call-1","toolName":"powershell","arguments":{"description":"Validate report"}}}'
+Write-Output '{"type":"tool.execution_complete","data":{"toolCallId":"call-1","success":true}}'
+Write-Output '{"type":"session.usage_checkpoint","data":{}}'
 Write-Output '{"type":"result","exitCode":0,"sessionId":"test-session"}'
 [Console]::Out.Flush()
 Start-Sleep -Seconds 30
@@ -137,12 +141,19 @@ Start-Sleep -Seconds 30
 
     $lingerProcess = [System.Diagnostics.Process]::Start($pinfo)
     $startedAt = Get-Date
-    $waitResult = Wait-CopilotProcess -Process $lingerProcess -PostResultShutdownTimeoutSeconds 1
+    $observedEvents = New-Object System.Collections.Generic.List[hashtable]
+    $onEvent = {
+        param([hashtable]$Event)
+        $observedEvents.Add($Event)
+    }.GetNewClosure()
+    $waitResult = Wait-CopilotProcess -Process $lingerProcess -PostResultShutdownTimeoutSeconds 1 -OnEvent $onEvent
     $elapsed = ((Get-Date) - $startedAt).TotalSeconds
 
     Assert-True ($waitResult.forcedShutdown -eq $true) "Lingering process is force-killed after result event"
     Assert-True ($waitResult.exitCode -eq 0) "Result event exit code is preserved"
     Assert-True ($waitResult.rawOutput -match '"type":"result"') "Result event remains in captured output"
+    Assert-True (@($observedEvents | Where-Object { $_["type"] -eq "tool.execution_start" }).Count -eq 1) "Progress callback receives tool start event"
+    Assert-True (@($observedEvents | Where-Object { $_["type"] -eq "session.usage_checkpoint" }).Count -eq 1) "Progress callback receives shutdown checkpoint"
     Assert-True ($elapsed -lt 10) "Wait returns within the bounded shutdown period"
     Assert-True ($null -eq (Get-Process -Id $lingerProcess.Id -ErrorAction SilentlyContinue)) "Lingering process is no longer alive"
 }
@@ -156,11 +167,58 @@ finally {
 }
 
 # ========================================
-# TC4: events.jsonl synthesis -- kill_initiated + force_killed land between
+# TC4: Copilot progress maps phases and outstanding tool metadata
+# ========================================
+Write-Host "`nTC4: Get-CopilotProgress maps diagnostic state" -ForegroundColor Cyan
+try {
+    $toolStart = @{
+        type = "tool.execution_start"
+        data = @{
+            toolName = "powershell"
+            toolCallId = "call-42"
+            arguments = @{ description = "Validate report" }
+        }
+    }
+    $toolProgress = Get-CopilotProgress -Event $toolStart
+    Assert-True ($toolProgress.phase -eq "tool_running") "Tool start maps to tool_running phase"
+    Assert-True ($toolProgress.outstandingTool -eq "powershell") "Tool name is recorded"
+    Assert-True ($toolProgress.toolCallId -eq "call-42") "Tool call ID is recorded"
+    Assert-True ($toolProgress.description -eq "Validate report") "Tool description is recorded"
+
+    $completeProgress = Get-CopilotProgress -Event @{ type = "tool.execution_complete"; data = @{} }
+    Assert-True ($completeProgress.phase -eq "reasoning") "Tool completion maps back to reasoning"
+    Assert-True ($null -eq $completeProgress.outstandingTool) "Completed tool is cleared"
+
+    $shutdownProgress = Get-CopilotProgress -Event @{ type = "session.usage_checkpoint"; data = @{} }
+    Assert-True ($shutdownProgress.phase -eq "waiting") "Usage checkpoint maps to non-terminal waiting phase"
+
+    $progressRoot = Join-Path $env:TEMP "vo-progress-$PID-$(Get-Random)"
+    $progressPath = Join-Path $progressRoot "state" "progress.json"
+    $AUDIT_DIR = Join-Path $progressRoot "audit"
+    $SYSTEM_VERSION = "test-progress-version"
+    Write-RunProgress -Path $progressPath -AgentName "test-agent" -JobName "test-job" -RunId "run-42" -Progress $toolProgress
+
+    $progressRecord = Get-Content $progressPath -Raw | ConvertFrom-Json -AsHashtable
+    Assert-True ($progressRecord["systemVersion"] -eq $SYSTEM_VERSION) "Progress record includes system version"
+    Assert-True ($progressRecord["outstandingTool"] -eq "powershell") "Progress record persists outstanding tool"
+    Assert-True (-not (Test-Path "$progressPath.$PID.tmp")) "Progress write leaves no temporary file"
+
+    $auditFile = Get-ChildItem $AUDIT_DIR -Filter "*.jsonl" | Select-Object -First 1
+    $auditRecord = Get-Content $auditFile.FullName -Raw | ConvertFrom-Json -AsHashtable
+    Assert-True ($auditRecord["action"] -eq "progress_updated") "Progress mutation writes an audit entry"
+    Assert-True ($auditRecord["system_version"] -eq $SYSTEM_VERSION) "Progress audit includes system version"
+    Remove-Item -Path $progressRoot -Recurse -Force -ErrorAction SilentlyContinue
+}
+catch {
+    Assert-True $false "TC4 threw: $_"
+}
+
+# ========================================
+# TC5: events.jsonl synthesis -- kill_initiated + force_killed land between
 # started and completed for a TTL-exceeding run, and the lock-TTL invariant
 # test (tests/test_lock_ttl_enforcement.py) would consider this run KILLED.
 # ========================================
-Write-Host "`nTC4: synthetic events.jsonl satisfies test_lock_ttl_enforcement" -ForegroundColor Cyan
+Write-Host "`nTC5: synthetic events.jsonl satisfies test_lock_ttl_enforcement" -ForegroundColor Cyan
 try {
     $tmpRoot = Join-Path $env:TEMP "vo-killtest-$PID-$(Get-Random)"
     New-Item -ItemType Directory -Path (Join-Path $tmpRoot "state") -Force | Out-Null
@@ -221,7 +279,7 @@ sys.exit(0 if not unkilled else 1)
     Remove-Item -Path $tmpRoot -Recurse -Force -ErrorAction SilentlyContinue
 }
 catch {
-    Assert-True $false "TC3 threw: $_"
+    Assert-True $false "TC5 threw: $_"
 }
 
 # --- Summary ---
