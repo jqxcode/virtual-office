@@ -517,8 +517,9 @@ class TestDetectOrderInversions(unittest.TestCase):
             {"id": 2, "state": "RollingOut", "tags": "", "owner": "b", "stackRank": 100},
             {"id": 3, "state": "Active", "tags": "", "owner": "c", "stackRank": 200},
         ]
-        flagged, _ = shc.detect_order_inversions(rows)
+        flagged, suggested = shc.detect_order_inversions(rows)
         self.assertEqual(flagged, [])  # Blocked on top must NOT invert the RollingOut/Active below it
+        self.assertEqual([r["id"] for r in suggested], [1, 2, 3])
 
     def test_blocked_at_bottom_not_flagged(self):
         rows = [
@@ -526,8 +527,19 @@ class TestDetectOrderInversions(unittest.TestCase):
             {"id": 2, "state": "Active", "tags": "", "owner": "b", "stackRank": 200},
             {"id": 3, "state": "Blocked", "tags": "", "owner": "c", "stackRank": 900},
         ]
-        flagged, _ = shc.detect_order_inversions(rows)
+        flagged, suggested = shc.detect_order_inversions(rows)
         self.assertEqual(flagged, [])
+        self.assertEqual([r["id"] for r in suggested], [1, 2, 3])
+
+    def test_suggested_order_preserves_blocked_position(self):
+        rows = [
+            {"id": 1, "state": "Proposed", "tags": "", "owner": "a", "stackRank": 100},
+            {"id": 2, "state": "Blocked", "tags": "", "owner": "b", "stackRank": 200},
+            {"id": 3, "state": "RollingOut", "tags": "", "owner": "c", "stackRank": 300},
+        ]
+        flagged, suggested = shc.detect_order_inversions(rows)
+        self.assertEqual([r["id"] for r in flagged], [3])
+        self.assertEqual([r["id"] for r in suggested], [3, 2, 1])
 
     def test_exception_tier_on_top(self):
         rows = [
@@ -571,6 +583,7 @@ class TestDetectOrderInversions(unittest.TestCase):
         ]
         flagged, suggested = shc.detect_order_inversions(rows)
         self.assertEqual(len(flagged), 0)
+        self.assertEqual([r["id"] for r in suggested], [2])
 
 
 if __name__ == "__main__":

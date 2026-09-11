@@ -763,8 +763,9 @@ def detect_order_inversions(rows):
 
     rows: list of {id, title, state, tags, owner, stackRank}. Returns
     (flagged, suggested): `flagged` = items that sit below a higher-priority-
-    state item once ordered by StackRank (an inversion); `suggested` = the
-    same rows re-sorted into the desired (tier, StackRank) order.
+    state item once ordered by StackRank (an inversion); `suggested` = ranked
+    rows with reorderable items sorted by tier while exempt states retain
+    their current positions. Unranked items are omitted.
     """
     enriched = []
     for r in rows:
@@ -801,11 +802,20 @@ def detect_order_inversions(rows):
         else:
             running_max = r["tier"]
             running_item = r
+    ranked = [r for r in enriched if r["stackRank"] is not None]
+    reorderable = sorted(
+        (r for r in ranked if r["state"] not in EXEMPT_ORDER_STATES),
+        key=lambda x: (x["tier"], x["stackRank"]),
+    )
+    reorderable_iter = iter(reorderable)
+    suggested_rows = [
+        r if r["state"] in EXEMPT_ORDER_STATES else next(reorderable_iter)
+        for r in ranked
+    ]
     suggested = [
         {"id": r["id"], "title": r["title"], "state": r["state"],
          "tier": r["tier"], "stackRank": r["stackRank"]}
-        for r in sorted(enriched, key=lambda x: (x["tier"], x["stackRank"] is None,
-                                                 x["stackRank"] if x["stackRank"] is not None else 0))
+        for r in suggested_rows
     ]
     return flagged, suggested
 
