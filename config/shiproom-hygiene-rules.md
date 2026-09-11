@@ -490,11 +490,11 @@ RETURN GROUPBY(_filtered, TestResults[TESTNAME],
 
 **Source: Madhu requirement (2026-06-29 EM Sync).**
 
-**Goal**: Features in `Active` or `RollingOut` deployment state must live under the current-month iteration node. Madhu: "anything in rolling out or active state must be in current month."
+**Goal**: Feature/Exception items on the Features backlog in `Active` or `RollingOut` state must live under the current-month iteration node. Madhu: "anything in rolling out or active state must be in current month."
 
 **Action policy: PATCH allowed under the Hard Rules in the safety policy. MutationController-guarded.**
 
-**State tokens**: Feature deployment states are `Active`, `Committed`, `Proposed`, `RollingOut`, `Closed`. The rolling-out token is `RollingOut` (NO space).
+**State tokens**: Relevant lifecycle states include `Active`, `Proposed`, `RollingOut`, and `Closed`. The rolling-out token is `RollingOut` (NO space). `Committed` is not a lifecycle or deployment state; it is the funding field value `Custom.CommittedTargettedCut`.
 
 **Current-month node**: Resolve **date-driven** — pick the primary `MSTeams\<year>\H<1|2>\Q<1-4>\<Month>` iteration node whose `[startDate, finishDate]` range contains today (via the classification-nodes tree). Example on 2026-07-02: `MSTeams\2026\H2\Q3\July`. This is correct across the H1→H2 boundary. **Do NOT** use "parent of the current sprint path" as the primary source: at a boundary the current sprint can still be filed under the previous month's node (e.g. Sprint 209 "22-June to 5-July" is under `H1\Q2\June` yet runs into July), which falsely flags items that are genuinely in the current (July) month. The sprint-parent heuristic is kept only as a fallback if the iteration tree can't be read.
 
@@ -508,7 +508,7 @@ RETURN GROUPBY(_filtered, TestResults[TESTNAME],
      AND [System.AreaPath] UNDER '<allowed-area>'
    ```
 2. For each result:
-   a. GET item. **Re-verify** `item.fields["System.AreaPath"]` starts with the allowed-area string before PATCH; skip and audit-log if not.
+   a. GET item. **Re-verify** `System.WorkItemType` is `Feature` or `Exception` and `item.fields["System.AreaPath"]` starts with the allowed-area string before PATCH; skip and audit-log if not.
    b. Dry-run: write the planned `System.IterationPath` change to the patch preview and do NOT PATCH.
    c. Execute through MutationController only if all Hard Rules pass and the 50-PATCH cap has not been reached.
    d. PATCH `System.IterationPath` → `current_month_node`.
@@ -517,32 +517,33 @@ RETURN GROUPBY(_filtered, TestResults[TESTNAME],
 
 Check 16 & 19: deferred, not implemented this iteration.
 
-## Check 17: Zero RemainingWork on Non-Closed Active Items
+## Check 17: Exact-Zero RemainingWork on Active Features Backlog Items
 
 **Source: Madhu requirement (2026-06-29 EM Sync).**
 
-**Goal**: Madhu: "zero work means there is no work, but I can clearly see there is work remaining." Flag non-closed `Active`/`RollingOut` items whose `Microsoft.VSTS.Scheduling.RemainingWork` is 0 or empty.
+**Goal**: Madhu: "zero work means there is no work, but I can clearly see there is work remaining." Flag only `Feature`/`Exception` items on the Features backlog in `Active`/`RollingOut` whose `Microsoft.VSTS.Scheduling.RemainingWork` is the numeric value `0` or `0.0`. Missing/null values, empty strings, booleans, and the string `"0"` do not match.
 
 **Action policy: Report-only + @mention comment. No PATCH. Respect dry-run (no comment in dry-run).**
 
 1. WIQL per area:
    ```
-   SELECT [System.Id], [System.Title], [System.State], [System.AssignedTo], [Microsoft.VSTS.Scheduling.RemainingWork], [System.AreaPath]
+   SELECT [System.Id], [System.Title], [System.WorkItemType], [System.State], [System.AssignedTo], [Microsoft.VSTS.Scheduling.RemainingWork], [System.AreaPath]
    FROM workitems
-   WHERE [System.State] IN ('Active','RollingOut')
-     AND [System.State] <> 'Closed'
-     AND ([Microsoft.VSTS.Scheduling.RemainingWork] = 0 OR [Microsoft.VSTS.Scheduling.RemainingWork] = '')
+   WHERE [System.WorkItemType] IN ('Feature','Exception')
+     AND [System.State] IN ('Active','RollingOut')
+     AND [Microsoft.VSTS.Scheduling.RemainingWork] = 0
      AND [System.AreaPath] UNDER '<area>'
    ```
-2. Collect: ID, Title, Owner, State, RemainingWork, AreaPath.
-3. Comment @mentioning owner unless dry-run: "Madhu shiproom rule: this Active/RollingOut item has RemainingWork set to 0 or empty, but work appears to remain. Please set a realistic RemainingWork estimate."
-4. **Report-only** (no auto-fix). The bot cannot infer the correct value.
+2. Re-check work-item type, state, and exact numeric-zero semantics after retrieval so stale or mocked query results cannot leak lower-level work items into the result.
+3. Collect: ID, Title, Owner, State, RemainingWork, AreaPath.
+4. Comment @mentioning owner unless dry-run: "Madhu shiproom rule: this Active/RollingOut Features backlog item has RemainingWork set to numeric zero, but work appears to remain. Please set a realistic RemainingWork estimate."
+5. **Report-only** (no auto-fix). The bot cannot infer the correct value.
 
 ## Check 18: Stale RemainingWork (Untouched > 30 Days)
 
 **Source: Madhu requirement (2026-06-29 EM Sync).**
 
-**Goal**: Madhu: "34 days remaining ... means this has not been looked at for a month." Flag items with `Microsoft.VSTS.Scheduling.RemainingWork` > 0 and `System.ChangedDate` older than 30 days.
+**Goal**: Madhu: "34 days remaining ... means this has not been looked at for a month." Flag only non-closed/non-removed `Feature`/`Exception` items on the Features backlog with numeric `Microsoft.VSTS.Scheduling.RemainingWork` > 0 and `System.ChangedDate` strictly older than 30 days.
 
 **Action policy: Report-only + @mention comment. No PATCH. Respect dry-run (no comment in dry-run).**
 
@@ -550,24 +551,25 @@ Check 16 & 19: deferred, not implemented this iteration.
 
 1. WIQL per area:
    ```
-   SELECT [System.Id], [System.Title], [System.State], [System.AssignedTo], [System.ChangedDate], [Microsoft.VSTS.Scheduling.RemainingWork], [System.AreaPath]
+   SELECT [System.Id], [System.Title], [System.WorkItemType], [System.State], [System.AssignedTo], [System.ChangedDate], [Microsoft.VSTS.Scheduling.RemainingWork], [System.AreaPath]
    FROM workitems
-   WHERE [System.State] <> 'Closed'
-     AND [System.State] <> 'Removed'
+   WHERE [System.WorkItemType] IN ('Feature','Exception')
+     AND [System.State] NOT IN ('Closed','Removed')
      AND [Microsoft.VSTS.Scheduling.RemainingWork] > 0
      AND [System.ChangedDate] < @today - <stale_remaining_work_days>
      AND [System.AreaPath] UNDER '<area>'
    ORDER BY [System.ChangedDate] ASC
    ```
-2. Collect: ID, Title, Owner, State, ChangedDate, RemainingWork, AreaPath, ageDays.
-3. Comment @mentioning owner unless dry-run: "Madhu shiproom rule: this item has RemainingWork > 0 but has not been changed in more than {stale_remaining_work_days} days. Please refresh the estimate or close/move the work if it is no longer active."
-4. **Report-only** (no auto-fix).
+2. Re-check work-item type, state, numeric RemainingWork, and age after retrieval so stale or mocked query results cannot leak invalid items into the result.
+3. Collect: ID, Title, Owner, State, ChangedDate, RemainingWork, AreaPath, ageDays.
+4. Comment @mentioning owner unless dry-run: "Madhu shiproom rule: this Features backlog item has RemainingWork > 0 but has not been changed in more than {stale_remaining_work_days} days. Please refresh the estimate or close/move the work if it is no longer active."
+5. **Report-only** (no auto-fix).
 
 ## Check 20: Backlog State-Order Violations
 
 **Source: Madhu requirement (2026-06-29 EM Sync).**
 
-**Goal**: Enforce Madhu's stack order (top→bottom): exceptions → `RollingOut` / `Active` → plan/backlog (`Proposed`/`New`). `Blocked` is an in-flight state that may sit anywhere in the RollingOut/Active zone (before or after) and is **exempt** from inversion detection. (Corrected 2026-07-28 per EM feedback.)
+**Goal**: Enforce Madhu's Features backlog stack order for `Feature`/`Exception` items (top→bottom): exceptions → `RollingOut` / `Active` → plan/backlog (`Proposed`/`New`). `Blocked` is an in-flight state that may sit anywhere in the RollingOut/Active zone (before or after) and is **exempt** from inversion detection. (Corrected 2026-07-28 per EM feedback.)
 
 **Action policy: REPORT-ONLY. No StackRank PATCH. Bulk reorder is the exact incident risk class.**
 
@@ -584,13 +586,14 @@ Check 16 & 19: deferred, not implemented this iteration.
      AND [System.AreaPath] UNDER '<allowed-area>'
    ORDER BY [Microsoft.VSTS.Common.StackRank] ASC
    ```
-2. Walk the StackRank-ordered list top→bottom:
+2. Re-check that every retrieved item has work-item type `Feature` or `Exception`; discard Task, Bug, User Story, Epic, and any other lower-level type before ordering.
+3. Walk the StackRank-ordered list top→bottom:
    a. Compute each item's tier. **Skip `Blocked` items entirely** (exempt: not flagged, not a reference).
    b. Track `running_max_tier`.
    c. Any non-exempt item with `tier < running_max_tier` is an inversion because it sits below a higher-priority-state item; flag it.
-3. Emit flagged inversions: ID, Title, State, StackRank, tier, AreaPath, and the preceding higher-priority-state context.
-4. Emit a "suggested correct order": the same list re-sorted by `(tier, current StackRank)`.
-5. **Report-only** (no auto-fix). Results included in Teams post.
+4. Emit flagged inversions: ID, Title, State, StackRank, tier, AreaPath, and the preceding higher-priority-state context.
+5. Emit a "suggested correct order": the same list re-sorted by `(tier, current StackRank)`.
+6. **Report-only** (no auto-fix). Results included in Teams post.
 
 ---
 

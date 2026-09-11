@@ -16,6 +16,7 @@ import tempfile
 import unittest
 from datetime import date
 from typing import List
+from unittest.mock import patch
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(REPO_ROOT, "runner"))
@@ -310,6 +311,153 @@ class TestPickMonthNode(unittest.TestCase):
             shc._node_path_to_wiql(r"\MSTeams\Iteration\2026\H2\Q3\July"),
             r"MSTeams\2026\H2\Q3\July",
         )
+
+
+class TestFeatureBacklogScope(unittest.TestCase):
+    def _item(self, wid, wtype, state="Active", remaining=0, changed="2026-08-01"):
+        return {
+            "id": wid,
+            "fields": {
+                "System.Id": wid,
+                "System.Title": "Item {0}".format(wid),
+                "System.WorkItemType": wtype,
+                "System.State": state,
+                "System.AreaPath": shc.AREA_MJ,
+                "System.IterationPath": r"MSTeams\Backlog",
+                "Microsoft.VSTS.Scheduling.RemainingWork": remaining,
+                "Microsoft.VSTS.Common.StackRank": wid * 100,
+                "System.ChangedDate": changed,
+            },
+        }
+
+    def test_madhu_wiql_uses_only_feature_backlog_types(self):
+        for wiql in [
+            shc.WIQL_CHECK15_ROLLOUT_ACTIVE_MONTH,
+            shc.WIQL_CHECK17_ZERO_REMAINING,
+            shc.WIQL_CHECK18_STALE_REMAINING,
+            shc.WIQL_CHECK20_BACKLOG_ORDER,
+        ]:
+            self.assertIn("[System.WorkItemType] IN ('Feature', 'Exception')", wiql)
+            for lower_type in ("Task", "Bug", "User Story", "Epic"):
+                self.assertNotIn("'{0}'".format(lower_type), wiql)
+
+    def test_check15_defensively_excludes_lower_level_types(self):
+        items = [
+            self._item(1, "Feature"),
+            self._item(2, "Exception"),
+            self._item(3, "Task"),
+            self._item(4, "Bug"),
+            self._item(5, "User Story"),
+            self._item(6, "Epic"),
+        ]
+
+        class FakeMutationController:
+            def plan(self, event):
+                return True
+
+            def record(self, event):
+                pass
+
+        with patch.object(shc, "resolve_current_month_node", return_value=r"MSTeams\2026\H2\Q3\September"), \
+                patch.object(shc, "wiql_query", return_value=[item["id"] for item in items]), \
+                patch.object(shc, "get_work_items_batch", return_value=items):
+            result = shc.check15(
+                "token", [shc.AREA_MJ], FakeMutationController(), True,
+                {"path": r"MSTeams\2026\H2\Q3\September\Sprint"}, date(2026, 9, 11),
+            )
+        self.assertEqual([item["id"] for item in result["items"]], [1, 2])
+
+    def test_check17_requires_exact_numeric_zero_and_feature_backlog_type(self):
+        items = [
+            self._item(1, "Feature", remaining=0),
+            self._item(2, "Exception", state="RollingOut", remaining=0.0),
+            self._item(3, "Task", remaining=0),
+            self._item(4, "Bug", remaining=0),
+            self._item(5, "User Story", remaining=0),
+            self._item(6, "Epic", remaining=0),
+            self._item(7, "Feature", remaining=None),
+            self._item(8, "Feature", remaining=""),
+            self._item(9, "Feature", remaining=False),
+            self._item(10, "Feature", remaining="0"),
+            self._item(11, "Feature", state="Proposed", remaining=0),
+        ]
+        items[6]["fields"].pop("Microsoft.VSTS.Scheduling.RemainingWork")
+        with patch.object(shc, "wiql_query", return_value=[item["id"] for item in items]), \
+                patch.object(shc, "get_work_items_batch", return_value=items):
+            result = shc.check17("token", [shc.AREA_MJ], True)
+        self.assertEqual([item["id"] for item in result["items"]], [1, 2])
+
+    def test_check18_rechecks_type_state_number_and_age(self):
+        items = [
+            self._item(1, "Feature", remaining=1, changed="2026-08-11"),
+            self._item(2, "Exception", state="RollingOut", remaining=0.5, changed="2026-08-01"),
+            self._item(3, "Task", remaining=1, changed="2026-08-01"),
+            self._item(4, "Bug", remaining=1, changed="2026-08-01"),
+            self._item(5, "User Story", remaining=1, changed="2026-08-01"),
+            self._item(6, "Epic", remaining=1, changed="2026-08-01"),
+            self._item(7, "Feature", remaining=0, changed="2026-08-01"),
+            self._item(8, "Feature", remaining=False, changed="2026-08-01"),
+            self._item(9, "Feature", remaining="1", changed="2026-08-01"),
+            self._item(10, "Feature", remaining=1, changed="2026-08-12"),
+            self._item(11, "Feature", state="Closed", remaining=1, changed="2026-08-01"),
+            self._item(12, "Feature", state="Removed", remaining=1, changed="2026-08-01"),
+        ]
+        with patch.object(shc, "wiql_query", return_value=[item["id"] for item in items]), \
+                patch.object(shc, "get_work_items_batch", return_value=items):
+            result = shc.check18("token", [shc.AREA_MJ], True, date(2026, 9, 11))
+        self.assertEqual([item["id"] for item in result["items"]], [1, 2])
+
+    def test_check20_defensively_excludes_lower_level_types(self):
+        items = [
+            self._item(1, "Feature", state="Proposed"),
+            self._item(2, "Task", state="RollingOut"),
+            self._item(3, "Bug", state="RollingOut"),
+            self._item(4, "User Story", state="RollingOut"),
+            self._item(5, "Epic", state="RollingOut"),
+            self._item(6, "Exception", state="Open"),
+        ]
+        items[-1]["fields"]["Microsoft.VSTS.Common.StackRank"] = 50
+        with patch.object(shc, "wiql_query", return_value=[item["id"] for item in items]), \
+                patch.object(shc, "get_work_items_batch", return_value=items):
+            result = shc.check20("token", [shc.AREA_MJ])
+        self.assertEqual(result["items"], [])
+        self.assertEqual(
+            sorted(item["id"] for item in result["suggestedOrder"]),
+            [1, 6],
+        )
+
+
+class TestCheck4RemainingWork(unittest.TestCase):
+    def test_numeric_zero_is_present_but_missing_and_none_are_not(self):
+        def item(wid, remaining_marker):
+            fields = {
+                "System.Id": wid,
+                "System.Title": "Task {0}".format(wid),
+                "System.State": "Active",
+                "System.AreaPath": shc.AREA_MJ,
+                "Microsoft.VSTS.Scheduling.OriginalEstimate": 1,
+            }
+            if remaining_marker != "absent":
+                fields["Microsoft.VSTS.Scheduling.RemainingWork"] = remaining_marker
+            return {
+                "id": wid,
+                "fields": fields,
+                "relations": [{"rel": "System.LinkTypes.Hierarchy-Reverse"}],
+            }
+
+        work_items = {
+            1: item(1, 0),
+            2: item(2, "absent"),
+            3: item(3, None),
+            4: item(4, ""),
+        }
+        with patch.object(shc, "wiql_query", return_value=[1, 2, 3, 4]), \
+                patch.object(shc, "get_work_item", side_effect=lambda wid, token, expand=None: work_items[wid]):
+            result = shc.check4(
+                "token", [shc.AREA_MJ], {"path": r"MSTeams\2026\Sprint"}, True,
+            )
+        self.assertEqual([item["id"] for item in result["items"]], [2, 3])
+        self.assertTrue(all("RemainingWork" in item["issue"] for item in result["items"]))
 
 
 class TestTierFor(unittest.TestCase):

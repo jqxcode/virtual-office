@@ -256,19 +256,21 @@ WIQL_CHECK15_ROLLOUT_ACTIVE_MONTH = (
 )
 
 WIQL_CHECK17_ZERO_REMAINING = (
-    "SELECT [System.Id], [System.Title], [System.State], [System.AreaPath] "
+    "SELECT [System.Id], [System.Title], [System.WorkItemType], [System.State], "
+    "[System.AreaPath] "
     "FROM workitems "
-    "WHERE [System.WorkItemType] IN ('Task', 'Bug') "
-    "AND [System.State] = 'Active' "
+    "WHERE [System.WorkItemType] IN ('Feature', 'Exception') "
+    "AND [System.State] IN ('Active', 'RollingOut') "
     "AND [Microsoft.VSTS.Scheduling.RemainingWork] = 0 "
     "AND [System.AreaPath] UNDER '{area}'"
 )
 
 WIQL_CHECK18_STALE_REMAINING = (
-    "SELECT [System.Id], [System.Title], [System.State], [System.AreaPath] "
+    "SELECT [System.Id], [System.Title], [System.WorkItemType], [System.State], "
+    "[System.AreaPath] "
     "FROM workitems "
-    "WHERE [System.WorkItemType] IN ('Task', 'Bug') "
-    "AND [System.State] <> 'Closed' AND [System.State] <> 'Removed' "
+    "WHERE [System.WorkItemType] IN ('Feature', 'Exception') "
+    "AND [System.State] NOT IN ('Closed', 'Removed') "
     "AND [Microsoft.VSTS.Scheduling.RemainingWork] > 0 "
     "AND [System.ChangedDate] < @today - {stale_days} "
     "AND [System.AreaPath] UNDER '{area}'"
@@ -293,6 +295,7 @@ STALE_REMAINING_DAYS = 30
 # System.Tags substring match kept as a fallback signal.
 EXCEPTION_TYPES = ["Exception"]
 EXCEPTION_TAGS = ["exception"]
+FEATURE_BACKLOG_TYPES = {"Feature", "Exception"}
 # Lifecycle-state tiers for Madhu's backlog order (6/29 EM Sync; corrected 2026-07-28
 # per EM feedback). Lower tier belongs higher in the backlog.
 #   * "Committed" is NOT a lifecycle state -- it is a FUNDING value
@@ -1121,7 +1124,10 @@ def check4(token, allowed_areas, current_iter, dry_run):
             missing = []
             if not f.get("Microsoft.VSTS.Scheduling.OriginalEstimate"):
                 missing.append("OriginalEstimate")
-            if not f.get("Microsoft.VSTS.Scheduling.RemainingWork"):
+            if (
+                "Microsoft.VSTS.Scheduling.RemainingWork" not in f
+                or f.get("Microsoft.VSTS.Scheduling.RemainingWork") is None
+            ):
                 missing.append("RemainingWork")
             has_parent = any(
                 rel.get("rel") == "System.LinkTypes.Hierarchy-Reverse"
@@ -1705,6 +1711,24 @@ def check14(token, pbi_token, allowed_areas, now):
 # ---------------------------------------------------------------------------
 
 
+def _is_feature_backlog_item(fields):
+    # type: (Dict[str, Any]) -> bool
+    """Return True only for work-item types shown on the Features backlog."""
+    return fields.get("System.WorkItemType") in FEATURE_BACKLOG_TYPES
+
+
+def _is_exact_numeric_zero(value):
+    # type: (Any) -> bool
+    """Match JSON numeric 0/0.0, but not bool, strings, null, or missing values."""
+    return not isinstance(value, bool) and isinstance(value, (int, float)) and value == 0
+
+
+def _is_positive_number(value):
+    # type: (Any) -> bool
+    """Match positive JSON numbers while excluding bool and numeric strings."""
+    return not isinstance(value, bool) and isinstance(value, (int, float)) and value > 0
+
+
 def check15(token, allowed_areas, mc, dry_run, current_iter, today):
     # type: (str, List[str], MutationController, bool, Dict[str, Any], date) -> Dict[str, Any]
     print("Check 15: Rolling-out/Active Features not in current month (Madhu req 6/29)")
@@ -1722,12 +1746,14 @@ def check15(token, allowed_areas, mc, dry_run, current_iter, today):
         if not ids:
             continue
         wis = get_work_items_batch(ids, token, fields=[
-            "System.Id", "System.Title", "System.State", "System.IterationPath",
-            "System.AssignedTo", "System.AreaPath",
+            "System.Id", "System.Title", "System.WorkItemType", "System.State",
+            "System.IterationPath", "System.AssignedTo", "System.AreaPath",
         ])
         for wi in wis:
             wid = wi["id"]
             f = wi.get("fields", {})
+            if not _is_feature_backlog_item(f):
+                continue
             ap = f.get("System.AreaPath", "")
             if not area_path_allowed(ap, allowed_areas):
                 mc.plan({"event": "skip_area_mismatch", "check": "check15", "id": wid, "areaPath": ap})
@@ -1747,9 +1773,9 @@ def check15(token, allowed_areas, mc, dry_run, current_iter, today):
                     {"op": "add", "path": "/fields/System.IterationPath", "value": month},
                 ], token)
                 add_comment(wid, (
-                    "{0} This Feature is '{1}' but was not in the current month. Per Madhu's "
-                    "backlog rule (2026-06-29 EM Sync), rolling-out/active items must be in the "
-                    "current month, so it was auto-moved to {2}."
+                    "{0} This Features backlog item is '{1}' but was not in the current month. "
+                    "Per Madhu's backlog rule (2026-06-29 EM Sync), Feature/Exception items in "
+                    "RollingOut/Active must be in the current month, so it was auto-moved to {2}."
                 ).format(mention_html(wi), f.get("System.State", ""), month), token)
                 mc.record({
                     "check": "check15", "id": wid, "areaPath": ap,
@@ -1775,7 +1801,7 @@ def check15(token, allowed_areas, mc, dry_run, current_iter, today):
 
 def check17(token, allowed_areas, dry_run):
     # type: (str, List[str], bool) -> Dict[str, Any]
-    print("Check 17: Zero RemainingWork on Active items (Madhu req 6/29)")
+    print("Check 17: Zero RemainingWork on Active/RollingOut Features backlog (Madhu req 6/29)")
     items = []
     for area in allowed_areas:
         wiql = WIQL_CHECK17_ZERO_REMAINING.format(area=area)
@@ -1786,19 +1812,27 @@ def check17(token, allowed_areas, dry_run):
         if not ids:
             continue
         wis = get_work_items_batch(ids, token, fields=[
-            "System.Id", "System.Title", "System.State", "System.AssignedTo",
-            "System.AreaPath", "Microsoft.VSTS.Scheduling.RemainingWork",
+            "System.Id", "System.Title", "System.WorkItemType", "System.State",
+            "System.AssignedTo", "System.AreaPath",
+            "Microsoft.VSTS.Scheduling.RemainingWork",
         ])
         for wi in wis:
             f = wi.get("fields", {})
+            if not _is_feature_backlog_item(f):
+                continue
+            if f.get("System.State") not in ("Active", "RollingOut"):
+                continue
+            rw = f.get("Microsoft.VSTS.Scheduling.RemainingWork")
+            if not _is_exact_numeric_zero(rw):
+                continue
             ap = f.get("System.AreaPath", "")
             if not area_path_allowed(ap, allowed_areas):
                 continue
             wid = wi["id"]
             if not dry_run:
                 add_comment(wid, (
-                    "{0} This Active item shows 0 Remaining Work. Per Madhu's backlog rule "
-                    "(2026-06-29 EM Sync), an active item with work left must not show 0 - "
+                    "{0} This Active/RollingOut Feature backlog item shows 0 Remaining Work. "
+                    "Per Madhu's backlog rule (2026-06-29 EM Sync), an item with work left must not show 0 - "
                     "please set a realistic Remaining Work value or close it."
                 ).format(mention_html(wi)), token)
             items.append({
@@ -1825,19 +1859,27 @@ def check18(token, allowed_areas, dry_run, today):
         if not ids:
             continue
         wis = get_work_items_batch(ids, token, fields=[
-            "System.Id", "System.Title", "System.State", "System.AssignedTo",
-            "System.AreaPath", "System.ChangedDate",
+            "System.Id", "System.Title", "System.WorkItemType", "System.State",
+            "System.AssignedTo", "System.AreaPath", "System.ChangedDate",
             "Microsoft.VSTS.Scheduling.RemainingWork",
         ])
         for wi in wis:
             f = wi.get("fields", {})
+            if not _is_feature_backlog_item(f):
+                continue
+            if f.get("System.State") in ("Closed", "Removed"):
+                continue
+            rw = f.get("Microsoft.VSTS.Scheduling.RemainingWork")
+            if not _is_positive_number(rw):
+                continue
+            changed = _parse_iter_date(f.get("System.ChangedDate"))
+            if changed is None or (today - changed).days <= STALE_REMAINING_DAYS:
+                continue
             ap = f.get("System.AreaPath", "")
             if not area_path_allowed(ap, allowed_areas):
                 continue
             wid = wi["id"]
-            changed = _parse_iter_date(f.get("System.ChangedDate"))
-            days = (today - changed).days if changed else None
-            rw = f.get("Microsoft.VSTS.Scheduling.RemainingWork")
+            days = (today - changed).days
             if not dry_run:
                 add_comment(wid, (
                     "{0} This item has {1} Remaining Work but hasn't been updated in {2} days. "
@@ -1878,6 +1920,8 @@ def check20(token, allowed_areas):
         rows = []
         for wi in wis:
             f = wi.get("fields", {})
+            if not _is_feature_backlog_item(f):
+                continue
             ap = f.get("System.AreaPath", "")
             if not area_path_allowed(ap, allowed_areas):
                 continue
@@ -2159,7 +2203,7 @@ def _build_check8_section(res):
     return _section_html(
         "Check 8: Committed Features Outside Current Semester",
         "{0} flagged".format(len(items)),
-        "Features that are funding-Committed (Custom.CommittedTargettedCut) must belong to the current semester. Summary posted to Teams.",
+        "Features with funding field Custom.CommittedTargettedCut set to Committed must belong to the current semester. Committed is not a lifecycle or deployment state. Summary posted to Teams.",
         ["Feature ID", "Title", "Owner", "Iteration", "Area"],
         rows,
         _query_link(ids, "Open all {0} items in ADO query".format(len(items))),
@@ -2359,10 +2403,10 @@ def _build_check15_section(res):
             '<span class="badge badge-moved">{0}</span>'.format(_html_escape(it.get("action", ""))),
         ))
     return _section_html(
-        "Check 15: Rolling-out/Active Items Not in Current Month",
+        "Check 15: Rolling-out/Active Features Backlog Items Not in Current Month",
         "{0} moved".format(len(items)),
-        "Madhu requirement (6/29 EM Sync): Active/RollingOut Features must be in the current month. Auto-moved to the current-month node.",
-        ["Feature ID", "Title", "State", "Owner", "Previous Iteration", "Action"],
+        "Madhu requirement (6/29 EM Sync): Feature/Exception items on the Features backlog in Active/RollingOut must be in the current month. Auto-moved to the current-month node.",
+        ["Item ID", "Title", "State", "Owner", "Previous Iteration", "Action"],
         rows,
         _query_link(ids, "Open all {0} items in ADO query".format(len(items))),
     )
@@ -2384,9 +2428,9 @@ def _build_check17_section(res):
             '<span class="badge badge-flagged">{0}</span>'.format(_html_escape(it.get("action", ""))),
         ))
     return _section_html(
-        "Check 17: Zero Remaining Work on Active Items",
+        "Check 17: Exact-Zero Remaining Work on Active Features Backlog Items",
         "{0} flagged".format(len(items)),
-        "Madhu requirement (6/29 EM Sync): an Active item with work left must not show 0 Remaining Work. Owner notified to set a realistic value.",
+        "Madhu requirement (6/29 EM Sync): Feature/Exception items in Active/RollingOut with exact numeric RemainingWork 0 or 0.0 need attention. Missing/null, empty, boolean, and string values do not match.",
         ["ID", "Title", "State", "Owner", "Area", "Action"],
         rows,
         _query_link(ids, "Open all {0} items in ADO query".format(len(items))),
@@ -2414,7 +2458,7 @@ def _build_check18_section(res):
     return _section_html(
         "Check 18: Stale Remaining Work",
         "{0} flagged".format(len(items)),
-        "Madhu requirement (6/29 EM Sync): Remaining Work must reflect reality. These items have work left but have not been updated in over {0} days.".format(STALE_REMAINING_DAYS),
+        "Madhu requirement (6/29 EM Sync): non-closed Feature/Exception items on the Features backlog with numeric Remaining Work greater than zero have not been updated in over {0} days.".format(STALE_REMAINING_DAYS),
         ["ID", "Title", "State", "Owner", "Area", "Remaining", "Stale", "Action"],
         rows,
         _query_link(ids, "Open all {0} items in ADO query".format(len(items))),
@@ -2438,9 +2482,9 @@ def _build_check20_section(res):
             _html_escape(it.get("below", "")),
         ))
     return _section_html(
-        "Check 20: Backlog State-Order Violations",
+        "Check 20: Features Backlog State-Order Violations",
         "{0} out of order".format(len(items)),
-        "Madhu requirement (6/29 EM Sync): backlog order should be exceptions &gt; RollingOut / Active &gt; plan/backlog (Proposed/New). Blocked is exempt (in-flight, may sit anywhere between Active and RollingOut); Committed is a funding value, not a lifecycle state. These items sit below a higher-priority-state item. Report-only (no auto-reorder); see suggested order in the JSON output.",
+        "Madhu requirement (6/29 EM Sync): Feature/Exception items on the Features backlog should be ordered as exceptions &gt; RollingOut / Active &gt; plan/backlog (Proposed/New). Blocked is exempt; items without StackRank are skipped. Committed is the funding field Custom.CommittedTargettedCut, not a lifecycle or deployment state. Report-only (no auto-reorder); see suggested order in the JSON output.",
         ["ID", "Title", "State", "Tier", "StackRank", "Owner", "Sits Below"],
         rows,
         _query_link(ids, "Open all {0} items in ADO query".format(len(items))),

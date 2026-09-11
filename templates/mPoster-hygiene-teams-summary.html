@@ -82,7 +82,7 @@ Row: <tr><td><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit
 {{CHECK8_SECTION}}
 <!-- Replace with EMPTY STRING if no check8 items. Otherwise:
 <p><b>Committed Features Outside Current Semester ({{CHECK8_COUNT}})</b></p>
-<p>These Features are Committed but their iteration path is not under H1 2026:</p>
+<p>These Features have funding field Custom.CommittedTargettedCut set to Committed, but their iteration path is not under H1 2026. Committed is not a lifecycle or deployment state:</p>
 <table>
   <tr><th>Feature</th><th>Title</th><th>Owner</th><th>Iteration</th></tr>
   {{CHECK8_ROWS}}
@@ -157,8 +157,8 @@ Row: <tr><td>{metric}</td><td>{value}</td><td>{status}</td></tr>
 -->
 {{CHECK15_SECTION}}
 <!-- Replace with EMPTY STRING if no check15 items. Otherwise:
-<p><b>Rolling-out/Active not in current month (auto-fix) ({{CHECK15_COUNT}})</b></p>
-<p>Madhu requirement (6/29 EM Sync): Rolling-out or Active items not in the current month, fixed automatically:</p>
+<p><b>Rolling-out/Active Features backlog items not in current month (auto-fix) ({{CHECK15_COUNT}})</b></p>
+<p>Madhu requirement (6/29 EM Sync): Feature/Exception items on the Features backlog in RollingOut or Active state that were not in the current month, fixed automatically:</p>
 <table>
   <tr><th>Item</th><th>Title</th><th>Owner</th><th>State</th><th>Previous Iteration</th><th>Action</th></tr>
   {{CHECK15_ROWS}}
@@ -168,8 +168,8 @@ Row: <tr><td><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit
 
 {{CHECK17_SECTION}}
 <!-- Replace with EMPTY STRING if no check17 items. Otherwise:
-<p><b>Zero RemainingWork on active items ({{CHECK17_COUNT}})</b></p>
-<p>Madhu requirement (6/29 EM Sync): Active items with zero Remaining Work that need owner attention:</p>
+<p><b>Exact-zero RemainingWork on Active Features backlog items ({{CHECK17_COUNT}})</b></p>
+<p>Madhu requirement (6/29 EM Sync): Feature/Exception items in Active or RollingOut state with numeric RemainingWork 0 or 0.0 that need owner attention. Missing/null, empty, boolean, and string values do not match:</p>
 <table>
   <tr><th>Item</th><th>Title</th><th>Owner</th><th>State</th><th>Area</th><th>Action</th></tr>
   {{CHECK17_ROWS}}
@@ -180,7 +180,7 @@ Row: <tr><td><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit
 {{CHECK18_SECTION}}
 <!-- Replace with EMPTY STRING if no check18 items. Otherwise:
 <p><b>Stale RemainingWork (&gt;30d untouched) ({{CHECK18_COUNT}})</b></p>
-<p>Madhu requirement (6/29 EM Sync): Active items with Remaining Work unchanged for more than 30 days:</p>
+<p>Madhu requirement (6/29 EM Sync): Non-closed Feature/Exception items on the Features backlog with numeric Remaining Work greater than zero and unchanged for more than 30 days:</p>
 <table>
   <tr><th>Item</th><th>Title</th><th>Owner</th><th>State</th><th>Area</th><th>Remaining Work</th><th>Days Since Changed</th><th>Action</th></tr>
   {{CHECK18_ROWS}}
@@ -190,8 +190,8 @@ Row: <tr><td><a href="https://domoreexp.visualstudio.com/MSTeams/_workitems/edit
 
 {{CHECK20_SECTION}}
 <!-- Replace with EMPTY STRING if no check20 items. Otherwise:
-<p><b>Backlog state-order violations ({{CHECK20_COUNT}})</b></p>
-<p>Madhu requirement (6/29 EM Sync): Backlog items whose state ordering violates the suggested order:</p>
+<p><b>Features backlog state-order violations ({{CHECK20_COUNT}})</b></p>
+<p>Madhu requirement (6/29 EM Sync): Feature/Exception items whose Features backlog ordering violates the suggested order. Blocked items are exempt and items without StackRank are skipped:</p>
 <table>
   <tr><th>Item</th><th>Title</th><th>Owner</th><th>State</th><th>Tier</th><th>Stack Rank</th><th>Below</th></tr>
   {{CHECK20_ROWS}}
