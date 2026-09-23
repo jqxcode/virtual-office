@@ -285,6 +285,7 @@ WIQL_CHECK20_BACKLOG_ORDER = (
     "AND [System.AreaPath] UNDER '{area}' "
     "ORDER BY [Microsoft.VSTS.Common.StackRank]"
 )
+CHECK20_QUERY_ID = "e52188a5-b262-4984-8175-4c185e06f831"
 
 # Check 18 staleness threshold (days since last change) -- configurable.
 STALE_REMAINING_DAYS = 30
@@ -503,6 +504,18 @@ def wiql_query(wiql, token):
                     ids.append(node["id"])
         return ids
     return []
+
+
+def saved_query_ids(query_id, token):
+    # type: (str, str) -> List[int]
+    """Execute a fixed ADO Shared Query by ID and return its ordered work-item IDs."""
+    resp = ado_request(
+        "{0}/_apis/wit/wiql/{1}?api-version=7.1".format(PROJECT, query_id),
+        token,
+    )
+    if not resp:
+        return []
+    return [item["id"] for item in resp.get("workItems", [])]
 
 
 def wiql_link_query(wiql, token):
@@ -1764,6 +1777,8 @@ def check15(token, allowed_areas, mc, dry_run, current_iter, today):
             f = wi.get("fields", {})
             if not _is_feature_backlog_item(f):
                 continue
+            if f.get("System.State") in ("Closed", "Removed"):
+                continue
             ap = f.get("System.AreaPath", "")
             if not area_path_allowed(ap, allowed_areas):
                 mc.plan({"event": "skip_area_mismatch", "check": "check15", "id": wid, "areaPath": ap})
@@ -1912,41 +1927,34 @@ def check18(token, allowed_areas, dry_run, today):
 def check20(token, allowed_areas):
     # type: (str, List[str]) -> Dict[str, Any]
     print("Check 20: Backlog state-order violations (Madhu req 6/29)")
-    flagged = []
-    suggested = []
-    for area in allowed_areas:
-        wiql = WIQL_CHECK20_BACKLOG_ORDER.format(area=area)
-        if not validate_wiql_has_area_filter(wiql, False):
-            print("  ABORT check20: missing area filter", file=sys.stderr)
+    ids = saved_query_ids(CHECK20_QUERY_ID, token)
+    if not ids:
+        return {"items": [], "count": 0, "suggestedOrder": []}
+    wis = get_work_items_batch(ids, token, fields=[
+        "System.Id", "System.Title", "System.WorkItemType", "System.State",
+        "System.Tags", "System.AssignedTo", "System.AreaPath",
+        "Microsoft.VSTS.Common.StackRank",
+    ])
+    rows = []
+    for wi in wis:
+        f = wi.get("fields", {})
+        if not _is_feature_backlog_item(f):
             continue
-        ids = wiql_query(wiql, token)
-        if not ids:
+        if f.get("System.State") in ("Closed", "Removed"):
             continue
-        wis = get_work_items_batch(ids, token, fields=[
-            "System.Id", "System.Title", "System.WorkItemType", "System.State",
-            "System.Tags", "System.AssignedTo", "System.AreaPath",
-            "Microsoft.VSTS.Common.StackRank",
-        ])
-        rows = []
-        for wi in wis:
-            f = wi.get("fields", {})
-            if not _is_feature_backlog_item(f):
-                continue
-            ap = f.get("System.AreaPath", "")
-            if not area_path_allowed(ap, allowed_areas):
-                continue
-            rows.append({
-                "id": wi["id"],
-                "title": f.get("System.Title", ""),
-                "state": f.get("System.State", ""),
-                "type": f.get("System.WorkItemType", ""),
-                "tags": f.get("System.Tags", ""),
-                "owner": get_owner_name(wi),
-                "stackRank": f.get("Microsoft.VSTS.Common.StackRank"),
-            })
-        area_flagged, area_suggested = detect_order_inversions(rows)
-        flagged.extend(area_flagged)
-        suggested.extend(area_suggested)
+        ap = f.get("System.AreaPath", "")
+        if not area_path_allowed(ap, allowed_areas):
+            continue
+        rows.append({
+            "id": wi["id"],
+            "title": f.get("System.Title", ""),
+            "state": f.get("System.State", ""),
+            "type": f.get("System.WorkItemType", ""),
+            "tags": f.get("System.Tags", ""),
+            "owner": get_owner_name(wi),
+            "stackRank": f.get("Microsoft.VSTS.Common.StackRank"),
+        })
+    flagged, suggested = detect_order_inversions(rows)
     return {"items": flagged, "count": len(flagged), "suggestedOrder": suggested}
 
 

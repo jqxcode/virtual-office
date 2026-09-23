@@ -415,15 +415,29 @@ class TestFeatureBacklogScope(unittest.TestCase):
             self._item(4, "User Story", state="RollingOut"),
             self._item(5, "Epic", state="RollingOut"),
             self._item(6, "Exception", state="Open"),
+            self._item(7, "Feature", state="Closed"),
+            self._item(8, "Exception", state="Removed"),
         ]
-        items[-1]["fields"]["Microsoft.VSTS.Common.StackRank"] = 50
-        with patch.object(shc, "wiql_query", return_value=[item["id"] for item in items]), \
+        items[5]["fields"]["Microsoft.VSTS.Common.StackRank"] = 50
+        with patch.object(shc, "saved_query_ids", return_value=[item["id"] for item in items]), \
                 patch.object(shc, "get_work_items_batch", return_value=items):
             result = shc.check20("token", [shc.AREA_MJ])
         self.assertEqual(result["items"], [])
         self.assertEqual(
             sorted(item["id"] for item in result["suggestedOrder"]),
             [1, 6],
+        )
+
+    def test_saved_query_ids_executes_check20_shared_query(self):
+        with patch.object(
+                shc,
+                "ado_request",
+                return_value={"workItems": [{"id": 10}, {"id": 20}]},
+        ) as request:
+            self.assertEqual(shc.saved_query_ids(shc.CHECK20_QUERY_ID, "token"), [10, 20])
+        request.assert_called_once_with(
+            "MSTeams/_apis/wit/wiql/{0}?api-version=7.1".format(shc.CHECK20_QUERY_ID),
+            "token",
         )
 
 
