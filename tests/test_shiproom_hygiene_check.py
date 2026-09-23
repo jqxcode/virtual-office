@@ -419,9 +419,15 @@ class TestFeatureBacklogScope(unittest.TestCase):
             self._item(8, "Exception", state="Removed"),
         ]
         items[5]["fields"]["Microsoft.VSTS.Common.StackRank"] = 50
-        with patch.object(shc, "saved_query_ids", return_value=[item["id"] for item in items]), \
+        with tempfile.TemporaryDirectory() as temp_dir, \
+                patch.object(shc, "saved_query_ids", return_value=[item["id"] for item in items]), \
                 patch.object(shc, "get_work_items_batch", return_value=items):
-            result = shc.check20("token", [shc.AREA_MJ])
+            mc = shc.MutationController(
+                os.path.join(temp_dir, "plan.jsonl"),
+                os.path.join(temp_dir, "audit.jsonl"),
+                dry_run=True,
+            )
+            result = shc.check20("token", [shc.AREA_MJ], mc, True)
         self.assertEqual(result["items"], [])
         self.assertEqual(
             sorted(item["id"] for item in result["suggestedOrder"]),
@@ -438,6 +444,55 @@ class TestFeatureBacklogScope(unittest.TestCase):
         request.assert_called_once_with(
             "MSTeams/_apis/wit/wiql/{0}?api-version=7.1".format(shc.CHECK20_QUERY_ID),
             "token",
+        )
+
+    def test_rank_move_places_active_before_first_proposed(self):
+        rows = [
+            {"id": 1, "state": "Active", "type": "Feature", "tags": "", "stackRank": 7950},
+            {"id": 2, "state": "Proposed", "type": "Feature", "tags": "", "stackRank": 8018},
+            {"id": 3, "state": "Proposed", "type": "Feature", "tags": "", "stackRank": 10026},
+            {"id": 4, "state": "Active", "type": "Feature", "tags": "", "stackRank": 10153},
+        ]
+        self.assertEqual(
+            shc._rank_move_for_violation(rows, 4),
+            {"previousId": 1, "nextId": 2},
+        )
+
+    def test_rank_move_places_rollingout_before_active(self):
+        rows = [
+            {"id": 1, "state": "Open", "type": "Exception", "tags": "", "stackRank": 100},
+            {"id": 2, "state": "Active", "type": "Feature", "tags": "", "stackRank": 200},
+            {"id": 3, "state": "RollingOut", "type": "Feature", "tags": "", "stackRank": 300},
+        ]
+        self.assertEqual(
+            shc._rank_move_for_violation(rows, 3),
+            {"previousId": 1, "nextId": 2},
+        )
+
+    def test_rank_move_does_not_move_planning_items(self):
+        rows = [
+            {"id": 1, "state": "Proposed", "type": "Feature", "tags": "", "stackRank": 100},
+            {"id": 2, "state": "Active", "type": "Feature", "tags": "", "stackRank": 200},
+        ]
+        self.assertIsNone(shc._rank_move_for_violation(rows, 1))
+
+    def test_reorder_backlog_item_preserves_parent_and_uses_json(self):
+        response = {"count": 1, "value": [{"id": 4, "order": 150.0}]}
+        with patch.object(shc, "ado_request", return_value=response) as request:
+            result = shc.reorder_backlog_item(4, 1, 2, 99, "token")
+        self.assertEqual(result, response)
+        request.assert_called_once_with(
+            "MSTeams/6f72ea4e-c73a-4a15-b622-46cdacc53987/"
+            "_apis/work/workitemsorder?api-version=7.1",
+            "token",
+            "PATCH",
+            {
+                "ids": [4],
+                "previousId": 1,
+                "nextId": 2,
+                "parentId": 99,
+            },
+            content_type="application/json",
         )
 
 

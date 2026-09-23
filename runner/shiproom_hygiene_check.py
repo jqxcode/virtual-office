@@ -78,7 +78,7 @@ OUTPUT_DIR = os.path.join(REPO_ROOT, "output", "mScrumMaster")
 TEMPLATE_PATH = os.path.join(REPO_ROOT, "templates", "mScrumMaster-shiproom-hygiene.html")
 
 # Mutating check IDs (referenced by safety policy)
-MUTATING_CHECKS = {"1", "2", "3", "5", "6"}
+MUTATING_CHECKS = {"1", "2", "3", "5", "6", "20"}
 
 # Mutating checks must contain the workitems area filter literally.
 # Check 1 is a workitemLinks query which uses [Source].[System.AreaPath].
@@ -309,6 +309,7 @@ TIER_BY_STATE = {"RollingOut": 1, "Active": 2}
 # States exempt from state-order inversion detection: they may legitimately appear
 # anywhere in the in-flight zone, so they neither trigger nor receive an inversion flag.
 EXEMPT_ORDER_STATES = {"Blocked"}
+AUTO_RANK_STATES = {"RollingOut", "Active"}
 
 
 # ---------------------------------------------------------------------------
@@ -566,6 +567,23 @@ def patch_work_item(wid, ops, token):
     return ado_request(
         "{0}/_apis/wit/workItems/{1}?api-version=7.1".format(PROJECT, wid),
         token, "PATCH", ops, content_type="application/json-patch+json",
+    )
+
+
+def reorder_backlog_item(wid, previous_id, next_id, parent_id, token):
+    # type: (int, int, int, int, str) -> Optional[Any]
+    """Move one item between two neighbors in the team's Features backlog."""
+    return ado_request(
+        "{0}/{1}/_apis/work/workitemsorder?api-version=7.1".format(PROJECT, TEAM_ID),
+        token,
+        "PATCH",
+        {
+            "ids": [wid],
+            "previousId": previous_id,
+            "nextId": next_id,
+            "parentId": parent_id,
+        },
+        content_type="application/json",
     )
 
 
@@ -831,6 +849,36 @@ def detect_order_inversions(rows):
         for r in suggested_rows
     ]
     return flagged, suggested
+
+
+def _rank_move_for_violation(rows, wid):
+    # type: (List[Dict[str, Any]], int) -> Optional[Dict[str, int]]
+    """Return the minimal neighbor move that restores one in-flight item.
+
+    Only RollingOut/Active items are eligible. The item is inserted immediately
+    before the first ranked, non-exempt item with a lower business priority.
+    """
+    ranked = sorted(
+        (row for row in rows if row.get("stackRank") is not None),
+        key=lambda row: row["stackRank"],
+    )
+    item = next((row for row in ranked if row.get("id") == wid), None)
+    if not item or item.get("state") not in AUTO_RANK_STATES:
+        return None
+    item_tier = _tier_for(item.get("state", ""), item.get("tags", ""), item.get("type"))
+    item_index = ranked.index(item)
+    target_index = next((
+        index for index, row in enumerate(ranked[:item_index])
+        if row.get("state") not in EXEMPT_ORDER_STATES
+        and _tier_for(row.get("state", ""), row.get("tags", ""), row.get("type")) > item_tier
+    ), None)
+    if target_index is None:
+        return None
+    preceding = [row for row in ranked[:target_index] if row.get("id") != wid]
+    return {
+        "previousId": preceding[-1]["id"] if preceding else 0,
+        "nextId": ranked[target_index]["id"],
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -1924,15 +1972,14 @@ def check18(token, allowed_areas, dry_run, today):
     return {"items": items, "count": len(items)}
 
 
-def check20(token, allowed_areas):
-    # type: (str, List[str]) -> Dict[str, Any]
-    print("Check 20: Backlog state-order violations (Madhu req 6/29)")
+def _load_check20_rows(token, allowed_areas):
+    # type: (str, List[str]) -> List[Dict[str, Any]]
     ids = saved_query_ids(CHECK20_QUERY_ID, token)
     if not ids:
-        return {"items": [], "count": 0, "suggestedOrder": []}
+        return []
     wis = get_work_items_batch(ids, token, fields=[
         "System.Id", "System.Title", "System.WorkItemType", "System.State",
-        "System.Tags", "System.AssignedTo", "System.AreaPath",
+        "System.Tags", "System.AssignedTo", "System.AreaPath", "System.Parent",
         "Microsoft.VSTS.Common.StackRank",
     ])
     rows = []
@@ -1952,10 +1999,105 @@ def check20(token, allowed_areas):
             "type": f.get("System.WorkItemType", ""),
             "tags": f.get("System.Tags", ""),
             "owner": get_owner_name(wi),
+            "parentId": f.get("System.Parent") or 0,
             "stackRank": f.get("Microsoft.VSTS.Common.StackRank"),
         })
+    return rows
+
+
+def check20(token, allowed_areas, mc, dry_run):
+    # type: (str, List[str], MutationController, bool) -> Dict[str, Any]
+    print("Check 20: Backlog state-order violations (Madhu req 6/29)")
+    rows = _load_check20_rows(token, allowed_areas)
     flagged, suggested = detect_order_inversions(rows)
-    return {"items": flagged, "count": len(flagged), "suggestedOrder": suggested}
+    items = []
+    for initial in flagged:
+        wid = initial["id"]
+        live_rows = _load_check20_rows(token, allowed_areas)
+        live_flagged, _ = detect_order_inversions(live_rows)
+        live_violation = next((item for item in live_flagged if item["id"] == wid), None)
+        if not live_violation:
+            action = "already-fixed"
+        else:
+            move = _rank_move_for_violation(live_rows, wid)
+            if not move:
+                action = "reported-only"
+            else:
+                before = next(row for row in live_rows if row["id"] == wid)
+                plan_ok = mc.plan({
+                    "event": "plan_backlog_reorder",
+                    "check": "check20",
+                    "id": wid,
+                    "before": {
+                        "stackRank": before["stackRank"],
+                        "parentId": before["parentId"],
+                    },
+                    "move": move,
+                })
+                if plan_ok and dry_run:
+                    action = "would-rerank (dry-run)"
+                elif plan_ok:
+                    response = reorder_backlog_item(
+                        wid,
+                        move["previousId"],
+                        move["nextId"],
+                        before["parentId"],
+                        token,
+                    )
+                    verified_rows = _load_check20_rows(token, allowed_areas)
+                    verified_flagged, _ = detect_order_inversions(verified_rows)
+                    still_flagged = any(item["id"] == wid for item in verified_flagged)
+                    after = next((row for row in verified_rows if row["id"] == wid), None)
+                    response_item = next((
+                        item for item in (response or {}).get("value", [])
+                        if item.get("id") == wid
+                    ), None) if isinstance(response, dict) else None
+                    parent_preserved = (
+                        after is not None and after["parentId"] == before["parentId"]
+                    )
+                    rank_changed = (
+                        after is not None and after["stackRank"] != before["stackRank"]
+                    )
+                    response_matches = (
+                        response_item is not None
+                        and after is not None
+                        and response_item.get("order") == after["stackRank"]
+                    )
+                    ok = (
+                        response_matches
+                        and parent_preserved
+                        and rank_changed
+                        and not still_flagged
+                    )
+                    mc.record({
+                        "check": "check20",
+                        "id": wid,
+                        "before": {
+                            "stackRank": before["stackRank"],
+                            "parentId": before["parentId"],
+                        },
+                        "after": {
+                            "stackRank": after["stackRank"] if after else None,
+                            "parentId": after["parentId"] if after else None,
+                            "previousId": move["previousId"],
+                            "nextId": move["nextId"],
+                        },
+                        "ok": ok,
+                    })
+                    action = "reranked" if ok else "rerank-failed-verification"
+                else:
+                    action = "skipped (cap)"
+        item = dict(initial)
+        item["action"] = action
+        items.append(item)
+    final_rows = _load_check20_rows(token, allowed_areas)
+    remaining, final_suggested = detect_order_inversions(final_rows)
+    return {
+        "items": items,
+        "count": len(items),
+        "remainingCount": len(remaining),
+        "suggestedOrder": final_suggested,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -2498,12 +2640,13 @@ def _build_check20_section(res):
             _html_escape(it.get("stackRank", "")),
             _html_escape(it.get("owner", "")),
             _html_escape(it.get("below", "")),
+            _html_escape(it.get("action", "")),
         ))
     return _section_html(
         "Check 20: Features Backlog State-Order Violations",
         "{0} out of order".format(len(items)),
-        "Madhu requirement (6/29 EM Sync): Feature/Exception items on the Features backlog should be ordered as exceptions &gt; RollingOut / Active &gt; plan/backlog (Proposed/New). Blocked is exempt; items without StackRank are skipped. Committed is the funding field Custom.CommittedTargettedCut, not a lifecycle or deployment state. Report-only (no auto-reorder); see suggested order in the JSON output.",
-        ["ID", "Title", "State", "Tier", "StackRank", "Owner", "Sits Below"],
+        "Madhu requirement (6/29 EM Sync): Feature/Exception items on the Features backlog should be ordered as exceptions &gt; RollingOut / Active &gt; plan/backlog (Proposed/New). Blocked is exempt; items without StackRank are skipped. Eligible RollingOut/Active inversions are moved one at a time using the backlog reorder API and verified.",
+        ["ID", "Title", "State", "Tier", "StackRank", "Owner", "Sits Below", "Action"],
         rows,
         _query_link(ids, "Open all {0} items in ADO query".format(len(items))),
     )
@@ -2744,7 +2887,7 @@ def main(argv=None):
     if should_run("18"):
         results["check18"] = check18(ado_token, allowed_areas, args.dry_run, today)
     if should_run("20"):
-        results["check20"] = check20(ado_token, allowed_areas)
+        results["check20"] = check20(ado_token, allowed_areas, mc, args.dry_run)
 
     complete_dt = datetime.now(PST)
 

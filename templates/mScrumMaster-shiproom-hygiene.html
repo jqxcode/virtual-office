@@ -435,7 +435,7 @@ Work item IDs link to https://domoreexp.visualstudio.com/MSTeams/_workitems/edit
 <!-- Replace {{CHECK20_SECTION}} with the block below ONLY if issues were found:
 <div class="section">
   <h2>Check 20: Features backlog state-order violations (Madhu requirement, 6/29 EM Sync) <span class="count">N flagged</span></h2>
-  <p style="color:var(--vo-text-tertiary); font-size:12px; margin-bottom:12px;">Feature/Exception items on the Features backlog should appear in valid state order. Blocked items are exempt and items without StackRank are skipped.</p>
+  <p style="color:var(--vo-text-tertiary); font-size:12px; margin-bottom:12px;">Feature/Exception items on the Features backlog should appear in valid state order. Eligible RollingOut/Active inversions are reranked one at a time and verified. Blocked items are exempt and items without StackRank are skipped.</p>
   {{CHECK20_QUERY_LINK}}
   <table>
     <thead>

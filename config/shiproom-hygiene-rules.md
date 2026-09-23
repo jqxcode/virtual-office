@@ -571,7 +571,7 @@ Check 16 & 19: deferred, not implemented this iteration.
 
 **Goal**: Enforce Madhu's Features backlog stack order for `Feature`/`Exception` items (top→bottom): exceptions → `RollingOut` / `Active` → plan/backlog (`Proposed`/`New`). `Blocked` is an in-flight state that may sit anywhere in the RollingOut/Active zone (before or after) and is **exempt** from inversion detection. (Corrected 2026-07-28 per EM feedback.)
 
-**Action policy: REPORT-ONLY. No StackRank PATCH. Bulk reorder is the exact incident risk class.**
+**Action policy: MINIMAL AUTO-FIX for ranking-only inversions.** Only `RollingOut`/`Active` items that are currently below a lower-priority state may be moved. Move one item at a time through the team backlog reorder API, between explicit neighboring IDs; never bulk-rewrite StackRank values. Re-query immediately before each move, respect dry-run and the mutation cap, audit the before/after rank and neighbors, then re-query to verify the violation is gone. Exception misplacement, `Blocked`, unranked items, ambiguous hierarchy, or any non-ranking issue remains report-only.
 
 **Field mapping**: Backlog node = `MSTeams\Backlog`. StackRank field = `Microsoft.VSTS.Common.StackRank` (ascending = top of backlog).
 
@@ -593,7 +593,7 @@ Check 16 & 19: deferred, not implemented this iteration.
    c. Any non-exempt item with `tier < running_max_tier` is an inversion because it sits below a higher-priority-state item; flag it.
 4. Emit flagged inversions: ID, Title, State, StackRank, tier, AreaPath, and the preceding higher-priority-state context.
 5. Emit a "suggested correct order": reorder ranked, non-exempt items by `(tier, current StackRank)`, preserve each `Blocked` item's current position, and omit unranked items.
-6. **Report-only** (no auto-fix). Results included in Teams post.
+6. For each eligible `RollingOut`/`Active` inversion, move it immediately before the first ranked, non-exempt lower-priority item. Results include the action (`reranked`, `would-rerank`, verification failure, or report-only).
 
 ---
 
