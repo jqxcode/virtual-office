@@ -682,6 +682,11 @@ class TestStructuredSummaryPipeline(unittest.TestCase):
             self.assertIn("fetch('/api/execute'", html)
             self.assertIn("state.status === 'running' || state.status === 'queued'", html)
             self.assertIn("document.getElementById('execute').disabled = true", html)
+            self.assertIn("emailTriagePendingActions", html)
+            self.assertIn("removalActions", html)
+            self.assertIn("card.dataset.pending = 'true'", html)
+            self.assertIn("updateVisibleCounts()", html)
+            self.assertIn("localStorage.removeItem(PENDING_KEY)", html)
             self.assertNotIn("outlooktriage://", html)
             self.assertIn(
                 '<button type="button" class="btn primary open-outlook"',
