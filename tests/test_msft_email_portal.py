@@ -338,6 +338,16 @@ class TestNdrNoiseClassifier(unittest.TestCase):
     "Personal email-triage portal assets are not installed on this machine.",
 )
 class TestThreadClassification(unittest.TestCase):
+    def test_no_action_required_negates_action_required_substring(self):
+        fixture = message(
+            "no-action",
+            "[No Action Required] Security Group FFv2 Flight",
+            "No action needed — this is an FYI only.",
+            "2026-09-24T20:00:00Z",
+        )
+        self.assertNotEqual(GEN.classify_semantic(fixture), "action")
+        self.assertFalse(GEN.requires_reply(fixture))
+
     def test_normalization_global_uniqueness_and_scott_not_josh(self):
         messages = [
             item for item in synthetic_messages() if not is_global_noise(item)
@@ -601,8 +611,8 @@ class TestStructuredSummaryPipeline(unittest.TestCase):
                 html.index("navigator.sendBeacon("),
                 html.index("window.open(link.href"),
             )
-            self.assertIn("fetch('/api/click-stats'", html)
-            self.assertIn("网页打开 0 次", html)
+            self.assertNotIn("fetch('/api/click-stats'", html)
+            self.assertNotIn("网页打开 0 次", html)
             self.assertIn('data-normalized-thread="', html)
             self.assertIn('data-report-snapshot="', html)
             self.assertIn('id="category-reply_required"', html)
