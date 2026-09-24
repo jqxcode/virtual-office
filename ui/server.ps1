@@ -649,7 +649,9 @@ try {
                 }
             }
             elseif ($urlPath -eq "/api/costs") {
-                # Aggregate cost data from audit JSONL (completed/failed entries with cost field)
+                # Aggregate usage data from audit JSONL (completed/failed entries with cost field).
+                # Copilot CLI does not currently provide a USD conversion; expose dollars only
+                # when a real non-zero USD value exists, otherwise use the best available usage unit.
                 # Query params: ?days=N (default 30)
                 $AuditDir = Join-Path (Join-Path (Split-Path $UiDir -Parent) "output") "audit"
                 $daysParam = $request.QueryString["days"]
@@ -681,15 +683,16 @@ try {
                                         agent              = $obj.agent
                                         job                = $obj.job
                                         run_id             = $obj.run_id
-                                        costUSD            = if ($c.PSObject.Properties["costUSD"]) { $c.costUSD } else { 0 }
-                                        inputTokens        = if ($c.PSObject.Properties["inputTokens"]) { $c.inputTokens } else { 0 }
-                                        outputTokens       = if ($c.PSObject.Properties["outputTokens"]) { $c.outputTokens } else { 0 }
+                                        costUSD            = if ($c.PSObject.Properties["costUSD"]) { [double]$c.costUSD } else { 0 }
+                                        inputTokens        = if ($c.PSObject.Properties["inputTokens"]) { [double]$c.inputTokens } else { 0 }
+                                        outputTokens       = if ($c.PSObject.Properties["outputTokens"]) { [double]$c.outputTokens } else { 0 }
                                         cacheCreationTokens = if ($c.PSObject.Properties["cacheCreationTokens"]) { $c.cacheCreationTokens } else { 0 }
                                         cacheReadTokens    = if ($c.PSObject.Properties["cacheReadTokens"]) { $c.cacheReadTokens } else { 0 }
                                         durationMs         = if ($c.PSObject.Properties["durationMs"]) { $c.durationMs } else { 0 }
                                         model              = if ($c.PSObject.Properties["model"]) { $c.model } else { "" }
                                         contextUsedPct     = if ($c.PSObject.Properties["contextUsedPct"]) { $c.contextUsedPct } else { 0 }
                                         numTurns           = if ($c.PSObject.Properties["numTurns"]) { $c.numTurns } else { 0 }
+                                        premiumRequests    = if ($c.PSObject.Properties["premiumRequests"]) { [double]$c.premiumRequests } else { 0 }
                                         exitCode           = if ($obj.details.PSObject.Properties["exit_code"]) { $obj.details.exit_code } else { 0 }
                                     }
                                 }
@@ -698,52 +701,119 @@ try {
                         }
                     }
                 }
+                $totalCost = ($entries | Measure-Object -Property costUSD -Sum).Sum
+                $totalInputTokens = ($entries | Measure-Object -Property inputTokens -Sum).Sum
+                $totalOutputTokens = ($entries | Measure-Object -Property outputTokens -Sum).Sum
+                $totalPremiumRequests = ($entries | Measure-Object -Property premiumRequests -Sum).Sum
+                $totalTokens = $totalInputTokens + $totalOutputTokens
+                $hasDollarCost = ($totalCost -gt 0)
+
+                $metricKey = "runs"
+                $metricLabel = "Runs"
+                $metricUnit = "runs"
+                $metricTotal = $entries.Count
+                $metricSource = "Job count; no token, credit, or USD usage was found."
+                $metricIsMoney = $false
+                if ($hasDollarCost) {
+                    $metricKey = "usd"
+                    $metricLabel = "Cost"
+                    $metricUnit = "USD"
+                    $metricTotal = $totalCost
+                    $metricSource = "USD values from audit costUSD."
+                    $metricIsMoney = $true
+                } elseif ($totalPremiumRequests -gt 0) {
+                    $metricKey = "premiumRequests"
+                    $metricLabel = "Premium Requests"
+                    $metricUnit = "requests"
+                    $metricTotal = $totalPremiumRequests
+                    $metricSource = "Copilot CLI usage.premiumRequests; no USD conversion source is present."
+                } elseif ($totalOutputTokens -gt 0) {
+                    $metricKey = "outputTokens"
+                    $metricLabel = "Output Tokens"
+                    $metricUnit = "tokens"
+                    $metricTotal = $totalOutputTokens
+                    $metricSource = "Copilot CLI assistant.message outputTokens; no USD conversion source is present."
+                } elseif ($totalTokens -gt 0) {
+                    $metricKey = "tokens"
+                    $metricLabel = "Tokens"
+                    $metricUnit = "tokens"
+                    $metricTotal = $totalTokens
+                    $metricSource = "Token counts from audit cost records; no USD conversion source is present."
+                }
+
+                function Get-UsageMetricValue($entry, [string]$key) {
+                    if ($key -eq "usd") { return [double]$entry.costUSD }
+                    if ($key -eq "premiumRequests") { return [double]$entry.premiumRequests }
+                    if ($key -eq "outputTokens") { return [double]$entry.outputTokens }
+                    if ($key -eq "tokens") { return [double]($entry.inputTokens + $entry.outputTokens) }
+                    return 1
+                }
+
+                foreach ($e in $entries) {
+                    $usageValue = Get-UsageMetricValue $e $metricKey
+                    $e | Add-Member -NotePropertyName "usageValue" -NotePropertyValue $usageValue -Force
+                }
+
                 # Build summary: per-agent totals and daily rollups
                 $agentTotals = @{}
                 $dailyRollups = @{}
                 foreach ($e in $entries) {
                     $aKey = $e.agent
                     if (-not $agentTotals.ContainsKey($aKey)) {
-                        $agentTotals[$aKey] = @{ costUSD = 0; runs = 0; inputTokens = 0; outputTokens = 0 }
+                        $agentTotals[$aKey] = @{ costUSD = 0; runs = 0; inputTokens = 0; outputTokens = 0; premiumRequests = 0; usageValue = 0 }
                     }
                     $agentTotals[$aKey]["costUSD"] += $e.costUSD
                     $agentTotals[$aKey]["runs"] += 1
                     $agentTotals[$aKey]["inputTokens"] += $e.inputTokens
                     $agentTotals[$aKey]["outputTokens"] += $e.outputTokens
+                    $agentTotals[$aKey]["premiumRequests"] += $e.premiumRequests
+                    $agentTotals[$aKey]["usageValue"] += $e.usageValue
 
                     $day = ([string]$e.timestamp).Substring(0, 10)
                     if (-not $dailyRollups.ContainsKey($day)) {
-                        $dailyRollups[$day] = @{ costUSD = 0; runs = 0 }
+                        $dailyRollups[$day] = @{ costUSD = 0; runs = 0; usageValue = 0 }
                     }
                     $dailyRollups[$day]["costUSD"] += $e.costUSD
                     $dailyRollups[$day]["runs"] += 1
+                    $dailyRollups[$day]["usageValue"] += $e.usageValue
                 }
-                # Detect anomalies: jobs exceeding 2x their 7-day average cost
+                # Detect anomalies: jobs exceeding 2x their average usage in the selected unit
                 $jobAvgs = @{}
                 $anomalies = @()
                 foreach ($e in $entries) {
                     $jKey = "$($e.agent)/$($e.job)"
                     if (-not $jobAvgs.ContainsKey($jKey)) { $jobAvgs[$jKey] = @() }
-                    $jobAvgs[$jKey] += $e.costUSD
+                    $jobAvgs[$jKey] += $e.usageValue
                 }
                 foreach ($jKey in $jobAvgs.Keys) {
-                    $costs = $jobAvgs[$jKey]
-                    if ($costs.Count -lt 2) { continue }
-                    $avg = ($costs | Measure-Object -Sum).Sum / $costs.Count
-                    $last = $costs[-1]
+                    $values = $jobAvgs[$jKey]
+                    if ($values.Count -lt 2) { continue }
+                    $avg = ($values | Measure-Object -Sum).Sum / $values.Count
+                    $last = $values[-1]
                     if ($avg -gt 0 -and $last -gt ($avg * 2)) {
-                        $anomalies += [PSCustomObject]@{ job = $jKey; lastCost = $last; avgCost = [math]::Round($avg, 4); ratio = [math]::Round($last / $avg, 1) }
+                        $anomalies += [PSCustomObject]@{ job = $jKey; lastValue = $last; avgValue = [math]::Round($avg, 4); ratio = [math]::Round($last / $avg, 1) }
                     }
                 }
-                $totalCost = ($entries | Measure-Object -Property costUSD -Sum).Sum
                 $result = [PSCustomObject]@{
-                    period     = "${days}d"
-                    totalCost  = [math]::Round($totalCost, 4)
-                    totalRuns  = $entries.Count
-                    agents     = $agentTotals
-                    daily      = $dailyRollups
-                    anomalies  = @($anomalies)
-                    entries    = @($entries)
+                    period               = "${days}d"
+                    totalCost            = [math]::Round($totalCost, 4)
+                    totalRuns            = $entries.Count
+                    totalInputTokens     = [math]::Round($totalInputTokens, 0)
+                    totalOutputTokens    = [math]::Round($totalOutputTokens, 0)
+                    totalPremiumRequests = [math]::Round($totalPremiumRequests, 4)
+                    hasDollarCost        = $hasDollarCost
+                    metric               = [PSCustomObject]@{
+                        key     = $metricKey
+                        label   = $metricLabel
+                        unit    = $metricUnit
+                        total   = [math]::Round($metricTotal, 4)
+                        isMoney = $metricIsMoney
+                        source  = $metricSource
+                    }
+                    agents               = $agentTotals
+                    daily                = $dailyRollups
+                    anomalies            = @($anomalies)
+                    entries              = @($entries)
                 }
                 Send-TextResponse $context 200 "application/json" ($result | ConvertTo-Json -Depth 10)
             }

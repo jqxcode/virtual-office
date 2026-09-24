@@ -1985,8 +1985,11 @@ body {
 
 .team-agent-list {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 560px), 1fr));
   gap: 1rem;
+  width: 100%;
+  margin: 0 auto;
+  min-width: 0;
 }
 
 .team-agent-card {
@@ -1997,6 +2000,7 @@ body {
   padding: 1rem 1.15rem;
   transition: box-shadow 0.2s, border-color 0.2s;
   position: relative;
+  min-width: 0;
 }
 
 .team-agent-card:hover {
@@ -2058,9 +2062,30 @@ body {
 
 .team-skills-table {
   width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
   font-size: 0.78rem;
   margin-bottom: 0.5rem;
+}
+
+.team-agent-card .team-skills-table th:nth-child(1),
+.team-agent-card .team-skills-table td:nth-child(1) {
+  width: 16%;
+}
+
+.team-agent-card .team-skills-table th:nth-child(2),
+.team-agent-card .team-skills-table td:nth-child(2) {
+  width: 26%;
+}
+
+.team-agent-card .team-skills-table th:nth-child(3),
+.team-agent-card .team-skills-table td:nth-child(3) {
+  width: 25%;
+}
+
+.team-agent-card .team-skills-table th:nth-child(4),
+.team-agent-card .team-skills-table td:nth-child(4) {
+  width: 33%;
 }
 
 .team-skills-table th {
@@ -2094,7 +2119,12 @@ body {
   cursor: pointer;
   position: relative;
   transition: color 0.15s;
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
+  vertical-align: bottom;
 }
 
 .team-skill-name:hover {
@@ -2127,6 +2157,8 @@ body {
   font-family: "Cascadia Code", "Fira Code", "Consolas", monospace;
   font-size: 0.72rem;
   color: #8b949e;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -2638,6 +2670,14 @@ body {
 
 .costs-kpi-value.danger {
   color: #ef4444;
+}
+
+.costs-metric-note {
+  grid-column: 1 / -1;
+  color: var(--vo-text-secondary, #8b949e);
+  font-size: 0.78rem;
+  line-height: 1.4;
+  padding: 0.25rem 0.1rem 0;
 }
 
 .costs-anomalies {

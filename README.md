@@ -73,7 +73,7 @@ virtual-office/
 The Mission Control dashboard at localhost:8400 provides:
 
 - **OFFICE tab**: Live status cards for all 6 agents (idle/working/disabled), with context budget badges (green <70%, yellow 70-90%, red >90%)
-- **COSTS tab**: Per-job token cost tracking, daily cost sparklines, per-agent breakdown, and anomaly detection (highlights jobs exceeding 2x average cost)
+- **COSTS tab**: Per-job usage tracking, daily usage sparklines, per-agent breakdown, and anomaly detection; shows USD only when a real dollar conversion source exists, otherwise shows premium requests or token usage
 - **BOARD tab**: Kanban-style task board with Your Turn / Claude's Turn / Done columns for tracking wish and task progress
 - **Event Log tab**: Filterable event history with per-agent dropdown
 - **Task Queue tab**: Upcoming schedule, queue depths, force-stop/cancel actions

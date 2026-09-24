@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Agent Virtual Office</title>
-  <link rel="stylesheet" href="styles.css?v=16">
+  <link rel="stylesheet" href="styles.css?v=17">
 </head>
 <body>
   <header class="header">
@@ -123,6 +123,9 @@
         <select id="schedule-v2-agent-filter" class="v2-filter-select">
           <option value="">All Agents</option>
         </select>
+        <select id="schedule-v2-host-filter" class="v2-filter-select">
+          <option value="">All Hosts</option>
+        </select>
       </div>
       <div class="schedule-table-wrapper">
         <table class="schedule-table">
@@ -147,7 +150,7 @@
     <!-- Costs View -->
     <section id="view-costs" class="view" style="display:none">
       <div class="section-header">
-        <span>Cost Tracking</span>
+        <span>Usage Tracking</span>
         <span class="section-badge" id="costs-period">30d</span>
       </div>
       <!-- KPI Cards -->
@@ -156,7 +159,7 @@
       <div id="costs-anomalies" class="costs-anomalies"></div>
       <!-- Daily Sparkline -->
       <div class="section-header" style="margin-top:1.5rem">
-        <span>Daily Spend</span>
+        <span>Daily Usage</span>
       </div>
       <div id="costs-sparkline" class="costs-sparkline"></div>
       <!-- Per-Agent Breakdown -->
@@ -169,16 +172,16 @@
             <tr>
               <th>Agent</th>
               <th>Runs</th>
-              <th>Total Cost</th>
+              <th>Usage</th>
               <th>Input Tokens</th>
               <th>Output Tokens</th>
-              <th>Avg Cost/Run</th>
+              <th>Avg Usage/Run</th>
             </tr>
           </thead>
           <tbody id="costs-agent-tbody"></tbody>
         </table>
       </div>
-      <!-- Recent Runs with Cost -->
+      <!-- Recent Runs -->
       <div class="section-header" style="margin-top:1.5rem">
         <span>Recent Runs</span>
         <span class="section-badge" id="costs-runs-count">--</span>
@@ -190,7 +193,7 @@
               <th>Time</th>
               <th>Agent</th>
               <th>Job</th>
-              <th>Cost</th>
+              <th>Usage</th>
               <th>Tokens (In/Out)</th>
               <th>Context %</th>
               <th>Turns</th>
@@ -232,6 +235,6 @@
     </section>
   </main>
 
-  <script src="app.js?v=16"></script>
+  <script src="app.js?v=17"></script>
 </body>
 </html>

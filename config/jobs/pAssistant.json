@@ -1,0 +1,46 @@
+{
+  "jobs": {
+    "flight-prices": {
+      "schedule": "manual",
+      "description": "Real-time flight price lookups, cheapest-date matrices, and airline/cabin/city comparisons via headless Google Flights scraping (zero API key)",
+      "requiresInput": true,
+      "inputPrompt": "What flight/airfare question? (e.g. 'cheapest SEA->NRT next month', 'JL vs NH business SEA-HND June')",
+      "prompt": "Read ~/.copilot/skills/flight-prices/SKILL.md for full instructions. Answer the flight-price question using the flight-prices skill: drive a headless Microsoft Edge over CDP to read Google Flights (project C:\\src\\jqxcode\\sea-asia-flight-monitor, venv .\\.venv\\Scripts\\python.exe). No API key, no signup. Always use REAL scraped data, never guess from memory. Deliver a concise, accurate result (a table when comparing dates/cabins/cities), cite that it is live scraped data, and note the query date since fares move. Question: {{EXTRA_ARGS}}"
+    },
+    "hotel-selection": {
+      "schedule": "manual",
+      "description": "Hotel search/comparison using live prices, location, cancellation terms, loyalty status, credit-card benefits, certificates, and points",
+      "requiresInput": true,
+      "inputPrompt": "Which hotel search/comparison? (e.g. 'Tokyo Shinjuku Dec 2026, cash vs points, Marriott Titanium')",
+      "prompt": "Read ~/.copilot/skills/hotel-selection/SKILL.md for full instructions. Research and recommend a hotel using live comparable rates, location, cancellation terms, loyalty status, card credits, certificates, and points; use the user's verified loyalty profile and never invent missing membership data or balances. Background/headless only; never operate or focus the user's visible browser. Return a compact comparison table, one primary pick, one fallback, and only the unknowns that must be verified before booking. Request: {{EXTRA_ARGS}}"
+    },
+    "viva-learning-automate": {
+      "schedule": "manual",
+      "description": "Complete Microsoft Viva Learning mandatory trainings (SCORM 2004 - Articulate Storyline 360 or Rise) via Edge CDP and get course credit",
+      "requiresInput": true,
+      "inputPrompt": "Viva Learning course URL? (learning.cloud.microsoft or df.learning.cloud.microsoft /detail/...)",
+      "prompt": "Read ~/.copilot/skills/viva-learning-automate/SKILL.md for full instructions. Complete the Microsoft Viva Learning course and get credit, reusing the scorm-rise-automation procedure (identify engine -> walk player -> SCORM2004 force-complete -> verify \"Completed on\"). Headless/background only; work in your own tab; one-shot CDP WebSocket; clean up automation Edge by PID afterward. Confirm success by the detail page showing \"Completed on YYYY-MM-DD\" (In-progress pill gone) and report the completion date. Course URL: {{EXTRA_ARGS}}"
+    },
+    "travel-plan": {
+      "schedule": "manual",
+      "description": "End-to-end travel itinerary research, source edits, map regeneration, validation, and static-site deployment (manual trigger only)",
+      "requiresInput": true,
+      "inputPrompt": "What travel-plan task? (e.g. route revision, hotel/transport comparison, itinerary audit, map sync, deploy)",
+      "prompt": "Read ~/.copilot/skills/travel-plan/SKILL.md for full instructions. Use the travel-plan skill for end-to-end itinerary work: verified research through source edits, map regeneration, validation, and deployment. Manual trigger only; do not create recurring monitors automatically. Request: {{EXTRA_ARGS}}"
+    },
+    "FSA-receipt-reimburse": {
+      "schedule": "manual",
+      "description": "FSA receipt reimbursement claim preparation and document upload via background Edge CDP",
+      "requiresInput": true,
+      "inputPrompt": "Which receipt to upload? (e.g. 'rcpt_38968f803075c277' or 'latest CVS receipt')",
+      "prompt": "Read ${LOCAL_SKILLS}/tax/fsa-receipt-reimburse.md or ${REPO_PERSONAL}/virtual-office/skills/FSA-receipt-reimburse.md for full instructions. Execute the FSA receipt upload automation using background Edge CDP (port 9236). Verify the selected receipt before entering any values, use only the edge-fsa-upload-profile tab, attach the verified file with DOM.setFileInputFiles, populate only verified category, type, date, merchant, and amount values, capture the review screen, and open that screenshot in VS Code with code \"<path>\". Do not interfere with foreground focus or input. Stop before the final Submit control and request explicit user approval rather than submitting."
+    },
+    "forma-perks-reimburse": {
+      "schedule": "manual",
+      "description": "Forma Perks+ receipt reimbursement claim preparation and document upload via background Edge CDP",
+      "requiresInput": true,
+      "inputPrompt": "Which receipt to upload? (e.g. 'rcpt_20260415_097' or 'PetPros receipt')",
+      "prompt": "Read ${LOCAL_SKILLS}/tax/forma-perks-reimburse.md or ${REPO_PERSONAL}/virtual-office/skills/forma-perks-reimburse.md for full instructions. Execute the Forma Perks+ receipt upload automation using background Edge CDP (port 9236). Verify the selected receipt before entering values, populate account, amount, vendor, category, date, and description, attach the file via DOM.setFileInputFiles, capture the draft screenshot, and open that screenshot in VS Code with code \"<path>\". Do not interfere with foreground focus or input. Stop before final Submit and request explicit user approval."
+    }
+  }
+}

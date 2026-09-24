@@ -92,6 +92,13 @@
       "description": "Bug-AutoPilot daily summary post to Teams at 7:30am"
     },
     {
+      "agent": "mPoster",
+      "job": "Bug-Autopilot-Adoption-daily-summary",
+      "cron": "30 12 * * 1",
+      "host": "AI0003",
+      "description": "Bug-AutoPilot weekly adoption summary post to Teams on Mondays at 12:30pm"
+    },
+    {
       "agent": "pHangScout",
       "job": "detect-hang",
       "cron": "45 * * * *",
