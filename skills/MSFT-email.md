@@ -1,5 +1,10 @@
 # MSFT-email
 
+> Portable documentation/code mirror:
+> [`qitxu_microsoft/util/MSFT-email`](https://github.com/qitxu_microsoft/util/tree/main/MSFT-email).
+> Runtime changes belong in `virtual-office`; synchronize the portable package
+> with `MSFT-email/Sync-MSFTEmail.ps1`.
+
 Microsoft 365 (Outlook) inbox triage, filtering, and HTML reporting for **Josh.Xu@microsoft.com** — the **portable** successor to `msft-outlook-email-inbox-clean`. It is driven by the **WorkIQ MCP (Microsoft Graph)**, so it runs regardless of the desktop Outlook flavor: **New Outlook (`olk.exe`)**, classic Outlook (COM), or OWA.
 
 > Why this exists: the original skill used classic-Outlook COM automation. Machines running **New Outlook (`olk.exe`) have no COM/MAPI surface**, and `New-Object -ComObject Outlook.Application` there just launches the classic "Welcome to Outlook" setup wizard. The Graph/MCP path avoids all of that. Prefer this skill; only fall back to COM when a classic Outlook MAPI profile is present **and** MCP is unavailable.
