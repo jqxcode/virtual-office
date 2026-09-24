@@ -306,8 +306,8 @@ FEATURE_BACKLOG_TYPES = {"Feature", "Exception"}
 #     RollingOut (before or after), so it is handled via EXEMPT_ORDER_STATES below rather
 #     than tiered to the bottom.
 TIER_BY_STATE = {"RollingOut": 1, "Active": 2}
-# States exempt from state-order inversion detection: they may legitimately appear
-# anywhere in the in-flight zone, so they neither trigger nor receive an inversion flag.
+# States exempt from relative ordering within the in-flight zone. A separate
+# boundary check still keeps them below Exceptions and above planning items.
 EXEMPT_ORDER_STATES = {"Blocked"}
 AUTO_RANK_STATES = {"RollingOut", "Active"}
 
@@ -834,6 +834,30 @@ def detect_order_inversions(rows):
             running_max = r["tier"]
             running_item = r
     ranked = [r for r in enriched if r["stackRank"] is not None]
+    exception_indexes = [index for index, row in enumerate(ranked) if row["tier"] == 0]
+    planning_indexes = [
+        index for index, row in enumerate(ranked)
+        if row["state"] not in EXEMPT_ORDER_STATES and row["tier"] == 4
+    ]
+    last_exception_index = max(exception_indexes) if exception_indexes else None
+    first_planning_index = min(planning_indexes) if planning_indexes else None
+    for index, row in enumerate(ranked):
+        if row["state"] not in EXEMPT_ORDER_STATES:
+            continue
+        if last_exception_index is not None and index < last_exception_index:
+            exception = ranked[last_exception_index]
+            flagged.append({
+                "id": row["id"], "title": row["title"], "state": row["state"],
+                "tier": row["tier"], "stackRank": row["stackRank"], "owner": row["owner"],
+                "below": "must follow #{0} (Exception)".format(exception["id"]),
+            })
+        elif first_planning_index is not None and index > first_planning_index:
+            planning = ranked[first_planning_index]
+            flagged.append({
+                "id": row["id"], "title": row["title"], "state": row["state"],
+                "tier": row["tier"], "stackRank": row["stackRank"], "owner": row["owner"],
+                "below": "#{0} ({1})".format(planning["id"], planning["state"]),
+            })
     reorderable = sorted(
         (r for r in ranked if r["state"] not in EXEMPT_ORDER_STATES),
         key=lambda x: (x["tier"], x["stackRank"]),
@@ -843,6 +867,32 @@ def detect_order_inversions(rows):
         r if r["state"] in EXEMPT_ORDER_STATES else next(reorderable_iter)
         for r in ranked
     ]
+    for blocked in [
+            row for row in list(suggested_rows)
+            if row["state"] in EXEMPT_ORDER_STATES]:
+        index = suggested_rows.index(blocked)
+        last_exception_index = max(
+            (i for i, row in enumerate(suggested_rows) if row["tier"] == 0),
+            default=None,
+        )
+        first_planning_index = min(
+            (i for i, row in enumerate(suggested_rows)
+             if row["state"] not in EXEMPT_ORDER_STATES and row["tier"] == 4),
+            default=None,
+        )
+        if last_exception_index is not None and index < last_exception_index:
+            suggested_rows.pop(index)
+            last_exception_index = max(
+                i for i, row in enumerate(suggested_rows) if row["tier"] == 0
+            )
+            suggested_rows.insert(last_exception_index + 1, blocked)
+        elif first_planning_index is not None and index > first_planning_index:
+            suggested_rows.pop(index)
+            first_planning_index = min(
+                i for i, row in enumerate(suggested_rows)
+                if row["state"] not in EXEMPT_ORDER_STATES and row["tier"] == 4
+            )
+            suggested_rows.insert(first_planning_index, blocked)
     suggested = [
         {"id": r["id"], "title": r["title"], "state": r["state"],
          "tier": r["tier"], "stackRank": r["stackRank"]}
@@ -855,17 +905,74 @@ def _rank_move_for_violation(rows, wid):
     # type: (List[Dict[str, Any]], int) -> Optional[Dict[str, int]]
     """Return the minimal neighbor move that restores one in-flight item.
 
-    Only RollingOut/Active items are eligible. The item is inserted immediately
-    before the first ranked, non-exempt item with a lower business priority.
+    WorkItemType Exception and RollingOut/Active items are eligible. The item
+    is inserted immediately before the first ranked, non-exempt item with a
+    lower business priority.
     """
     ranked = sorted(
         (row for row in rows if row.get("stackRank") is not None),
         key=lambda row: row["stackRank"],
     )
     item = next((row for row in ranked if row.get("id") == wid), None)
-    if not item or item.get("state") not in AUTO_RANK_STATES:
+    if not item:
         return None
     item_tier = _tier_for(item.get("state", ""), item.get("tags", ""), item.get("type"))
+    if item.get("type") in EXCEPTION_TYPES:
+        item_index = ranked.index(item)
+        target_index = next((
+            index for index, row in enumerate(ranked[:item_index])
+            if _tier_for(
+                row.get("state", ""), row.get("tags", ""), row.get("type")
+            ) > 0
+        ), None)
+        if target_index is None:
+            return None
+        preceding = [row for row in ranked[:target_index] if row.get("id") != wid]
+        return {
+            "previousId": preceding[-1]["id"] if preceding else 0,
+            "nextId": ranked[target_index]["id"],
+        }
+    if item.get("state") in EXEMPT_ORDER_STATES:
+        item_index = ranked.index(item)
+        exception_indexes = [
+            index for index, row in enumerate(ranked)
+            if _tier_for(row.get("state", ""), row.get("tags", ""), row.get("type")) == 0
+        ]
+        planning_indexes = [
+            index for index, row in enumerate(ranked)
+            if row.get("state") not in EXEMPT_ORDER_STATES
+            and _tier_for(row.get("state", ""), row.get("tags", ""), row.get("type")) == 4
+        ]
+        if exception_indexes and item_index < max(exception_indexes):
+            without_item = [row for row in ranked if row.get("id") != wid]
+            last_exception_index = max(
+                index for index, row in enumerate(without_item)
+                if _tier_for(
+                    row.get("state", ""), row.get("tags", ""), row.get("type")
+                ) == 0
+            )
+            return {
+                "previousId": without_item[last_exception_index]["id"],
+                "nextId": (
+                    without_item[last_exception_index + 1]["id"]
+                    if last_exception_index + 1 < len(without_item) else 0
+                ),
+            }
+        if planning_indexes and item_index > min(planning_indexes):
+            target_index = min(planning_indexes)
+            preceding = [row for row in ranked[:target_index] if row.get("id") != wid]
+            return {
+                "previousId": preceding[-1]["id"] if preceding else 0,
+                "nextId": ranked[target_index]["id"],
+            }
+        return None
+    if item_tier == 0:
+        # A normal Feature classified as an Exception only by tag is report-only.
+        return None
+    if (
+        item.get("state") not in AUTO_RANK_STATES
+    ):
+        return None
     item_index = ranked.index(item)
     target_index = next((
         index for index, row in enumerate(ranked[:item_index])
@@ -2645,7 +2752,7 @@ def _build_check20_section(res):
     return _section_html(
         "Check 20: Features Backlog State-Order Violations",
         "{0} out of order".format(len(items)),
-        "Madhu requirement (6/29 EM Sync): Feature/Exception items on the Features backlog should be ordered as exceptions &gt; RollingOut / Active &gt; plan/backlog (Proposed/New). Blocked is exempt; items without StackRank are skipped. Eligible RollingOut/Active inversions are moved one at a time using the backlog reorder API and verified.",
+        "Madhu requirement (6/29 EM Sync): Feature/Exception items on the Features backlog should be ordered as exceptions &gt; in-flight (RollingOut / Active / Blocked) &gt; plan/backlog (Proposed/New). Blocked may sit anywhere inside the in-flight zone. Eligible ranking-only inversions are moved one at a time using the backlog reorder API and verified.",
         ["ID", "Title", "State", "Tier", "StackRank", "Owner", "Sits Below", "Action"],
         rows,
         _query_link(ids, "Open all {0} items in ADO query".format(len(items))),

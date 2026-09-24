@@ -469,6 +469,63 @@ class TestFeatureBacklogScope(unittest.TestCase):
             {"previousId": 1, "nextId": 2},
         )
 
+    def test_rank_move_places_exception_at_top(self):
+        rows = [
+            {"id": 2, "state": "RollingOut", "type": "Feature", "tags": "", "stackRank": 100},
+            {"id": 1, "state": "Open", "type": "Exception", "tags": "", "stackRank": 900},
+        ]
+        self.assertEqual(
+            shc._rank_move_for_violation(rows, 1),
+            {"previousId": 0, "nextId": 2},
+        )
+
+    def test_rank_move_places_exception_above_blocked(self):
+        rows = [
+            {"id": 3, "state": "Blocked", "type": "Feature", "tags": "", "stackRank": 100},
+            {"id": 2, "state": "Active", "type": "Feature", "tags": "", "stackRank": 200},
+            {"id": 1, "state": "Open", "type": "Exception", "tags": "", "stackRank": 300},
+        ]
+        self.assertEqual(
+            shc._rank_move_for_violation(rows, 1),
+            {"previousId": 0, "nextId": 3},
+        )
+
+    def test_rank_move_does_not_auto_move_tag_only_exception(self):
+        rows = [
+            {"id": 2, "state": "RollingOut", "type": "Feature", "tags": "", "stackRank": 100},
+            {"id": 1, "state": "Proposed", "type": "Feature", "tags": "exception", "stackRank": 900},
+        ]
+        self.assertIsNone(shc._rank_move_for_violation(rows, 1))
+
+    def test_rank_move_does_not_auto_move_active_tag_only_exception(self):
+        rows = [
+            {"id": 2, "state": "RollingOut", "type": "Feature", "tags": "", "stackRank": 100},
+            {"id": 1, "state": "Active", "type": "Feature", "tags": "exception", "stackRank": 900},
+        ]
+        self.assertIsNone(shc._rank_move_for_violation(rows, 1))
+
+    def test_rank_move_places_blocked_before_planning(self):
+        rows = [
+            {"id": 1, "state": "Active", "type": "Feature", "tags": "", "stackRank": 100},
+            {"id": 2, "state": "Proposed", "type": "Feature", "tags": "", "stackRank": 200},
+            {"id": 3, "state": "Blocked", "type": "Feature", "tags": "", "stackRank": 300},
+        ]
+        self.assertEqual(
+            shc._rank_move_for_violation(rows, 3),
+            {"previousId": 1, "nextId": 2},
+        )
+
+    def test_rank_move_places_blocked_after_exception(self):
+        rows = [
+            {"id": 3, "state": "Blocked", "type": "Feature", "tags": "", "stackRank": 100},
+            {"id": 1, "state": "Open", "type": "Exception", "tags": "", "stackRank": 200},
+            {"id": 2, "state": "RollingOut", "type": "Feature", "tags": "", "stackRank": 300},
+        ]
+        self.assertEqual(
+            shc._rank_move_for_violation(rows, 3),
+            {"previousId": 1, "nextId": 2},
+        )
+
     def test_rank_move_does_not_move_planning_items(self):
         rows = [
             {"id": 1, "state": "Proposed", "type": "Feature", "tags": "", "stackRank": 100},
@@ -578,16 +635,16 @@ class TestDetectOrderInversions(unittest.TestCase):
         self.assertIn("#10", flagged[0]["below"])
         self.assertEqual([r["id"] for r in suggested], [11, 10])
 
-    def test_blocked_is_exempt(self):
-        # Corrected 2026-07-28: Blocked is an in-flight state that may sit anywhere between
-        # Active and RollingOut (before or after), so it never flags nor is a reference.
+    def test_blocked_is_flexible_inside_inflight_zone(self):
+        # Blocked can sit on either side of RollingOut/Active when no Exception or
+        # planning item places it outside the in-flight zone.
         rows = [
             {"id": 1, "state": "Blocked", "tags": "", "owner": "a", "stackRank": 50},
             {"id": 2, "state": "RollingOut", "tags": "", "owner": "b", "stackRank": 100},
             {"id": 3, "state": "Active", "tags": "", "owner": "c", "stackRank": 200},
         ]
         flagged, suggested = shc.detect_order_inversions(rows)
-        self.assertEqual(flagged, [])  # Blocked on top must NOT invert the RollingOut/Active below it
+        self.assertEqual(flagged, [])
         self.assertEqual([r["id"] for r in suggested], [1, 2, 3])
 
     def test_blocked_at_bottom_not_flagged(self):
@@ -600,15 +657,25 @@ class TestDetectOrderInversions(unittest.TestCase):
         self.assertEqual(flagged, [])
         self.assertEqual([r["id"] for r in suggested], [1, 2, 3])
 
-    def test_suggested_order_preserves_blocked_position(self):
+    def test_blocked_below_planning_is_flagged_and_suggested_into_zone(self):
         rows = [
             {"id": 1, "state": "Proposed", "tags": "", "owner": "a", "stackRank": 100},
             {"id": 2, "state": "Blocked", "tags": "", "owner": "b", "stackRank": 200},
             {"id": 3, "state": "RollingOut", "tags": "", "owner": "c", "stackRank": 300},
         ]
         flagged, suggested = shc.detect_order_inversions(rows)
-        self.assertEqual([r["id"] for r in flagged], [3])
+        self.assertEqual([r["id"] for r in flagged], [3, 2])
         self.assertEqual([r["id"] for r in suggested], [3, 2, 1])
+
+    def test_blocked_above_exception_is_flagged_and_suggested_after_exception(self):
+        rows = [
+            {"id": 1, "state": "Blocked", "type": "Feature", "tags": "", "owner": "a", "stackRank": 100},
+            {"id": 2, "state": "Open", "type": "Exception", "tags": "", "owner": "b", "stackRank": 200},
+            {"id": 3, "state": "Active", "type": "Feature", "tags": "", "owner": "c", "stackRank": 300},
+        ]
+        flagged, suggested = shc.detect_order_inversions(rows)
+        self.assertEqual([r["id"] for r in flagged], [1])
+        self.assertEqual([r["id"] for r in suggested], [2, 1, 3])
 
     def test_exception_tier_on_top(self):
         rows = [

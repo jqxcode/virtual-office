@@ -569,13 +569,13 @@ Check 16 & 19: deferred, not implemented this iteration.
 
 **Source: Madhu requirement (2026-06-29 EM Sync).**
 
-**Goal**: Enforce Madhu's Features backlog stack order for `Feature`/`Exception` items (top→bottom): exceptions → `RollingOut` / `Active` → plan/backlog (`Proposed`/`New`). `Blocked` is an in-flight state that may sit anywhere in the RollingOut/Active zone (before or after) and is **exempt** from inversion detection. (Corrected 2026-07-28 per EM feedback.)
+**Goal**: Enforce Madhu's Features backlog stack order for `Feature`/`Exception` items (top→bottom): exceptions → in-flight (`RollingOut` / `Active` / `Blocked`) → plan/backlog (`Proposed`/`New`). `Blocked` may sit anywhere relative to RollingOut and Active, but it must remain below all Exceptions and above all planning items.
 
-**Action policy: MINIMAL AUTO-FIX for ranking-only inversions.** Only `RollingOut`/`Active` items that are currently below a lower-priority state may be moved. Move one item at a time through the team backlog reorder API, between explicit neighboring IDs; never bulk-rewrite StackRank values. Re-query immediately before each move, respect dry-run and the mutation cap, audit the before/after rank and neighbors, then re-query to verify the violation is gone. Exception misplacement, `Blocked`, unranked items, ambiguous hierarchy, or any non-ranking issue remains report-only.
+**Action policy: MINIMAL AUTO-FIX for ranking-only inversions.** Work items whose actual type is `Exception`, plus `RollingOut`, `Active`, and out-of-zone `Blocked` items, may be moved. Move one item at a time through the team backlog reorder API, between explicit neighboring IDs; never bulk-rewrite StackRank values. Re-query immediately before each move, respect dry-run and the mutation cap, audit the before/after rank and neighbors, then re-query to verify the violation is gone. A normal Feature carrying only an `exception` tag, unranked items, ambiguous hierarchy, or any non-ranking issue remains report-only.
 
 **Field mapping**: Backlog node = `MSTeams\Backlog`. StackRank field = `Microsoft.VSTS.Common.StackRank` (ascending = top of backlog).
 
-**Tier map**: `{exception:0, RollingOut:1, Active:2, Proposed/New/backlog:4}`. `Blocked` is **EXEMPT** — it is never flagged and never used as a running-max reference, because an in-flight Blocked Feature may legitimately sit anywhere between Active and RollingOut (before or after). **`Committed` is NOT a lifecycle state** — it is a funding value (`Custom.CommittedTargettedCut`: Committed / not-committed / looking...), a separate dimension, so it is intentionally absent from the tier map (no work item has `State='Committed'`). The exception tier is detected primarily by **work-item TYPE == `Exception`** (the Features backlog board interleaves `Exception` items with `Feature` items, ordered by StackRank), with a `System.Tags` substring match on `exception` kept as a fallback. If exception detection cannot be resolved, degrade gracefully to the state tiers and note "exception tier skipped".
+**Tier map**: `{exception:0, RollingOut:1, Active:2, Proposed/New/backlog:4}`. `Blocked` has no fixed tier relative to RollingOut/Active: it is ignored by their running-max comparison, then separately checked against the in-flight zone boundaries (after the last Exception and before the first planning item). **`Committed` is NOT a lifecycle state** — it is a funding value (`Custom.CommittedTargettedCut`: Committed / not-committed / looking...), a separate dimension, so it is intentionally absent from the tier map (no work item has `State='Committed'`). The exception tier is detected primarily by **work-item TYPE == `Exception`** (the Features backlog board interleaves `Exception` items with `Feature` items, ordered by StackRank), with a `System.Tags` substring match on `exception` kept as a fallback. If exception detection cannot be resolved, degrade gracefully to the state tiers and note "exception tier skipped".
 
 1. Execute the fixed ADO Shared Query `Shared Queries/CMD/Meeting Join/Shiproom Hygiene/Check 20 - Features Backlog State-Order Candidates` (query ID `e52188a5-b262-4984-8175-4c185e06f831`). Its WIQL MUST include the area filter and MUST NOT include an iteration filter:
    ```
@@ -588,12 +588,12 @@ Check 16 & 19: deferred, not implemented this iteration.
    ```
 2. Re-check that every retrieved item has work-item type `Feature` or `Exception`; discard Task, Bug, User Story, Epic, and any other lower-level type before ordering.
 3. Walk the StackRank-ordered list top→bottom:
-   a. Compute each item's tier. **Skip `Blocked` items entirely** (exempt: not flagged, not a reference).
+   a. Compute each item's tier. Ignore `Blocked` for relative RollingOut/Active comparisons, then verify each Blocked item is below all Exceptions and above all planning items.
    b. Track `running_max_tier`.
    c. Any non-exempt item with `tier < running_max_tier` is an inversion because it sits below a higher-priority-state item; flag it.
 4. Emit flagged inversions: ID, Title, State, StackRank, tier, AreaPath, and the preceding higher-priority-state context.
-5. Emit a "suggested correct order": reorder ranked, non-exempt items by `(tier, current StackRank)`, preserve each `Blocked` item's current position, and omit unranked items.
-6. For each eligible `RollingOut`/`Active` inversion, move it immediately before the first ranked, non-exempt lower-priority item. Results include the action (`reranked`, `would-rerank`, verification failure, or report-only).
+5. Emit a "suggested correct order": reorder ranked non-Blocked items by `(tier, current StackRank)`, retain valid Blocked positions, move out-of-zone Blocked items to the nearest in-flight boundary, and omit unranked items.
+6. For each eligible `Exception`/`RollingOut`/`Active` inversion or out-of-zone `Blocked` item, move it to the nearest valid boundary. Results include the action (`reranked`, `would-rerank`, verification failure, or report-only).
 
 ---
 
