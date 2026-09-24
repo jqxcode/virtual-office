@@ -1997,7 +1997,7 @@ body {
   border: 1px solid #30363d;
   border-radius: 10px;
   border-left: 4px solid #30363d;
-  padding: 1rem 1.15rem;
+  padding: 0.85rem 0.9rem;
   transition: box-shadow 0.2s, border-color 0.2s;
   position: relative;
   min-width: 0;
@@ -2070,27 +2070,27 @@ body {
 
 .team-agent-card .team-skills-table th:nth-child(1),
 .team-agent-card .team-skills-table td:nth-child(1) {
-  width: 16%;
+  width: 12%;
 }
 
 .team-agent-card .team-skills-table th:nth-child(2),
 .team-agent-card .team-skills-table td:nth-child(2) {
-  width: 26%;
+  width: 28%;
 }
 
 .team-agent-card .team-skills-table th:nth-child(3),
 .team-agent-card .team-skills-table td:nth-child(3) {
-  width: 25%;
+  width: 20%;
 }
 
 .team-agent-card .team-skills-table th:nth-child(4),
 .team-agent-card .team-skills-table td:nth-child(4) {
-  width: 33%;
+  width: 40%;
 }
 
 .team-skills-table th {
   text-align: left;
-  padding: 0.3rem 0.5rem;
+  padding: 0.25rem 0.3rem;
   font-size: 0.65rem;
   font-weight: 500;
   text-transform: uppercase;
@@ -2101,9 +2101,10 @@ body {
 }
 
 .team-skills-table td {
-  padding: 0.3rem 0.5rem;
+  padding: 0.25rem 0.3rem;
   border-bottom: 1px solid #21262d;
   color: #e6edf3;
+  vertical-align: top;
 }
 
 .team-skills-table tr:nth-child(even) td {
@@ -2119,11 +2120,12 @@ body {
   cursor: pointer;
   position: relative;
   transition: color 0.15s;
-  display: inline-block;
+  display: inline;
   max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow: visible;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
   vertical-align: bottom;
 }
 
@@ -2165,10 +2167,11 @@ body {
 .team-skill-desc {
   font-size: 0.72rem;
   color: #8b949e;
-  max-width: 300px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  max-width: none;
+  overflow: visible;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .team-card-footer {
@@ -2210,9 +2213,8 @@ body {
 
 .team-hooks-card .team-skill-desc {
   max-width: none;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow: visible;
+  white-space: normal;
 }
 
 .team-hooks-type {

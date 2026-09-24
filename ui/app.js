@@ -314,34 +314,80 @@ function parseActivityTime(timestamp) {
   return isNaN(t) ? 0 : t;
 }
 
-function getAgentActivityTime(agentData) {
-  if (!agentData) return 0;
-  var latest = 0;
-  function include(timestamp) {
+function getLatestAgentActivity(agentData, eventActivity) {
+  var latest = { time: 0, timestamp: null, label: "" };
+  function include(timestamp, label) {
     var t = parseActivityTime(timestamp);
-    if (t > latest) latest = t;
+    if (t > latest.time) {
+      latest = { time: t, timestamp: timestamp, label: label || "updated" };
+    }
   }
-  include(agentData.updated);
-  include(agentData.last_completed);
-  include(agentData.lastError);
-  (agentData.jobs || []).forEach(function(job) {
-    include(job.updated);
-    include(job.started);
-    include(job.lastCompleted);
-    include(job.lastOutputTime);
+  function includeError(lastError) {
+    if (!lastError) return;
+    if (typeof lastError === "string") {
+      include(lastError, "error");
+      return;
+    }
+    if (typeof lastError === "object") {
+      include(lastError.timestamp || lastError.time || lastError.updated || lastError.created_at, "error");
+    }
+  }
+
+  if (agentData) {
+    include(agentData.updated, "updated");
+    include(agentData.last_completed, "completed");
+    include(agentData.lastCompleted, "completed");
+    include(agentData.lastOutputTime || agentData.last_output_time, "report");
+    includeError(agentData.lastError);
+  }
+  ((agentData && agentData.jobs) || []).forEach(function(job) {
+    include(job.updated, "updated");
+    include(job.started, job.status === "running" ? "started" : "activity");
+    include(job.lastCompleted || job.last_completed, "completed");
+    include(job.lastOutputTime || job.last_output_time, "report");
   });
+  if (eventActivity) {
+    include(eventActivity.timestamp, eventActivity.label || "event");
+  }
   return latest;
 }
 
-function sortAgentNamesByRecentActivity(agentNames, mergedAgents) {
+function getAgentActivityTime(agentData, eventActivity) {
+  return getLatestAgentActivity(agentData, eventActivity).time;
+}
+
+function sortAgentNamesByRecentActivity(agentNames, mergedAgents, eventActivityByAgent) {
   var originalOrder = {};
   agentNames.forEach(function(name, index) { originalOrder[name] = index; });
   return agentNames.slice().sort(function(a, b) {
-    var at = getAgentActivityTime(mergedAgents[a]);
-    var bt = getAgentActivityTime(mergedAgents[b]);
+    var at = getAgentActivityTime(mergedAgents[a], eventActivityByAgent && eventActivityByAgent[a]);
+    var bt = getAgentActivityTime(mergedAgents[b], eventActivityByAgent && eventActivityByAgent[b]);
+    if (at === 0 && bt > 0) return 1;
+    if (at > 0 && bt === 0) return -1;
     if (at !== bt) return bt - at;
     return originalOrder[a] - originalOrder[b];
   });
+}
+
+function getEventActivityByAgent(events) {
+  var byAgent = {};
+  if (!Array.isArray(events)) return byAgent;
+  events.forEach(function(evt) {
+    var rawAgent = evt.agent;
+    if (!rawAgent) return;
+    var timestamp = evt.timestamp || evt.ts || evt.time;
+    var t = parseActivityTime(timestamp);
+    if (t === 0) return;
+    var agent = canonicalAgentName(rawAgent);
+    if (!byAgent[agent] || t > byAgent[agent].time) {
+      byAgent[agent] = {
+        time: t,
+        timestamp: timestamp,
+        label: evt.event || evt.type || "event"
+      };
+    }
+  });
+  return byAgent;
 }
 
 // --- Click-to-copy helper ---
@@ -3166,6 +3212,16 @@ function formatRelativeTime(timestamp) {
   if (diff < 86400) return "done " + Math.floor(diff / 3600) + "h ago";
   return "done " + Math.floor(diff / 86400) + "d ago";
 }
+function formatOfficeActivity(activity) {
+  if (!activity || !activity.timestamp) return "";
+  var label = "Last active";
+  if (activity.label === "completed") label = "Last completed";
+  else if (activity.label === "failed") label = "Last failed";
+  else if (activity.label === "started") label = "Started";
+  else if (activity.label === "report") label = "Last report";
+  else if (activity.label === "error") label = "Last error";
+  return label + ": " + formatTimeAgo(activity.timestamp);
+}
 function getRobotSvg(state, color) {
   // Vivid robot scenes: working (at desk with monitor), idle (coffee break), sleeping (in bed)
   var c = color || "#8b949e";
@@ -3321,6 +3377,7 @@ function renderOfficeTab() {
   var schedules = (scheduleData && scheduleData.schedules) ? scheduleData.schedules : [];
   var agentHasSchedule = {};
   schedules.forEach(function(s) { agentHasSchedule[s.agent] = true; });
+  var eventActivityByAgent = getEventActivityByAgent(latestEvents);
   var agentNames = Object.keys(config.agents);
   var floorEl = document.getElementById("office-floor"); if (!floorEl) return;
   floorEl.innerHTML = "";
@@ -3337,7 +3394,7 @@ function renderOfficeTab() {
   groupOrder.forEach(function(groupName) {
     var members = groups[groupName];
     if (!members || members.length === 0) return;
-    members = sortAgentNamesByRecentActivity(members, merged);
+    members = sortAgentNamesByRecentActivity(members, merged, eventActivityByAgent);
     var header = document.createElement("div"); header.className = "office-group-header";
     header.textContent = groupName; floorEl.appendChild(header);
     var grid = document.createElement("div"); grid.className = "office-group-grid";
@@ -3345,6 +3402,7 @@ function renderOfficeTab() {
     members.forEach(function(name) {
       var _floorTarget = grid;
     var agentCfg = config.agents[name], agentData = merged[name] || {};
+    var latestActivity = getLatestAgentActivity(agentData, eventActivityByAgent[name]);
     var color = getAgentColor(name), status = getAgentStatus(agentData), hasSchedule = agentHasSchedule[name];
     var desk = document.createElement("div"); desk.className = "office-desk"; desk.style.borderLeftColor = color;
     var deskStatus, statusDotClass, statusText;
@@ -3367,7 +3425,10 @@ function renderOfficeTab() {
       var st = null; (agentData.jobs || []).forEach(function(j) { if (j.status === "running" && j.started) st = j.started; });
       if (st) { ed.dataset.startedAt = st; var el = Math.max(0, Math.floor((Date.now() - new Date(st).getTime()) / 1000)); ed.textContent = Math.floor(el / 60) + ":" + (el % 60 < 10 ? "0" : "") + (el % 60); }
       else { ed.textContent = "--:--"; } desk.appendChild(ed);
-    } else if (deskStatus === "sleeping") { jd.textContent = "manual only"; desk.appendChild(jd); }
+    } else if (deskStatus === "sleeping") {
+      jd.textContent = latestActivity.time > 0 ? formatOfficeActivity(latestActivity) : "no activity yet";
+      desk.appendChild(jd);
+    }
     else {
       var ljn = "", ljt = null, ljr = null;
       (agentData.jobs || []).forEach(function(j) {
@@ -3379,7 +3440,10 @@ function renderOfficeTab() {
         var is = document.createElement("span"); is.className = ljr === "success" ? "success" : "failure";
         is.textContent = ljr === "success" ? "\u2713 " : "\u2717 "; rd.appendChild(is);
         rd.appendChild(document.createTextNode(formatRelativeTime(ljt))); desk.appendChild(rd);
-      } else { jd.textContent = "no runs yet"; desk.appendChild(jd); }
+      } else {
+        jd.textContent = latestActivity.time > 0 ? formatOfficeActivity(latestActivity) : "no runs yet";
+        desk.appendChild(jd);
+      }
     }
     // Context budget badge from lastCost data
     var costInfo = getLastCostForAgent(name, lastDashboard);
