@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import importlib.util
 import json
 import os
@@ -17,14 +18,31 @@ from unittest import mock
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 GENERATOR = Path(
-    r"C:\Users\qitxu\.copilot\session-state"
-    r"\244f18cc-6067-434f-a320-412ada5fc3bd\files"
-    r"\generate_unread_triage.py"
+    os.environ.get(
+        "EMAIL_TRIAGE_GENERATOR",
+        r"C:\Users\qitxu\.copilot\session-state"
+        r"\244f18cc-6067-434f-a320-412ada5fc3bd\files"
+        r"\generate_unread_triage.py",
+    )
 )
-THREAD_PREPARER = GENERATOR.with_name("prepare_thread_summary_input.py")
+THREAD_PREPARER = Path(
+    os.environ.get(
+        "EMAIL_TRIAGE_THREAD_PREPARER",
+        str(GENERATOR.with_name("prepare_thread_summary_input.py")),
+    )
+)
 SERVER = Path(
-    r"C:\Users\qitxu\OneDrive - Microsoft\2-AI\email-triage"
-    r"\email-triage-server.py"
+    os.environ.get(
+        "EMAIL_TRIAGE_SERVER",
+        r"C:\Users\qitxu\OneDrive - Microsoft\2-AI\email-triage"
+        r"\email-triage-server.py",
+    )
+)
+PEMAILER_AGENT = Path(
+    os.environ.get(
+        "PEMAILER_AGENT_FILE",
+        r"C:\Users\qitxu\.copilot\agents\pemailer.agent.md",
+    )
 )
 STATE_DIR = REPO_ROOT / "state" / "email-triage"
 
@@ -51,12 +69,31 @@ EXTERNAL_PORTAL_ASSETS_AVAILABLE = all(
 GEN = load_generator() if EXTERNAL_PORTAL_ASSETS_AVAILABLE else None
 
 
-def load_server():
+def load_server(**environment):
     spec = importlib.util.spec_from_file_location("email_triage_server", SERVER)
     module = importlib.util.module_from_spec(spec)
     assert spec.loader
-    spec.loader.exec_module(module)
+    with mock.patch.dict(os.environ, environment, clear=False):
+        spec.loader.exec_module(module)
     return module
+
+
+@contextlib.contextmanager
+def run_isolated_server(server, root):
+    server.STATE_DIR = root
+    server.STATE_FILE = root / "server-state.json"
+    server.CLICK_EVENTS = root / "owa-clicks.jsonl"
+    server.REPORT = root / "report.html"
+    server.REPORT.write_text("<!doctype html><title>fixture</title>", encoding="utf-8")
+    httpd = server.ThreadingHTTPServer(("127.0.0.1", 0), server.Handler)
+    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield f"http://127.0.0.1:{httpd.server_address[1]}"
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+        thread.join(timeout=5)
 
 BOFA_EXPECTED_SUMMARY = {
     "currentStatus": "最新 BofA 测试显示，禁用后 CAPTCHA 仍然处于启用状态。",
@@ -211,8 +248,12 @@ def synthetic_messages():
 class TestMeetingNoiseClassifier(unittest.TestCase):
     def test_canonical_noise_cases_and_quoted_history_limit(self):
         positives = [
+            {"@odata.type": "#microsoft.graph.eventMessageRequest"},
+            {"@odata.type": "#microsoft.graph.eventMessageUpdate"},
             {"@odata.type": "#microsoft.graph.eventMessageResponse"},
+            {"@odata.type": "#microsoft.graph.eventMessageCancellation"},
             {"subject": "Canceled: Customer sync"},
+            {"subject": "Cancelled: Customer sync"},
             {"subject": "Meeting Forward Notification: Customer sync"},
             {"subject": "Automatic reply: Bot Protection Shiproom"},
             {
@@ -391,6 +432,43 @@ class TestThreadClassification(unittest.TestCase):
         ])
         self.assertEqual(categorized["bulk_low"], [])
 
+    def test_known_action_wording_is_not_missed(self):
+        fixtures = [
+            ("Action requested: update ownership", "Please update the owner."),
+            ("Citizenship resubmit", "Please resubmit the citizenship evidence."),
+            ("BAMI pending approval", "The BAMI request is pending your approval."),
+            ("AFD submission", "Complete the AFD submission by Friday."),
+        ]
+        for index, (subject, preview) in enumerate(fixtures):
+            with self.subTest(subject=subject):
+                fixture = message(
+                    f"action-{index}",
+                    subject,
+                    preview,
+                    "2026-09-24T21:00:00Z",
+                )
+                self.assertEqual(GEN.classify_semantic(fixture), "action")
+
+    def test_direct_to_me_is_not_a_category_and_action_reply_take_precedence(self):
+        self.assertNotIn("direct", GEN.CATEGORIES)
+        direct_action = message(
+            "direct-action",
+            "Action requested: submit AFD forecast",
+            "Please complete the submission.",
+            "2026-09-24T21:00:00Z",
+            to=[("Josh Xu", "josh.xu@microsoft.com")],
+        )
+        direct_reply = message(
+            "direct-reply",
+            "Review needed",
+            "@Josh, please review and reply.",
+            "2026-09-24T21:01:00Z",
+            to=[("Josh Xu", "josh.xu@microsoft.com")],
+        )
+        categorized, _ = GEN.categorize_threads([direct_action, direct_reply])
+        self.assertEqual(len(categorized["action"]), 1)
+        self.assertEqual(len(categorized["reply_required"]), 1)
+
     def test_duplicate_thread_invariant_rejects_split_categories(self):
         record = {"key": "same-thread", "messages": []}
         categorized = {key: [] for key in GEN.CATEGORIES}
@@ -437,6 +515,12 @@ class TestStructuredSummaryPipeline(unittest.TestCase):
         self.assertIn("owa-clicks.jsonl", prompt)
         self.assertIn("--thread-summaries", prompt)
         self.assertIn("thread-summary-prompt.md", prompt)
+        self.assertIn("The FIRST workiq-fetch call MUST contain both entityUrls", prompt)
+        self.assertIn("/me/mailFolders/inbox?$select=totalItemCount,unreadItemCount", prompt)
+        self.assertIn("/me/mailFolders/inbox/messages?$select=id,subject,from", prompt)
+        self.assertIn("Treat a 404 as already absent", prompt)
+        self.assertIn("fetch the newest", prompt)
+        self.assertIn("$select=id,subject,body,bodyPreview,receivedDateTime", prompt)
 
     def test_cli_pipeline_generates_verified_fixture_html(self):
         STATE_DIR.mkdir(parents=True, exist_ok=True)
@@ -618,6 +702,20 @@ class TestStructuredSummaryPipeline(unittest.TestCase):
             self.assertIn('id="category-reply_required"', html)
             self.assertIn('id="category-bulk_low"', html)
             self.assertIn('class="single-message-thread"', html)
+            self.assertIn(".category-header { position:sticky; top:86px;", html)
+            self.assertIn("分类 → 同主题线程 → 单封邮件", html)
+            self.assertIn("时间统一显示日期 + 时间", html)
+            self.assertRegex(html, r"\d{4}-\d{2}-\d{2} \d{2}:\d{2} [A-Z]{3,4}")
+            self.assertIn("sessionStorage.getItem('emailTriageCompletion')", html)
+            self.assertIn("sessionStorage.setItem('emailTriageCompletion'", html)
+            self.assertIn("pollStatus();", html)
+            self.assertIn("state.status === 'running' || state.status === 'queued'", html)
+            self.assertNotRegex(
+                html,
+                r'<select class="(?:message-action|category-action|thread-action)"'
+                r'[^>]*>(?:(?!</select>).)*'
+                r'<option value="(?!none)[^"]+" selected>',
+            )
 
             jessie_card = re.search(
                 r'<article class="message"[^>]*data-id="jessie".*?</article>',
@@ -637,6 +735,19 @@ class TestStructuredSummaryPipeline(unittest.TestCase):
     "Personal email-triage portal assets are not installed on this machine.",
 )
 class TestLocalServerApis(unittest.TestCase):
+    def make_root(self, prefix):
+        STATE_DIR.mkdir(parents=True, exist_ok=True)
+        return tempfile.TemporaryDirectory(prefix=prefix, dir=str(STATE_DIR))
+
+    def post_json(self, url, payload):
+        request = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode(),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        return urllib.request.urlopen(request, timeout=5)
+
     def test_open_request_validation_and_safe_helper_invocation(self):
         server = load_server()
         with self.assertRaisesRegex(ValueError, "sender"):
@@ -649,6 +760,14 @@ class TestLocalServerApis(unittest.TestCase):
                     "id": "message-1",
                     "subject": "Exact subject\nInjected",
                     "sender": "sender@example.com",
+                }
+            )
+        with self.assertRaisesRegex(ValueError, "sender email"):
+            server.validate_open_outlook(
+                {
+                    "id": "message-1",
+                    "subject": "Exact subject",
+                    "sender": 'not-an-email" OR subject:any',
                 }
             )
 
@@ -689,21 +808,9 @@ class TestLocalServerApis(unittest.TestCase):
 
     def test_isolated_http_click_tracking_and_invalid_open(self):
         server = load_server()
-        STATE_DIR.mkdir(parents=True, exist_ok=True)
-        with tempfile.TemporaryDirectory(
-            prefix="portal-server-test-", dir=str(STATE_DIR)
-        ) as directory:
+        with self.make_root("portal-server-test-") as directory:
             root = Path(directory)
-            server.STATE_DIR = root
-            server.STATE_FILE = root / "server-state.json"
-            server.CLICK_EVENTS = root / "owa-clicks.jsonl"
-            httpd = server.ThreadingHTTPServer(
-                ("127.0.0.1", 0), server.Handler
-            )
-            thread = threading.Thread(target=httpd.serve_forever, daemon=True)
-            thread.start()
-            base = f"http://127.0.0.1:{httpd.server_address[1]}"
-            try:
+            with run_isolated_server(server, root) as base:
                 invalid = urllib.request.Request(
                     base + "/api/open-outlook",
                     data=json.dumps(
@@ -755,10 +862,202 @@ class TestLocalServerApis(unittest.TestCase):
                 ]
                 self.assertEqual(len(events), 2)
                 self.assertEqual(events[0]["reportSnapshot"], "fixture-v1")
-            finally:
-                httpd.shutdown()
-                httpd.server_close()
-                thread.join(timeout=5)
+
+                invalid_click = dict(payload, linkType="javascript")
+                with self.assertRaises(urllib.error.HTTPError) as raised:
+                    self.post_json(base + "/api/track-click", invalid_click)
+                self.assertEqual(raised.exception.code, 400)
+                self.assertEqual(
+                    len(server.CLICK_EVENTS.read_text(encoding="utf-8").splitlines()),
+                    2,
+                )
+
+    def test_execute_posts_exactly_two_actions_and_conflict_returns_task(self):
+        server = load_server()
+        with self.make_root("portal-execute-test-") as directory:
+            root = Path(directory)
+            worker_called = threading.Event()
+            worker_args = []
+
+            def fake_worker(*args):
+                worker_args.append(args)
+                worker_called.set()
+
+            actions = [
+                {
+                    "id": "message-id-000000000001",
+                    "action": "archive",
+                    "subject": "Other one",
+                    "from": "one@example.com",
+                    "category": "other",
+                },
+                {
+                    "id": "message-id-000000000002",
+                    "action": "mark_read_keep",
+                    "subject": "Other two",
+                    "from": "two@example.com",
+                    "category": "other",
+                },
+            ]
+            with mock.patch.object(server, "run_plan", side_effect=fake_worker):
+                with run_isolated_server(server, root) as base:
+                    with self.post_json(
+                        base + "/api/execute", {"actions": actions}
+                    ) as response:
+                        result = json.load(response)
+                    self.assertEqual(response.status, 202)
+                    self.assertEqual(result["count"], 2)
+                    self.assertTrue(worker_called.wait(5))
+                    plan = json.loads(
+                        Path(result["plan"]).read_text(encoding="utf-8")
+                    )
+                    self.assertEqual(plan["actions"], actions)
+                    self.assertEqual(worker_args[0][3], 2)
+                    self.assertEqual(worker_args[0][6], "mailbox_actions")
+
+                    with self.assertRaises(urllib.error.HTTPError) as raised:
+                        self.post_json(base + "/api/refresh", {})
+                    self.assertEqual(raised.exception.code, 409)
+                    conflict = json.loads(raised.exception.read().decode())
+                    self.assertEqual(conflict["current"]["actionCount"], 2)
+                    self.assertEqual(
+                        conflict["current"]["taskType"], "mailbox_actions"
+                    )
+
+    def test_refresh_is_explicit_zero_action_task(self):
+        server = load_server()
+        with self.make_root("portal-refresh-test-") as directory:
+            root = Path(directory)
+            worker_called = threading.Event()
+            worker_args = []
+
+            def fake_worker(*args):
+                worker_args.append(args)
+                worker_called.set()
+
+            with mock.patch.object(server, "run_plan", side_effect=fake_worker):
+                with run_isolated_server(server, root) as base:
+                    with self.post_json(base + "/api/refresh", {}) as response:
+                        result = json.load(response)
+                    self.assertEqual(response.status, 202)
+                    self.assertEqual(result["taskType"], "refresh")
+                    self.assertTrue(worker_called.wait(5))
+                    plan = json.loads(
+                        Path(result["plan"]).read_text(encoding="utf-8")
+                    )
+                    self.assertEqual(plan, {"actions": []})
+                    self.assertEqual(worker_args[0][3], 0)
+                    self.assertEqual(worker_args[0][6], "refresh")
+                    state = server.read_state()
+                    self.assertEqual(state["actionCount"], 0)
+                    self.assertEqual(state["taskType"], "refresh")
+
+    def test_status_detail_atomic_state_and_workiq_phase_breakdown(self):
+        server = load_server()
+        with self.make_root("portal-state-test-") as directory:
+            root = Path(directory)
+            server.STATE_DIR = root
+            server.STATE_FILE = root / "server-state.json"
+            started = server.now()
+            server.write_state(
+                "running",
+                "fixture",
+                startedAt=started,
+                heartbeatAt=started,
+                actionCount=2,
+                taskType="mailbox_actions",
+                phase="验证结果",
+                mutationCalls=3,
+                fetchCalls=4,
+            )
+            state = server.read_state()
+            for text in (
+                "邮箱操作",
+                "阶段：验证结果",
+                "计划 2 项",
+                "已运行",
+                "WorkIQ 写操作 3 次",
+                "读取刷新 4 次",
+                "最近输出",
+            ):
+                self.assertIn(text, state["detail"])
+            self.assertFalse(server.STATE_FILE.with_suffix(".json.tmp").exists())
+            self.assertEqual(
+                server.infer_phase("workiq-delete_entity", {}),
+                "执行 / 验证邮箱操作",
+            )
+            self.assertEqual(
+                server.infer_phase("workiq-fetch", {}),
+                "读取 / 验证 Inbox",
+            )
+
+    def test_restart_reconciliation_tracks_active_worker_or_report_mtime(self):
+        server = load_server()
+        with self.make_root("portal-recovery-test-") as directory:
+            root = Path(directory)
+            server.STATE_DIR = root
+            server.STATE_FILE = root / "server-state.json"
+            server.REPORT = root / "report.html"
+            server.REPORT.write_text("new report", encoding="utf-8")
+            active = {
+                "status": "running",
+                "workerPid": 1234,
+                "taskType": "refresh",
+            }
+            thread = mock.Mock()
+            with mock.patch.object(
+                server, "process_is_active", return_value=True
+            ), mock.patch.object(
+                server.threading, "Thread", return_value=thread
+            ), mock.patch.object(server, "write_state") as write_state:
+                self.assertEqual(server.reconcile_prior_state(active), "monitoring")
+                thread.start.assert_called_once_with()
+                write_state.assert_not_called()
+
+            finished = {
+                "status": "running",
+                "workerPid": 1234,
+                "taskType": "refresh",
+                "reportMtimeBefore": 0,
+                "mutationCalls": 0,
+                "fetchCalls": 5,
+            }
+            with mock.patch.object(
+                server, "process_is_active", return_value=False
+            ):
+                self.assertEqual(server.reconcile_prior_state(finished), "completed")
+            recovered = server.read_state()
+            self.assertEqual(recovered["status"], "completed")
+            self.assertTrue(recovered["recovered"])
+            self.assertEqual(recovered["fetchCalls"], 5)
+
+            with mock.patch.object(
+                server, "process_is_active", return_value=False
+            ), mock.patch.object(server, "write_state") as write_state:
+                server.monitor_recovered_worker(finished)
+            completed_call = write_state.call_args
+            self.assertEqual(completed_call.args[0], "completed")
+            self.assertEqual(completed_call.kwargs["mutationCalls"], 0)
+            self.assertEqual(completed_call.kwargs["fetchCalls"], 5)
+            self.assertEqual(completed_call.kwargs["taskType"], "refresh")
+
+
+@unittest.skipUnless(
+    PEMAILER_AGENT.exists(),
+    "Personal pEmailer agent source is not installed on this machine.",
+)
+class TestPEmailerAgentSource(unittest.TestCase):
+    def test_frontmatter_has_loadable_name_and_description(self):
+        text = PEMAILER_AGENT.read_text(encoding="utf-8-sig")
+        match = re.match(r"^---\s*\n(.*?)\n---", text, re.S)
+        self.assertIsNotNone(match)
+        fields = {}
+        for line in match.group(1).splitlines():
+            key, separator, value = line.partition(":")
+            if separator:
+                fields[key.strip()] = value.strip()
+        self.assertEqual(fields.get("name", "").casefold(), PEMAILER_AGENT.stem.replace(".agent", "").casefold())
+        self.assertTrue(fields.get("description"))
 
 
 if __name__ == "__main__":

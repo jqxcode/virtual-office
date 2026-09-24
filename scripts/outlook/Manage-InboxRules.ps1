@@ -221,6 +221,19 @@ function Verify-RuleReadback {
     [pscustomobject]$checks
 }
 
+function Test-IsRuleNotFoundError {
+    param([Parameter(Mandatory)]$ErrorRecord)
+
+    $statusCode = $null
+    if ($ErrorRecord.Exception.Response -and
+        $ErrorRecord.Exception.Response.StatusCode) {
+        $statusCode = [int]$ErrorRecord.Exception.Response.StatusCode
+    }
+    $message = [string]$ErrorRecord.Exception.Message
+    return $statusCode -eq 404 -or
+        $message -match '(?i)\b404\b|ErrorItemNotFound|not found'
+}
+
 if ($Operation -eq 'BuildFromEmail') {
     New-RuleFromEmailSpec | ConvertTo-Json -Depth 20
     exit 0
@@ -229,7 +242,12 @@ if ($Operation -eq 'BuildFromEmail') {
 $writeOperation = $Operation -in @(
     'CreateFromEmail', 'Create', 'Update', 'Enable', 'Disable', 'Delete'
 )
-$context = Ensure-GraphConnection -Write:$writeOperation
+$context = if ($writeOperation -and $WhatIfPreference) {
+    $null
+}
+else {
+    Ensure-GraphConnection -Write:$writeOperation
+}
 
 switch ($Operation) {
     'List' {
@@ -248,10 +266,10 @@ switch ($Operation) {
     }
     'CreateFromEmail' {
         $rule = New-RuleFromEmailSpec
-        if ($rule.actions.moveToFolder) {
-            $rule.actions.moveToFolder = Resolve-MailFolderId $rule.actions.moveToFolder
-        }
         if ($PSCmdlet.ShouldProcess($RuleName, 'Create disabled Inbox rule')) {
+            if ($rule.actions.moveToFolder) {
+                $rule.actions.moveToFolder = Resolve-MailFolderId $rule.actions.moveToFolder
+            }
             $created = Invoke-RulesRequest -Method POST -Uri $RulesPath -Body $rule
             Verify-RuleReadback -Id $created.id -Expected $rule
         }
@@ -311,6 +329,9 @@ switch ($Operation) {
             }
             catch {
                 if ($_.Exception.Message -eq 'Rule still exists after DELETE.') {
+                    throw
+                }
+                if (-not (Test-IsRuleNotFoundError $_)) {
                     throw
                 }
             }
