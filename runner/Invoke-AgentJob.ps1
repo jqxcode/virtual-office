@@ -1,4 +1,4 @@
-﻿#Requires -Version 7.0
+#Requires -Version 7.0
 <#
 .SYNOPSIS
     Invokes a Virtual Office agent job.
@@ -396,6 +396,108 @@ function Stop-RunProcessTree {
         }
     }
     return $result
+}
+
+function Wait-CopilotProcess {
+    <#
+    .SYNOPSIS
+        Streams Copilot output and bounds shutdown after its result event.
+    .DESCRIPTION
+        MCP descendants can keep inherited output handles open after Copilot emits
+        its final result. ReadToEnd would then block forever. This function reads
+        stdout line-by-line so it can recognize the result event and terminate a
+        process tree that does not exit within the shutdown grace period.
+    #>
+    param(
+        [Parameter(Mandatory)]
+        [System.Diagnostics.Process]$Process,
+
+        [int]$PostResultShutdownTimeoutSeconds = 30
+    )
+
+    if ($PostResultShutdownTimeoutSeconds -lt 1) {
+        throw "PostResultShutdownTimeoutSeconds must be at least 1."
+    }
+
+    $stdoutLines = New-Object System.Collections.Generic.List[string]
+    $stderrTask = $Process.StandardError.ReadToEndAsync()
+    $lineTask = $Process.StandardOutput.ReadLineAsync()
+    $resultSeenAt = $null
+    $resultExitCode = $null
+    $forcedShutdown = $false
+    $killResult = $null
+
+    while ($true) {
+        if ($lineTask.Wait(250)) {
+            $line = $lineTask.GetAwaiter().GetResult()
+            if ($null -eq $line) {
+                break
+            }
+
+            $stdoutLines.Add($line)
+            $trimmed = $line.Trim()
+            if ($null -eq $resultSeenAt -and $trimmed.StartsWith("{")) {
+                try {
+                    $event = $trimmed | ConvertFrom-Json -AsHashtable
+                    if ($event -is [hashtable] -and $event["type"] -eq "result") {
+                        $resultSeenAt = Get-Date
+                        if ($event.ContainsKey("exitCode")) {
+                            $resultExitCode = [int]$event["exitCode"]
+                        }
+                    }
+                } catch {
+                    # Non-JSON output is preserved and parsed by the caller later.
+                }
+            }
+
+            $lineTask = $Process.StandardOutput.ReadLineAsync()
+            continue
+        }
+
+        if ($null -ne $resultSeenAt -and
+            ((Get-Date) - $resultSeenAt).TotalSeconds -ge $PostResultShutdownTimeoutSeconds) {
+            $forcedShutdown = $true
+            $killResult = Stop-RunProcessTree -RootPid $Process.Id
+            try { $Process.StandardOutput.Dispose() } catch { }
+            try { $Process.StandardError.Dispose() } catch { }
+            break
+        }
+    }
+
+    if ($forcedShutdown) {
+        if (-not $Process.HasExited) {
+            $null = $Process.WaitForExit(5000)
+        }
+    } else {
+        $Process.WaitForExit()
+    }
+
+    $stderr = ""
+    try {
+        if ($stderrTask.Wait(5000)) {
+            $stderr = $stderrTask.GetAwaiter().GetResult()
+        }
+    } catch {
+        if (-not $forcedShutdown) {
+            throw
+        }
+    }
+
+    $exitCode = if ($null -ne $resultExitCode) {
+        $resultExitCode
+    } elseif ($Process.HasExited) {
+        $Process.ExitCode
+    } else {
+        1
+    }
+
+    return @{
+        rawOutput      = $stdoutLines -join [Environment]::NewLine
+        errorOutput    = $stderr
+        exitCode       = $exitCode
+        forcedShutdown = $forcedShutdown
+        killResult     = $killResult
+    }
 }
 
 function Repair-StuckDashboard {
@@ -885,10 +987,27 @@ while ($keepRunning) {
             $lockContent = @{ ts = $lockTs; job = $Job; pid = $proc.Id; run_id = $runId } | ConvertTo-Json -Compress
             Write-AtomicFile -Path $lockFile -Content $lockContent
 
-            $rawOutput = $proc.StandardOutput.ReadToEnd()
-            $errOutput = $proc.StandardError.ReadToEnd()
-            $proc.WaitForExit()
-            $exitCode  = $proc.ExitCode
+            $postResultShutdownTimeoutSeconds = 30
+            $processResult = Wait-CopilotProcess -Process $proc -PostResultShutdownTimeoutSeconds $postResultShutdownTimeoutSeconds
+            $rawOutput = $processResult["rawOutput"]
+            $errOutput = $processResult["errorOutput"]
+            $exitCode = $processResult["exitCode"]
+
+            if ($processResult["forcedShutdown"]) {
+                $killResult = $processResult["killResult"]
+                $shutdownDetails = @{
+                    run_id = $runId
+                    pid = $proc.Id
+                    timeout_seconds = $postResultShutdownTimeoutSeconds
+                    pids_killed = $killResult.pids_killed
+                    zombie_pids = $killResult.zombie_pids
+                    already_gone = $killResult.already_gone
+                    errors = $killResult.errors
+                }
+                Write-Event -AgentName $Agent -JobName $Job -Event "post_result_force_killed" -Details $shutdownDetails
+                Write-AuditEntry -Action "post_result_force_killed" -AgentName $Agent -JobName $Job -RunId $runId -Details $shutdownDetails
+                Write-Host "Copilot emitted its result but did not exit within $postResultShutdownTimeoutSeconds seconds. Process tree shutdown completed for pid=$($proc.Id)."
+            }
         }
 
         # Parse Copilot CLI JSONL output: collect assistant message text + the final result event.

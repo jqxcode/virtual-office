@@ -1,4 +1,4 @@
-﻿#Requires -Version 7.0
+#Requires -Version 7.0
 # Test-HangScout-Kill.ps1 -- Unit tests for TTL-based process-kill enforcement
 # in runner/Invoke-AgentJob.ps1.
 #
@@ -10,7 +10,8 @@
 # These tests cover:
 #   1. Stop-RunProcessTree returns already_gone=true for a dead PID.
 #   2. Stop-RunProcessTree kills a real child process spawned for the test.
-#   3. The stale-lock branch of Invoke-AgentJob.ps1 emits both
+#   3. Wait-CopilotProcess bounds shutdown after a final result event.
+#   4. The stale-lock branch of Invoke-AgentJob.ps1 emits both
 #      kill_initiated and force_killed events with the right run_id / pid.
 #
 # Run: pwsh -File tests/Test-HangScout-Kill.ps1
@@ -111,11 +112,55 @@ catch {
 }
 
 # ========================================
-# TC3: events.jsonl synthesis -- kill_initiated + force_killed land between
+# TC3: A final result event starts a bounded process shutdown grace period
+# ========================================
+Write-Host "`nTC3: Wait-CopilotProcess bounds post-result shutdown" -ForegroundColor Cyan
+$lingerScript = Join-Path $env:TEMP "vo-lingering-result-$PID.ps1"
+try {
+    $lingerSource = @'
+Write-Output '{"type":"assistant.message","data":{"content":"done"}}'
+Write-Output '{"type":"result","exitCode":0,"sessionId":"test-session"}'
+[Console]::Out.Flush()
+Start-Sleep -Seconds 30
+'@
+    Set-Content -Path $lingerScript -Value $lingerSource -Encoding ASCII
+
+    $pinfo = [System.Diagnostics.ProcessStartInfo]::new()
+    $pinfo.FileName = "pwsh"
+    $pinfo.ArgumentList.Add("-NoProfile")
+    $pinfo.ArgumentList.Add("-File")
+    $pinfo.ArgumentList.Add($lingerScript)
+    $pinfo.RedirectStandardOutput = $true
+    $pinfo.RedirectStandardError = $true
+    $pinfo.UseShellExecute = $false
+    $pinfo.CreateNoWindow = $true
+
+    $lingerProcess = [System.Diagnostics.Process]::Start($pinfo)
+    $startedAt = Get-Date
+    $waitResult = Wait-CopilotProcess -Process $lingerProcess -PostResultShutdownTimeoutSeconds 1
+    $elapsed = ((Get-Date) - $startedAt).TotalSeconds
+
+    Assert-True ($waitResult.forcedShutdown -eq $true) "Lingering process is force-killed after result event"
+    Assert-True ($waitResult.exitCode -eq 0) "Result event exit code is preserved"
+    Assert-True ($waitResult.rawOutput -match '"type":"result"') "Result event remains in captured output"
+    Assert-True ($elapsed -lt 10) "Wait returns within the bounded shutdown period"
+    Assert-True ($null -eq (Get-Process -Id $lingerProcess.Id -ErrorAction SilentlyContinue)) "Lingering process is no longer alive"
+}
+catch {
+    Assert-True $false "TC3 threw: $_"
+}
+finally {
+    if (Test-Path $lingerScript) {
+        Remove-Item -Path $lingerScript -Force -ErrorAction SilentlyContinue
+    }
+}
+
+# ========================================
+# TC4: events.jsonl synthesis -- kill_initiated + force_killed land between
 # started and completed for a TTL-exceeding run, and the lock-TTL invariant
 # test (tests/test_lock_ttl_enforcement.py) would consider this run KILLED.
 # ========================================
-Write-Host "`nTC3: synthetic events.jsonl satisfies test_lock_ttl_enforcement" -ForegroundColor Cyan
+Write-Host "`nTC4: synthetic events.jsonl satisfies test_lock_ttl_enforcement" -ForegroundColor Cyan
 try {
     $tmpRoot = Join-Path $env:TEMP "vo-killtest-$PID-$(Get-Random)"
     New-Item -ItemType Directory -Path (Join-Path $tmpRoot "state") -Force | Out-Null
