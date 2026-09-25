@@ -24,6 +24,13 @@ sys.path.insert(0, os.path.join(REPO_ROOT, "runner"))
 import shiproom_hygiene_check as shc  # noqa: E402
 
 
+class DryRunMutationController:
+    dry_run = True
+
+    def plan(self, event):
+        return True
+
+
 # ---------------------------------------------------------------------------
 # validate_wiql_has_area_filter
 # ---------------------------------------------------------------------------
@@ -254,6 +261,45 @@ class TestMutationCap(unittest.TestCase):
         mc.record({"id": 2})
         self.assertFalse(mc.can_patch())
 
+    def test_controlled_comment_plans_audits_and_consumes_cap(self):
+        mc, plan_path, audit_path = self._make_controller(cap=1, dry_run=False)
+        response = {"id": 123}
+
+        with patch.object(shc, "add_comment", return_value=response) as add:
+            action = shc.controlled_comment(
+                42, "Please update this item.", "token", "check4", mc,
+                {"areaPath": shc.AREA_MJ},
+            )
+
+        self.assertEqual(action, "commented")
+        self.assertEqual(mc.count, 1)
+        add.assert_called_once_with(42, "Please update this item.", "token")
+        with open(plan_path, "r", encoding="utf-8") as f:
+            plan = f.read()
+        with open(audit_path, "r", encoding="utf-8") as f:
+            audit = f.read()
+        self.assertIn('"event": "plan_comment"', plan)
+        self.assertIn('"mutationType": "comment"', plan)
+        self.assertIn('"event": "comment"', audit)
+        self.assertIn('"ok": true', audit)
+        self.assertIn('"systemVersion": "{0}"'.format(shc.SYSTEM_VERSION), plan)
+        self.assertIn('"systemVersion": "{0}"'.format(shc.SYSTEM_VERSION), audit)
+
+    def test_controlled_comment_skips_when_cap_is_exhausted(self):
+        mc, plan_path, audit_path = self._make_controller(cap=0, dry_run=False)
+
+        with patch.object(shc, "add_comment") as add:
+            action = shc.controlled_comment(
+                42, "Please update this item.", "token", "check4", mc,
+            )
+
+        self.assertEqual(action, "skipped (cap)")
+        self.assertEqual(mc.count, 0)
+        add.assert_not_called()
+        self.assertFalse(os.path.exists(audit_path))
+        with open(plan_path, "r", encoding="utf-8") as f:
+            self.assertIn('"event": "cap_reached"', f.read())
+
 
 # ---------------------------------------------------------------------------
 # Madhu requirement (2026-06-29 EM Sync) checks: 15, 17, 18, 20
@@ -384,7 +430,9 @@ class TestFeatureBacklogScope(unittest.TestCase):
         items[6]["fields"].pop("Microsoft.VSTS.Scheduling.RemainingWork")
         with patch.object(shc, "wiql_query", return_value=[item["id"] for item in items]), \
                 patch.object(shc, "get_work_items_batch", return_value=items):
-            result = shc.check17("token", [shc.AREA_MJ], True)
+            result = shc.check17(
+                "token", [shc.AREA_MJ], DryRunMutationController(),
+            )
         self.assertEqual([item["id"] for item in result["items"]], [1, 2])
 
     def test_check18_rechecks_type_state_number_and_age(self):
@@ -404,7 +452,10 @@ class TestFeatureBacklogScope(unittest.TestCase):
         ]
         with patch.object(shc, "wiql_query", return_value=[item["id"] for item in items]), \
                 patch.object(shc, "get_work_items_batch", return_value=items):
-            result = shc.check18("token", [shc.AREA_MJ], True, date(2026, 9, 11))
+            result = shc.check18(
+                "token", [shc.AREA_MJ], DryRunMutationController(),
+                date(2026, 9, 11),
+            )
         self.assertEqual([item["id"] for item in result["items"]], [1, 2])
 
     def test_check20_defensively_excludes_lower_level_types(self):
@@ -580,7 +631,8 @@ class TestCheck4RemainingWork(unittest.TestCase):
         with patch.object(shc, "wiql_query", return_value=[1, 2, 3, 4]), \
                 patch.object(shc, "get_work_item", side_effect=lambda wid, token, expand=None: work_items[wid]):
             result = shc.check4(
-                "token", [shc.AREA_MJ], {"path": r"MSTeams\2026\Sprint"}, True,
+                "token", [shc.AREA_MJ], {"path": r"MSTeams\2026\Sprint"},
+                DryRunMutationController(),
             )
         self.assertEqual([item["id"] for item in result["items"]], [2, 3])
         self.assertTrue(all("RemainingWork" in item["issue"] for item in result["items"]))
