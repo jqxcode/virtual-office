@@ -191,6 +191,25 @@ if ($shcScheduledCount -ge 1) {
     Assert-True $runsWeekdays "mAuditor/schedule-health-check cron '$shcCron' runs on weekdays (dow field '$shcDow')"
 }
 
+# ========================================
+# TC10: Runner self-wait prevention reaches every execution path
+# ========================================
+Write-Host "`nTC10: Runner prevents agents from waiting on their own completion" -ForegroundColor Cyan
+
+$runnerFile = Join-Path $ProjectRoot "runner" "Invoke-AgentJob.ps1"
+$runnerRaw = Get-Content -Path $runnerFile -Raw
+$hasSafetyHelper = $runnerRaw -match 'function Add-RunnerSafetyRule'
+$safetyCallCount = ([regex]::Matches($runnerRaw, 'Add-RunnerSafetyRule -Prompt')).Count
+Assert-True $hasSafetyHelper "Runner defines the self-wait safety rule"
+Assert-True ($safetyCallCount -eq 2) "Runner applies the safety rule to initial and queued job prompts"
+
+$hangConfig = $allJobs["pHangScout"]["detect-hang"]["hangDetection"]
+$hasCircularWaitPolicy = $hangConfig["perClassification"].ContainsKey("ancestor-runner-circular-wait")
+Assert-True $hasCircularWaitPolicy "Hang Scout has an ancestor-runner-circular-wait policy"
+if ($hasCircularWaitPolicy) {
+    Assert-True ($hangConfig["perClassification"]["ancestor-runner-circular-wait"]["killThresholdMinutes"] -eq 10) "Circular waits use the 10-minute fast-kill threshold"
+}
+
 # --- Summary ---
 Write-Host "`n========================================" -ForegroundColor White
 Write-Host "Test-ConfigIntegrity: $script:Passed passed, $script:Failed failed" -ForegroundColor $(if ($script:Failed -gt 0) { "Red" } else { "Green" })
