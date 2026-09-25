@@ -1,0 +1,28 @@
+<h3>ADO Autopilot - Daily Status Report</h3>
+<p><a href="{{SHARE_URL}}">View Full Report on SharePoint</a></p>
+<table border="1" style="border-collapse:collapse;width:100%;">
+  <tr style="background-color:#1a1a2e;color:white;">
+    <th style="padding:8px;">Total</th>
+    <th style="padding:8px;">Updated</th>
+    <th style="padding:8px;">No Change</th>
+  </tr>
+  <tr style="text-align:center;font-size:18px;font-weight:bold;">
+    <td style="padding:8px;">{{TOTAL}}</td>
+    <td style="padding:8px;">{{UPDATED}}</td>
+    <td style="padding:8px;">{{NO_CHANGE}}</td>
+  </tr>
+</table>
+<h3>Feature Details</h3>
+<table border="1" style="border-collapse:collapse;width:100%;">
+  <tr style="background-color:#1a1a2e;color:white;">
+    <th style="padding:6px;">ID</th>
+    <th style="padding:6px;">Area</th>
+    <th style="padding:6px;">Feature</th>
+    <th style="padding:6px;">Owner</th>
+    <th style="padding:6px;">Tweet</th>
+  </tr>
+  {{FEATURE_ROWS}}
+</table>
+<p style="color:#f0f0f0;font-size:1px;line-height:1px;">Agent: Poster | Job: AAP-report-posting | Generated: {{GENERATED_AT_PST}}</p>
+<br/>
+<p>CC: <at id="0">Josh Xu</at> <at id="1">Varun Venkatesh</at> <at id="2">Naveen Shrivastava</at></p>
