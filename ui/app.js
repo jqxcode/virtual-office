@@ -298,6 +298,7 @@ function normalizeJobState(raw) {
   return {
     status: raw.status || "idle",
     started: raw.started || null,
+    updated: raw.updated || null,
     runId: raw.run_id || raw.runId || null,
     runsCompleted: raw.runs_completed || raw.runsCompleted || 0,
     lastCompleted: raw.last_completed || raw.lastCompleted || null,
@@ -305,6 +306,88 @@ function normalizeJobState(raw) {
     lastOutputTime: raw.lastOutputTime || raw.last_output_time || null,
     queueDepth: raw.queue_depth || raw.queueDepth || 0
   };
+}
+
+function parseActivityTime(timestamp) {
+  if (!timestamp) return 0;
+  var t = new Date(timestamp).getTime();
+  return isNaN(t) ? 0 : t;
+}
+
+function getLatestAgentActivity(agentData, eventActivity) {
+  var latest = { time: 0, timestamp: null, label: "" };
+  function include(timestamp, label) {
+    var t = parseActivityTime(timestamp);
+    if (t > latest.time) {
+      latest = { time: t, timestamp: timestamp, label: label || "updated" };
+    }
+  }
+  function includeError(lastError) {
+    if (!lastError) return;
+    if (typeof lastError === "string") {
+      include(lastError, "error");
+      return;
+    }
+    if (typeof lastError === "object") {
+      include(lastError.timestamp || lastError.time || lastError.updated || lastError.created_at, "error");
+    }
+  }
+
+  if (agentData) {
+    include(agentData.updated, "updated");
+    include(agentData.last_completed, "completed");
+    include(agentData.lastCompleted, "completed");
+    include(agentData.lastOutputTime || agentData.last_output_time, "report");
+    includeError(agentData.lastError);
+  }
+  ((agentData && agentData.jobs) || []).forEach(function(job) {
+    include(job.updated, "updated");
+    include(job.started, job.status === "running" ? "started" : "activity");
+    include(job.lastCompleted || job.last_completed, "completed");
+    include(job.lastOutputTime || job.last_output_time, "report");
+  });
+  if (eventActivity) {
+    include(eventActivity.timestamp, eventActivity.label || "event");
+  }
+  return latest;
+}
+
+function getAgentActivityTime(agentData, eventActivity) {
+  return getLatestAgentActivity(agentData, eventActivity).time;
+}
+
+function sortAgentNamesByRecentActivity(agentNames, mergedAgents, eventActivityByAgent) {
+  var originalOrder = {};
+  agentNames.forEach(function(name, index) { originalOrder[name] = index; });
+  return agentNames.slice().sort(function(a, b) {
+    var at = getAgentActivityTime(mergedAgents[a], eventActivityByAgent && eventActivityByAgent[a]);
+    var bt = getAgentActivityTime(mergedAgents[b], eventActivityByAgent && eventActivityByAgent[b]);
+    if (at === 0 && bt > 0) return 1;
+    if (at > 0 && bt === 0) return -1;
+    if (at !== bt) return bt - at;
+    return originalOrder[a] - originalOrder[b];
+  });
+}
+
+function getEventActivityByAgent(events) {
+  var byAgent = {};
+  if (!Array.isArray(events)) return byAgent;
+  events.forEach(function(evt) {
+    var rawAgent = evt.agent;
+    if (!rawAgent) return;
+    var timestamp = evt.timestamp || evt.ts || evt.time;
+    var t = parseActivityTime(timestamp);
+    if (t === 0) return;
+    var agent = canonicalAgentName(rawAgent);
+    if (!byAgent[agent] || t > byAgent[agent].time) {
+      byAgent[agent] = {
+        time: t,
+        timestamp: timestamp,
+        label: evt.event || evt.type || "event"
+      };
+    }
+  });
+  return byAgent;
 }
 
 // --- Click-to-copy helper ---
@@ -715,6 +798,7 @@ function mergeConfigAndDashboard(config, dashboard) {
         portalUrl: cfg.portalUrl || null,
         status: "idle",
         running_job: null,
+        updated: null,
         last_completed: null,
         queue_depth: 0,
         errorCount: 0,
@@ -728,6 +812,7 @@ function mergeConfigAndDashboard(config, dashboard) {
             status: "idle",
             description: cfg.jobs[jobName].description || "",
             started: null,
+            updated: null,
             runId: null,
             runsCompleted: 0,
             lastCompleted: null,
@@ -748,6 +833,7 @@ function mergeConfigAndDashboard(config, dashboard) {
           display_name: name,
           status: "idle",
           running_job: null,
+          updated: null,
           last_completed: null,
           queue_depth: 0,
           errorCount: 0,
@@ -760,6 +846,7 @@ function mergeConfigAndDashboard(config, dashboard) {
       if (state.lastError) merged[name].lastError = state.lastError;
       if (state.status) merged[name].status = state.status;
       if (state.activeJob) merged[name].running_job = { job: state.activeJob };
+      if (state.updated) merged[name].updated = state.updated;
 
       var jobsSource = {};
       if (state.jobs && typeof state.jobs === "object") {
@@ -787,6 +874,7 @@ function mergeConfigAndDashboard(config, dashboard) {
           if (j.name === jobName) {
             merged[name].jobs[i].status = normalized.status;
             merged[name].jobs[i].started = normalized.started;
+            merged[name].jobs[i].updated = normalized.updated;
             merged[name].jobs[i].runId = normalized.runId;
             merged[name].jobs[i].runsCompleted = normalized.runsCompleted;
             merged[name].jobs[i].lastCompleted = normalized.lastCompleted;
@@ -802,6 +890,7 @@ function mergeConfigAndDashboard(config, dashboard) {
             status: normalized.status,
             description: "",
             started: normalized.started,
+            updated: normalized.updated,
             runId: normalized.runId,
             runsCompleted: normalized.runsCompleted,
             lastCompleted: normalized.lastCompleted,
@@ -814,6 +903,9 @@ function mergeConfigAndDashboard(config, dashboard) {
         if (normalized.lastCompleted &&
             (!merged[name].last_completed || normalized.lastCompleted > merged[name].last_completed)) {
           merged[name].last_completed = normalized.lastCompleted;
+        }
+        if (normalized.updated && (!merged[name].updated || normalized.updated > merged[name].updated)) {
+          merged[name].updated = normalized.updated;
         }
         if (normalized.queueDepth) {
           merged[name].queue_depth = (merged[name].queue_depth || 0) + normalized.queueDepth;
@@ -3120,6 +3212,16 @@ function formatRelativeTime(timestamp) {
   if (diff < 86400) return "done " + Math.floor(diff / 3600) + "h ago";
   return "done " + Math.floor(diff / 86400) + "d ago";
 }
+function formatOfficeActivity(activity) {
+  if (!activity || !activity.timestamp) return "";
+  var label = "Last active";
+  if (activity.label === "completed") label = "Last completed";
+  else if (activity.label === "failed") label = "Last failed";
+  else if (activity.label === "started") label = "Started";
+  else if (activity.label === "report") label = "Last report";
+  else if (activity.label === "error") label = "Last error";
+  return label + ": " + formatTimeAgo(activity.timestamp);
+}
 function getRobotSvg(state, color) {
   // Vivid robot scenes: working (at desk with monitor), idle (coffee break), sleeping (in bed)
   var c = color || "#8b949e";
@@ -3275,6 +3377,7 @@ function renderOfficeTab() {
   var schedules = (scheduleData && scheduleData.schedules) ? scheduleData.schedules : [];
   var agentHasSchedule = {};
   schedules.forEach(function(s) { agentHasSchedule[s.agent] = true; });
+  var eventActivityByAgent = getEventActivityByAgent(latestEvents);
   var agentNames = Object.keys(config.agents);
   var floorEl = document.getElementById("office-floor"); if (!floorEl) return;
   floorEl.innerHTML = "";
@@ -3291,6 +3394,7 @@ function renderOfficeTab() {
   groupOrder.forEach(function(groupName) {
     var members = groups[groupName];
     if (!members || members.length === 0) return;
+    members = sortAgentNamesByRecentActivity(members, merged, eventActivityByAgent);
     var header = document.createElement("div"); header.className = "office-group-header";
     header.textContent = groupName; floorEl.appendChild(header);
     var grid = document.createElement("div"); grid.className = "office-group-grid";
@@ -3298,6 +3402,7 @@ function renderOfficeTab() {
     members.forEach(function(name) {
       var _floorTarget = grid;
     var agentCfg = config.agents[name], agentData = merged[name] || {};
+    var latestActivity = getLatestAgentActivity(agentData, eventActivityByAgent[name]);
     var color = getAgentColor(name), status = getAgentStatus(agentData), hasSchedule = agentHasSchedule[name];
     var desk = document.createElement("div"); desk.className = "office-desk"; desk.style.borderLeftColor = color;
     var deskStatus, statusDotClass, statusText;
@@ -3320,7 +3425,10 @@ function renderOfficeTab() {
       var st = null; (agentData.jobs || []).forEach(function(j) { if (j.status === "running" && j.started) st = j.started; });
       if (st) { ed.dataset.startedAt = st; var el = Math.max(0, Math.floor((Date.now() - new Date(st).getTime()) / 1000)); ed.textContent = Math.floor(el / 60) + ":" + (el % 60 < 10 ? "0" : "") + (el % 60); }
       else { ed.textContent = "--:--"; } desk.appendChild(ed);
-    } else if (deskStatus === "sleeping") { jd.textContent = "manual only"; desk.appendChild(jd); }
+    } else if (deskStatus === "sleeping") {
+      jd.textContent = latestActivity.time > 0 ? formatOfficeActivity(latestActivity) : "no activity yet";
+      desk.appendChild(jd);
+    }
     else {
       var ljn = "", ljt = null, ljr = null;
       (agentData.jobs || []).forEach(function(j) {
@@ -3332,7 +3440,10 @@ function renderOfficeTab() {
         var is = document.createElement("span"); is.className = ljr === "success" ? "success" : "failure";
         is.textContent = ljr === "success" ? "\u2713 " : "\u2717 "; rd.appendChild(is);
         rd.appendChild(document.createTextNode(formatRelativeTime(ljt))); desk.appendChild(rd);
-      } else { jd.textContent = "no runs yet"; desk.appendChild(jd); }
+      } else {
+        jd.textContent = latestActivity.time > 0 ? formatOfficeActivity(latestActivity) : "no runs yet";
+        desk.appendChild(jd);
+      }
     }
     // Context budget badge from lastCost data
     var costInfo = getLastCostForAgent(name, lastDashboard);
@@ -3567,15 +3678,23 @@ async function poll() {
   }
 }
 
+// Real top-level nav tabs (must match data-tab attributes / #view-<name> sections in index.html).
+var TOP_TAB_NAMES = ["agents", "events", "queue", "agents-v2", "schedules-v2", "team", "office", "history", "schedule", "costs", "board"];
+
 async function startPolling() {
   // Restore state from URL
   var urlParams = new URLSearchParams(window.location.search);
   var viewParam = urlParams.get("view");
   var tabParam = urlParams.get("tab");
-  if (tabParam) {
+  // Backward-compat: some links use ?tab=<topLevelTab> (for example ?tab=team)
+  // expecting it to switch the top-level view. Keep ?view= canonical, and only
+  // treat tabParam as a view alias when it names a real top-level tab.
+  if (!viewParam && tabParam && TOP_TAB_NAMES.indexOf(tabParam) !== -1) {
+    viewParam = tabParam;
+  } else if (tabParam) {
     activeGroup = tabParam;
   }
-  if (viewParam && (viewParam === "agents" || viewParam === "events" || viewParam === "queue" || viewParam === "agents-v2" || viewParam === "schedules-v2" || viewParam === "team" || viewParam === "office" || viewParam === "history" || viewParam === "schedule")) {
+  if (viewParam && TOP_TAB_NAMES.indexOf(viewParam) !== -1) {
     activeTopTab = viewParam;
     switchTopTab(viewParam);
   }
@@ -3973,6 +4092,28 @@ function populateScheduleV2AgentFilter() {
   select.value = current;
 }
 
+function populateScheduleV2HostFilter() {
+  var select = document.getElementById("schedule-v2-host-filter");
+  if (!select) return;
+  var hosts = {};
+  if (scheduleData && scheduleData.schedules) {
+    scheduleData.schedules.forEach(function(sched) {
+      toHostList(sched.hosts !== undefined ? sched.hosts : sched.host).forEach(function(host) {
+        hosts[host] = true;
+      });
+    });
+  }
+  var current = select.value;
+  select.innerHTML = '<option value="">All Hosts</option>';
+  Object.keys(hosts).sort().forEach(function(host) {
+    var opt = document.createElement("option");
+    opt.value = host;
+    opt.textContent = host;
+    select.appendChild(opt);
+  });
+  select.value = hosts[current] ? current : "";
+}
+
 function getLastRunResult(agent, job) {
   // Find most recent completed/failed event for this agent+job from allEvents
   for (var i = allEvents.length - 1; i >= 0; i--) {
@@ -3993,7 +4134,11 @@ function renderScheduleV2Tab() {
   var now = new Date();
   var in24h = now.getTime() + 24 * 60 * 60 * 1000;
   var agentFilter = (document.getElementById("schedule-v2-agent-filter") || {}).value || "";
+  var hostFilter = (document.getElementById("schedule-v2-host-filter") || {}).value || "";
   var allItems = [];
+
+  populateScheduleV2AgentFilter();
+  populateScheduleV2HostFilter();
 
   schedules.forEach(function(sched) {
     var agent = sched.agent || "";
@@ -4004,6 +4149,7 @@ function renderScheduleV2Tab() {
     var cronHuman = cronToHuman(cron);
 
     if (agentFilter && agent !== agentFilter) return;
+    if (hostFilter && hosts.indexOf(hostFilter) === -1) return;
 
     var fires = getNextCronFires(cron, now, 10);
 
@@ -4248,6 +4394,13 @@ document.addEventListener("DOMContentLoaded", function () {
       renderScheduleV2Tab();
     });
   }
+  var scheduleV2HostFilter = document.getElementById("schedule-v2-host-filter");
+  if (scheduleV2HostFilter) {
+    scheduleV2HostFilter.addEventListener("change", function() {
+      scheduleV2Page = 0;
+      renderScheduleV2Tab();
+    });
+  }
 
   // Schedule tab: "Show more" button handler
   var scheduleV2MoreBtn = document.getElementById("schedule-v2-more-btn");
@@ -4288,31 +4441,71 @@ function renderCostsKPIs() {
   var el = document.getElementById("costs-kpi-cards");
   if (!el) return;
   var d = costsData;
-  var avgCostPerRun = d.totalRuns > 0 ? (d.totalCost / d.totalRuns) : 0;
-  var totalTokens = 0;
-  if (d.entries) {
-    d.entries.forEach(function(e) {
-      totalTokens += (e.inputTokens || 0) + (e.outputTokens || 0);
-    });
-  }
+  var metric = getCostsMetric();
+  var totalUsage = getTotalUsageValue(metric);
+  var avgUsagePerRun = d.totalRuns > 0 ? (totalUsage / d.totalRuns) : 0;
+  var outputTokens = d.totalOutputTokens || 0;
+  var note = metric.isMoney ? "" :
+    '<div class="costs-metric-note">No USD conversion source is present in audit data; showing ' +
+    escapeHtml(metric.label.toLowerCase()) + ' instead of dollars.</div>';
   el.innerHTML =
-    '<div class="costs-kpi-card"><div class="costs-kpi-label">Total Cost (' + d.period + ')</div><div class="costs-kpi-value">$' + d.totalCost.toFixed(2) + '</div></div>' +
+    '<div class="costs-kpi-card"><div class="costs-kpi-label">' + escapeHtml(metric.label) + ' (' + d.period + ')</div><div class="costs-kpi-value">' + formatUsageValue(totalUsage, metric) + '</div></div>' +
     '<div class="costs-kpi-card"><div class="costs-kpi-label">Total Runs</div><div class="costs-kpi-value">' + d.totalRuns + '</div></div>' +
-    '<div class="costs-kpi-card"><div class="costs-kpi-label">Avg Cost/Run</div><div class="costs-kpi-value">$' + avgCostPerRun.toFixed(4) + '</div></div>' +
-    '<div class="costs-kpi-card"><div class="costs-kpi-label">Total Tokens</div><div class="costs-kpi-value">' + formatTokenCount(totalTokens) + '</div></div>' +
-    '<div class="costs-kpi-card"><div class="costs-kpi-label">Anomalies</div><div class="costs-kpi-value' + (d.anomalies.length > 0 ? ' danger' : '') + '">' + d.anomalies.length + '</div></div>';
+    '<div class="costs-kpi-card"><div class="costs-kpi-label">Avg ' + escapeHtml(metric.label) + '/Run</div><div class="costs-kpi-value">' + formatUsageValue(avgUsagePerRun, metric) + '</div></div>' +
+    '<div class="costs-kpi-card"><div class="costs-kpi-label">Output Tokens</div><div class="costs-kpi-value">' + formatTokenCount(outputTokens) + '</div></div>' +
+    '<div class="costs-kpi-card"><div class="costs-kpi-label">Anomalies</div><div class="costs-kpi-value' + (d.anomalies.length > 0 ? ' danger' : '') + '">' + d.anomalies.length + '</div></div>' +
+    note;
 }
 
 function formatTokenCount(n) {
+  n = Number(n || 0);
   if (n >= 1000000) return (n / 1000000).toFixed(1) + "M";
   if (n >= 1000) return (n / 1000).toFixed(1) + "K";
-  return "" + n;
+  return "" + Math.round(n);
 }
 
 function formatCost(n) {
   if (n === 0 || n === undefined || n === null) return "$0.00";
   if (n < 0.01) return "$" + n.toFixed(4);
   return "$" + n.toFixed(2);
+}
+
+function getCostsMetric() {
+  var m = (costsData && costsData.metric) || {};
+  var isMoney = !!(m.isMoney || m.key === "usd");
+  return {
+    key: m.key || (costsData && costsData.hasDollarCost ? "usd" : "outputTokens"),
+    label: m.label || (isMoney ? "Cost" : "Output Tokens"),
+    unit: m.unit || (isMoney ? "USD" : "tokens"),
+    isMoney: isMoney
+  };
+}
+
+function getTotalUsageValue(metric) {
+  if (costsData && costsData.metric && costsData.metric.total !== undefined) return Number(costsData.metric.total || 0);
+  if (metric.key === "usd") return Number(costsData.totalCost || 0);
+  if (metric.key === "premiumRequests") return Number(costsData.totalPremiumRequests || 0);
+  if (metric.key === "tokens") return Number((costsData.totalInputTokens || 0) + (costsData.totalOutputTokens || 0));
+  if (metric.key === "runs") return Number(costsData.totalRuns || 0);
+  return Number(costsData.totalOutputTokens || 0);
+}
+
+function getEntryUsageValue(e, metric) {
+  if (e.usageValue !== undefined && e.usageValue !== null) return Number(e.usageValue || 0);
+  if (metric.key === "usd") return Number(e.costUSD || 0);
+  if (metric.key === "premiumRequests") return Number(e.premiumRequests || 0);
+  if (metric.key === "tokens") return Number((e.inputTokens || 0) + (e.outputTokens || 0));
+  if (metric.key === "runs") return 1;
+  return Number(e.outputTokens || 0);
+}
+
+function formatUsageValue(n, metric) {
+  n = Number(n || 0);
+  if (metric.isMoney || metric.key === "usd") return formatCost(n);
+  if (metric.key === "tokens" || metric.key === "outputTokens") return formatTokenCount(n) + " tokens";
+  if (metric.key === "premiumRequests") return n.toLocaleString(undefined, { maximumFractionDigits: 2 }) + " requests";
+  if (metric.key === "runs") return n.toLocaleString(undefined, { maximumFractionDigits: 2 }) + " runs";
+  return n.toLocaleString(undefined, { maximumFractionDigits: 2 }) + " " + metric.unit;
 }
 
 function renderCostsAnomalies() {
@@ -4322,10 +4515,13 @@ function renderCostsAnomalies() {
     el.innerHTML = "";
     return;
   }
+  var metric = getCostsMetric();
   el.innerHTML = costsData.anomalies.map(function(a) {
+    var last = a.lastValue !== undefined ? a.lastValue : a.lastCost;
+    var avg = a.avgValue !== undefined ? a.avgValue : a.avgCost;
     return '<div class="costs-anomaly-alert"><span class="anomaly-job">' +
-      escapeHtml(a.job) + '</span> cost ' + formatCost(a.lastCost) +
-      ' is <strong>' + a.ratio + 'x</strong> the average (' + formatCost(a.avgCost) + ')</div>';
+      escapeHtml(a.job) + '</span> ' + escapeHtml(metric.label.toLowerCase()) + ' ' + formatUsageValue(last, metric) +
+      ' is <strong>' + a.ratio + 'x</strong> the average (' + formatUsageValue(avg, metric) + ')</div>';
   }).join("");
 }
 
@@ -4335,17 +4531,19 @@ function renderCostsSparkline() {
   var daily = costsData.daily || {};
   var days = Object.keys(daily).sort();
   if (days.length === 0) {
-    el.innerHTML = '<div style="color:var(--vo-text-secondary);font-size:0.8rem;padding:1rem;text-align:center">No cost data yet. Costs will appear after jobs run with the updated runner.</div>';
+    el.innerHTML = '<div style="color:var(--vo-text-secondary);font-size:0.8rem;padding:1rem;text-align:center">No usage data yet. Usage will appear after jobs run with the updated runner.</div>';
     return;
   }
-  var maxCost = 0;
-  days.forEach(function(d) { if (daily[d].costUSD > maxCost) maxCost = daily[d].costUSD; });
-  if (maxCost === 0) maxCost = 1;
+  var metric = getCostsMetric();
+  var maxUsage = 0;
+  days.forEach(function(d) { if ((daily[d].usageValue || 0) > maxUsage) maxUsage = daily[d].usageValue || 0; });
+  if (maxUsage === 0) maxUsage = 1;
   el.innerHTML = days.map(function(d) {
-    var pct = (daily[d].costUSD / maxCost) * 100;
+    var usage = daily[d].usageValue || 0;
+    var pct = (usage / maxUsage) * 100;
     var h = Math.max(4, pct);
     return '<div class="sparkline-bar" style="height:' + h + '%"><div class="sparkline-tooltip">' +
-      d + ': ' + formatCost(daily[d].costUSD) + ' (' + daily[d].runs + ' runs)</div></div>';
+      d + ': ' + formatUsageValue(usage, metric) + ' (' + daily[d].runs + ' runs)</div></div>';
   }).join("");
 }
 
@@ -4353,14 +4551,16 @@ function renderCostsAgentTable() {
   var tbody = document.getElementById("costs-agent-tbody");
   if (!tbody) return;
   var agents = costsData.agents || {};
+  var metric = getCostsMetric();
   var rows = Object.keys(agents).sort().map(function(name) {
     var a = agents[name];
-    var avg = a.runs > 0 ? a.costUSD / a.runs : 0;
+    var usage = a.usageValue !== undefined ? a.usageValue : (metric.key === "usd" ? a.costUSD : a.outputTokens);
+    var avg = a.runs > 0 ? usage / a.runs : 0;
     return "<tr><td>" + escapeHtml(name) + "</td><td>" + a.runs +
-      "</td><td>" + formatCost(a.costUSD) + "</td><td>" + formatTokenCount(a.inputTokens || 0) +
-      "</td><td>" + formatTokenCount(a.outputTokens || 0) + "</td><td>" + formatCost(avg) + "</td></tr>";
+      "</td><td>" + formatUsageValue(usage, metric) + "</td><td>" + formatTokenCount(a.inputTokens || 0) +
+      "</td><td>" + formatTokenCount(a.outputTokens || 0) + "</td><td>" + formatUsageValue(avg, metric) + "</td></tr>";
   });
-  tbody.innerHTML = rows.join("") || '<tr><td colspan="6" style="text-align:center;color:var(--vo-text-secondary)">No cost data yet</td></tr>';
+  tbody.innerHTML = rows.join("") || '<tr><td colspan="6" style="text-align:center;color:var(--vo-text-secondary)">No usage data yet</td></tr>';
 }
 
 function renderCostsRunsTable() {
@@ -4369,17 +4569,18 @@ function renderCostsRunsTable() {
   if (!tbody) return;
   var entries = (costsData.entries || []).slice().reverse().slice(0, 50);
   if (countEl) countEl.textContent = entries.length;
+  var metric = getCostsMetric();
   tbody.innerHTML = entries.map(function(e) {
     var ctxClass = "green";
     if (e.contextUsedPct >= 90) ctxClass = "red";
     else if (e.contextUsedPct >= 70) ctxClass = "yellow";
     var time = e.timestamp ? new Date(e.timestamp).toLocaleString() : "--";
     return "<tr><td>" + time + "</td><td>" + escapeHtml(e.agent) +
-      "</td><td>" + escapeHtml(e.job) + "</td><td>" + formatCost(e.costUSD) +
+      "</td><td>" + escapeHtml(e.job) + "</td><td>" + formatUsageValue(getEntryUsageValue(e, metric), metric) +
       "</td><td>" + formatTokenCount(e.inputTokens || 0) + " / " + formatTokenCount(e.outputTokens || 0) +
       '</td><td><span class="context-badge ' + ctxClass + '">' + (e.contextUsedPct || 0) + '%</span></td>' +
       "<td>" + (e.numTurns || 0) + "</td></tr>";
-  }).join("") || '<tr><td colspan="7" style="text-align:center;color:var(--vo-text-secondary)">No cost data yet</td></tr>';
+  }).join("") || '<tr><td colspan="7" style="text-align:center;color:var(--vo-text-secondary)">No usage data yet</td></tr>';
 }
 
 function escapeHtml(s) {

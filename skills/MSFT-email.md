@@ -1,5 +1,10 @@
 # MSFT-email
 
+> Portable documentation/code mirror:
+> [`qitxu_microsoft/util/MSFT-email`](https://github.com/qitxu_microsoft/util/tree/main/MSFT-email).
+> Runtime changes belong in `virtual-office`; synchronize the portable package
+> with `MSFT-email/Sync-MSFTEmail.ps1`.
+
 Microsoft 365 (Outlook) inbox triage, filtering, and HTML reporting for **Josh.Xu@microsoft.com** — the **portable** successor to `msft-outlook-email-inbox-clean`. It is driven by the **WorkIQ MCP (Microsoft Graph)**, so it runs regardless of the desktop Outlook flavor: **New Outlook (`olk.exe`)**, classic Outlook (COM), or OWA.
 
 > Why this exists: the original skill used classic-Outlook COM automation. Machines running **New Outlook (`olk.exe`) have no COM/MAPI surface**, and `New-Object -ComObject Outlook.Application` there just launches the classic "Welcome to Outlook" setup wizard. The Graph/MCP path avoids all of that. Prefer this skill; only fall back to COM when a classic Outlook MAPI profile is present **and** MCP is unavailable.
@@ -10,16 +15,27 @@ Microsoft 365 (Outlook) inbox triage, filtering, and HTML reporting for **Josh.X
 - (COM fallback only) classic Outlook running + `scripts/outlook/Generate-InboxReport.ps1` under **Windows PowerShell 5.1** (see caveats).
 
 ## Category detection (Graph — validated 2026-07-01)
+The canonical global-noise classifier is
+`scripts/email_triage_rules.py::global_noise_reason`. The generator imports it,
+and execution/report-refresh prompts must apply the same semantics rather than
+maintaining a looser duplicate rule.
+
 | Category | Detection rule |
 |---|---|
-| Meeting **invite** | message `@odata.type` == `#microsoft.graph.eventMessageRequest` |
-| Meeting **cancel** | `@odata.type` == `#microsoft.graph.eventMessage` **and** subject starts with `Canceled:` |
-| Meeting **forward** | subject starts with `Meeting Forward Notification:` |
+| Meeting object | case-insensitive `@odata.type` contains `eventMessage` (requests, updates, responses, cancellations) |
+| Meeting cancel/forward | subject starts with `Canceled:` / `Cancelled:` / `Meeting Forward Notification:` (case-insensitive) |
+| Automatic reply / OOF | **all** subjects starting with `Automatic reply:` / `Auto reply:` / `Autoreply:` / `Out of Office:`, regardless of sender or underlying topic; the prefix always wins |
+| Malformed meeting-only fallback | Teams join URL + `Meeting ID:` + `Passcode:` occur together near the start of `bodyPreview`, within the exact conservative bounds in the canonical module |
+| Verified NDR / bounce | subject starts `Undeliverable:` **and** sender is `MicrosoftExchange*@service.microsoft.com` or display name `Microsoft Outlook` **and** body/preview contains delivery-failure evidence (`couldn't be delivered`, `wasn't found`, `Recipient Unknown`, or canonical variants) |
 | **External** | subject contains `[EXTERNAL]` (case-insensitive) |
 | Importance | `importance` ∈ {`low`,`normal`,`high`} |
 | Sender | `from.emailAddress.address` / `from.emailAddress.name` |
 
 `@odata.type` is returned automatically for meeting messages — you do **not** need to `$select` it.
+The malformed/plain fallback intentionally does **not** match substantive work
+mail whose quoted history merely contains an old Teams join block. This can miss
+long or heavily prefaced malformed meeting templates; review those instead of
+broadening automatic deletion.
 
 ## Folder map — `M / z-Notifications / …` (validated 2026-07-01)
 Resolve ids **by name at runtime** (folders are stable but ids change if recreated):
@@ -47,8 +63,14 @@ Resolve ids **by name at runtime** (folders are stable but ids change if recreat
 ### Phase 2 — Delete noise → Deleted Items (recoverable)
 `workiq-delete_entity /me/messages/{id}` for:
 - Office 365 / SharePoint notifications, Power BI, Lockbox
-- **Meeting invites, cancellations, and forwards** — delete all meeting-schedule mail. The meeting is already on the calendar, so the email is redundant clutter.
-- Automatic replies (`Automatic reply:` / `Out of Office:`)
+- **All messages matched by `scripts/email_triage_rules.py::global_noise_reason`**: event objects, cancellation/forward prefixes, automatic replies/OOF, conservative malformed meeting-only fallback, and verified Microsoft Exchange NDR/bounces.
+- The automatic-reply prefix wins over topic/vendor classification: `Automatic reply: Bot Protection Shiproom` is noise even though Bot Protection is a legitimate work topic.
+- `Automatic reply: Josh:Naveen` from `navshri@microsoft.com` is therefore
+  global noise even though its OOF-until-Oct-9 body and thread topic are
+  otherwise legitimate.
+- `Undeliverable: Bot Protection Shiproom` is also global noise only when its
+  Microsoft Exchange/Outlook sender identity and delivery-failure body evidence
+  satisfy the canonical rule. `Undeliverable:` alone is not enough.
 - Azure User Access Review; Event Polls
 > Runs **unattended — no review gate**; meeting invites are deleted outright (recoverable in Deleted Items). If you ever want to eyeball invites first, generate the Phase 6 report *before* Phase 2.
 
@@ -83,6 +105,18 @@ Every report MUST include the VO subtitle directly under the title:
 
 ### Phase 7 — Open
 `Start-Process msedge.exe -ArgumentList '--disable-extensions --new-tab "file:///C:/Users/qitxu/inbox_report.html"'` (`--disable-extensions` avoids the enterprise DLP extension crash).
+
+## Portal deployment / server reload
+
+- Changes to `email-triage-server.py` or
+  `scripts/email_triage_rules.py` are **not active in an already-running
+  process**. A successful file edit is not deployment.
+- Before restarting, query `http://127.0.0.1:8765/api/status` and wait for the
+  worker to be operationally idle: `status` must not be `queued` or `running`.
+  Never terminate/reload the server while an action or refresh worker is active.
+- Once idle, stop the exact listening PID, start
+  `email-triage-server.py` again, then re-query `/api/status` and verify the
+  listener is responsive. Only then treat classifier/prompt changes as deployed.
 
 ## WorkIQ operations reference
 - **Read:** `workiq-fetch /me/mailFolders/inbox/messages?$select=…&$top=25`

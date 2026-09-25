@@ -24,6 +24,13 @@ sys.path.insert(0, os.path.join(REPO_ROOT, "runner"))
 import shiproom_hygiene_check as shc  # noqa: E402
 
 
+class DryRunMutationController:
+    dry_run = True
+
+    def plan(self, event):
+        return True
+
+
 # ---------------------------------------------------------------------------
 # validate_wiql_has_area_filter
 # ---------------------------------------------------------------------------
@@ -352,6 +359,285 @@ class TestPickMonthNode(unittest.TestCase):
         )
 
 
+class TestFeatureBacklogScope(unittest.TestCase):
+    def _item(self, wid, wtype, state="Active", remaining=0, changed="2026-08-01"):
+        return {
+            "id": wid,
+            "fields": {
+                "System.Id": wid,
+                "System.Title": "Item {0}".format(wid),
+                "System.WorkItemType": wtype,
+                "System.State": state,
+                "System.AreaPath": shc.AREA_MJ,
+                "System.IterationPath": r"MSTeams\Backlog",
+                "Microsoft.VSTS.Scheduling.RemainingWork": remaining,
+                "Microsoft.VSTS.Common.StackRank": wid * 100,
+                "System.ChangedDate": changed,
+            },
+        }
+
+    def test_madhu_wiql_uses_only_feature_backlog_types(self):
+        for wiql in [
+            shc.WIQL_CHECK15_ROLLOUT_ACTIVE_MONTH,
+            shc.WIQL_CHECK17_ZERO_REMAINING,
+            shc.WIQL_CHECK18_STALE_REMAINING,
+            shc.WIQL_CHECK20_BACKLOG_ORDER,
+        ]:
+            self.assertIn("[System.WorkItemType] IN ('Feature', 'Exception')", wiql)
+            for lower_type in ("Task", "Bug", "User Story", "Epic"):
+                self.assertNotIn("'{0}'".format(lower_type), wiql)
+
+    def test_check15_defensively_excludes_lower_level_types(self):
+        items = [
+            self._item(1, "Feature"),
+            self._item(2, "Exception"),
+            self._item(3, "Task"),
+            self._item(4, "Bug"),
+            self._item(5, "User Story"),
+            self._item(6, "Epic"),
+        ]
+
+        class FakeMutationController:
+            def plan(self, event):
+                return True
+
+            def record(self, event):
+                pass
+
+        with patch.object(shc, "resolve_current_month_node", return_value=r"MSTeams\2026\H2\Q3\September"), \
+                patch.object(shc, "wiql_query", return_value=[item["id"] for item in items]), \
+                patch.object(shc, "get_work_items_batch", return_value=items):
+            result = shc.check15(
+                "token", [shc.AREA_MJ], FakeMutationController(), True,
+                {"path": r"MSTeams\2026\H2\Q3\September\Sprint"}, date(2026, 9, 11),
+            )
+        self.assertEqual([item["id"] for item in result["items"]], [1, 2])
+
+    def test_check17_requires_exact_numeric_zero_and_feature_backlog_type(self):
+        items = [
+            self._item(1, "Feature", remaining=0),
+            self._item(2, "Exception", state="RollingOut", remaining=0.0),
+            self._item(3, "Task", remaining=0),
+            self._item(4, "Bug", remaining=0),
+            self._item(5, "User Story", remaining=0),
+            self._item(6, "Epic", remaining=0),
+            self._item(7, "Feature", remaining=None),
+            self._item(8, "Feature", remaining=""),
+            self._item(9, "Feature", remaining=False),
+            self._item(10, "Feature", remaining="0"),
+            self._item(11, "Feature", state="Proposed", remaining=0),
+        ]
+        items[6]["fields"].pop("Microsoft.VSTS.Scheduling.RemainingWork")
+        with patch.object(shc, "wiql_query", return_value=[item["id"] for item in items]), \
+                patch.object(shc, "get_work_items_batch", return_value=items):
+            result = shc.check17(
+                "token", [shc.AREA_MJ], DryRunMutationController(),
+            )
+        self.assertEqual([item["id"] for item in result["items"]], [1, 2])
+
+    def test_check18_rechecks_type_state_number_and_age(self):
+        items = [
+            self._item(1, "Feature", remaining=1, changed="2026-08-11"),
+            self._item(2, "Exception", state="RollingOut", remaining=0.5, changed="2026-08-01"),
+            self._item(3, "Task", remaining=1, changed="2026-08-01"),
+            self._item(4, "Bug", remaining=1, changed="2026-08-01"),
+            self._item(5, "User Story", remaining=1, changed="2026-08-01"),
+            self._item(6, "Epic", remaining=1, changed="2026-08-01"),
+            self._item(7, "Feature", remaining=0, changed="2026-08-01"),
+            self._item(8, "Feature", remaining=False, changed="2026-08-01"),
+            self._item(9, "Feature", remaining="1", changed="2026-08-01"),
+            self._item(10, "Feature", remaining=1, changed="2026-08-12"),
+            self._item(11, "Feature", state="Closed", remaining=1, changed="2026-08-01"),
+            self._item(12, "Feature", state="Removed", remaining=1, changed="2026-08-01"),
+        ]
+        with patch.object(shc, "wiql_query", return_value=[item["id"] for item in items]), \
+                patch.object(shc, "get_work_items_batch", return_value=items):
+            result = shc.check18(
+                "token", [shc.AREA_MJ], DryRunMutationController(),
+                date(2026, 9, 11),
+            )
+        self.assertEqual([item["id"] for item in result["items"]], [1, 2])
+
+    def test_check20_defensively_excludes_lower_level_types(self):
+        items = [
+            self._item(1, "Feature", state="Proposed"),
+            self._item(2, "Task", state="RollingOut"),
+            self._item(3, "Bug", state="RollingOut"),
+            self._item(4, "User Story", state="RollingOut"),
+            self._item(5, "Epic", state="RollingOut"),
+            self._item(6, "Exception", state="Open"),
+            self._item(7, "Feature", state="Closed"),
+            self._item(8, "Exception", state="Removed"),
+        ]
+        items[5]["fields"]["Microsoft.VSTS.Common.StackRank"] = 50
+        with tempfile.TemporaryDirectory() as temp_dir, \
+                patch.object(shc, "saved_query_ids", return_value=[item["id"] for item in items]), \
+                patch.object(shc, "get_work_items_batch", return_value=items):
+            mc = shc.MutationController(
+                os.path.join(temp_dir, "plan.jsonl"),
+                os.path.join(temp_dir, "audit.jsonl"),
+                dry_run=True,
+            )
+            result = shc.check20("token", [shc.AREA_MJ], mc, True)
+        self.assertEqual(result["items"], [])
+        self.assertEqual(
+            sorted(item["id"] for item in result["suggestedOrder"]),
+            [1, 6],
+        )
+
+    def test_saved_query_ids_executes_check20_shared_query(self):
+        with patch.object(
+                shc,
+                "ado_request",
+                return_value={"workItems": [{"id": 10}, {"id": 20}]},
+        ) as request:
+            self.assertEqual(shc.saved_query_ids(shc.CHECK20_QUERY_ID, "token"), [10, 20])
+        request.assert_called_once_with(
+            "MSTeams/_apis/wit/wiql/{0}?api-version=7.1".format(shc.CHECK20_QUERY_ID),
+            "token",
+        )
+
+    def test_rank_move_places_active_before_first_proposed(self):
+        rows = [
+            {"id": 1, "state": "Active", "type": "Feature", "tags": "", "stackRank": 7950},
+            {"id": 2, "state": "Proposed", "type": "Feature", "tags": "", "stackRank": 8018},
+            {"id": 3, "state": "Proposed", "type": "Feature", "tags": "", "stackRank": 10026},
+            {"id": 4, "state": "Active", "type": "Feature", "tags": "", "stackRank": 10153},
+        ]
+        self.assertEqual(
+            shc._rank_move_for_violation(rows, 4),
+            {"previousId": 1, "nextId": 2},
+        )
+
+    def test_rank_move_places_rollingout_before_active(self):
+        rows = [
+            {"id": 1, "state": "Open", "type": "Exception", "tags": "", "stackRank": 100},
+            {"id": 2, "state": "Active", "type": "Feature", "tags": "", "stackRank": 200},
+            {"id": 3, "state": "RollingOut", "type": "Feature", "tags": "", "stackRank": 300},
+        ]
+        self.assertEqual(
+            shc._rank_move_for_violation(rows, 3),
+            {"previousId": 1, "nextId": 2},
+        )
+
+    def test_rank_move_places_exception_at_top(self):
+        rows = [
+            {"id": 2, "state": "RollingOut", "type": "Feature", "tags": "", "stackRank": 100},
+            {"id": 1, "state": "Open", "type": "Exception", "tags": "", "stackRank": 900},
+        ]
+        self.assertEqual(
+            shc._rank_move_for_violation(rows, 1),
+            {"previousId": 0, "nextId": 2},
+        )
+
+    def test_rank_move_places_exception_above_blocked(self):
+        rows = [
+            {"id": 3, "state": "Blocked", "type": "Feature", "tags": "", "stackRank": 100},
+            {"id": 2, "state": "Active", "type": "Feature", "tags": "", "stackRank": 200},
+            {"id": 1, "state": "Open", "type": "Exception", "tags": "", "stackRank": 300},
+        ]
+        self.assertEqual(
+            shc._rank_move_for_violation(rows, 1),
+            {"previousId": 0, "nextId": 3},
+        )
+
+    def test_rank_move_does_not_auto_move_tag_only_exception(self):
+        rows = [
+            {"id": 2, "state": "RollingOut", "type": "Feature", "tags": "", "stackRank": 100},
+            {"id": 1, "state": "Proposed", "type": "Feature", "tags": "exception", "stackRank": 900},
+        ]
+        self.assertIsNone(shc._rank_move_for_violation(rows, 1))
+
+    def test_rank_move_does_not_auto_move_active_tag_only_exception(self):
+        rows = [
+            {"id": 2, "state": "RollingOut", "type": "Feature", "tags": "", "stackRank": 100},
+            {"id": 1, "state": "Active", "type": "Feature", "tags": "exception", "stackRank": 900},
+        ]
+        self.assertIsNone(shc._rank_move_for_violation(rows, 1))
+
+    def test_rank_move_places_blocked_before_planning(self):
+        rows = [
+            {"id": 1, "state": "Active", "type": "Feature", "tags": "", "stackRank": 100},
+            {"id": 2, "state": "Proposed", "type": "Feature", "tags": "", "stackRank": 200},
+            {"id": 3, "state": "Blocked", "type": "Feature", "tags": "", "stackRank": 300},
+        ]
+        self.assertEqual(
+            shc._rank_move_for_violation(rows, 3),
+            {"previousId": 1, "nextId": 2},
+        )
+
+    def test_rank_move_places_blocked_after_exception(self):
+        rows = [
+            {"id": 3, "state": "Blocked", "type": "Feature", "tags": "", "stackRank": 100},
+            {"id": 1, "state": "Open", "type": "Exception", "tags": "", "stackRank": 200},
+            {"id": 2, "state": "RollingOut", "type": "Feature", "tags": "", "stackRank": 300},
+        ]
+        self.assertEqual(
+            shc._rank_move_for_violation(rows, 3),
+            {"previousId": 1, "nextId": 2},
+        )
+
+    def test_rank_move_does_not_move_planning_items(self):
+        rows = [
+            {"id": 1, "state": "Proposed", "type": "Feature", "tags": "", "stackRank": 100},
+            {"id": 2, "state": "Active", "type": "Feature", "tags": "", "stackRank": 200},
+        ]
+        self.assertIsNone(shc._rank_move_for_violation(rows, 1))
+
+    def test_reorder_backlog_item_preserves_parent_and_uses_json(self):
+        response = {"count": 1, "value": [{"id": 4, "order": 150.0}]}
+        with patch.object(shc, "ado_request", return_value=response) as request:
+            result = shc.reorder_backlog_item(4, 1, 2, 99, "token")
+        self.assertEqual(result, response)
+        request.assert_called_once_with(
+            "MSTeams/6f72ea4e-c73a-4a15-b622-46cdacc53987/"
+            "_apis/work/workitemsorder?api-version=7.1",
+            "token",
+            "PATCH",
+            {
+                "ids": [4],
+                "previousId": 1,
+                "nextId": 2,
+                "parentId": 99,
+            },
+            content_type="application/json",
+        )
+
+
+class TestCheck4RemainingWork(unittest.TestCase):
+    def test_numeric_zero_is_present_but_missing_and_none_are_not(self):
+        def item(wid, remaining_marker):
+            fields = {
+                "System.Id": wid,
+                "System.Title": "Task {0}".format(wid),
+                "System.State": "Active",
+                "System.AreaPath": shc.AREA_MJ,
+                "Microsoft.VSTS.Scheduling.OriginalEstimate": 1,
+            }
+            if remaining_marker != "absent":
+                fields["Microsoft.VSTS.Scheduling.RemainingWork"] = remaining_marker
+            return {
+                "id": wid,
+                "fields": fields,
+                "relations": [{"rel": "System.LinkTypes.Hierarchy-Reverse"}],
+            }
+
+        work_items = {
+            1: item(1, 0),
+            2: item(2, "absent"),
+            3: item(3, None),
+            4: item(4, ""),
+        }
+        with patch.object(shc, "wiql_query", return_value=[1, 2, 3, 4]), \
+                patch.object(shc, "get_work_item", side_effect=lambda wid, token, expand=None: work_items[wid]):
+            result = shc.check4(
+                "token", [shc.AREA_MJ], {"path": r"MSTeams\2026\Sprint"},
+                DryRunMutationController(),
+            )
+        self.assertEqual([item["id"] for item in result["items"]], [2, 3])
+        self.assertTrue(all("RemainingWork" in item["issue"] for item in result["items"]))
+
+
 class TestTierFor(unittest.TestCase):
     def test_state_tiers(self):
         self.assertEqual(shc._tier_for("RollingOut", ""), 1)
@@ -401,16 +687,17 @@ class TestDetectOrderInversions(unittest.TestCase):
         self.assertIn("#10", flagged[0]["below"])
         self.assertEqual([r["id"] for r in suggested], [11, 10])
 
-    def test_blocked_is_exempt(self):
-        # Corrected 2026-07-28: Blocked is an in-flight state that may sit anywhere between
-        # Active and RollingOut (before or after), so it never flags nor is a reference.
+    def test_blocked_is_flexible_inside_inflight_zone(self):
+        # Blocked can sit on either side of RollingOut/Active when no Exception or
+        # planning item places it outside the in-flight zone.
         rows = [
             {"id": 1, "state": "Blocked", "tags": "", "owner": "a", "stackRank": 50},
             {"id": 2, "state": "RollingOut", "tags": "", "owner": "b", "stackRank": 100},
             {"id": 3, "state": "Active", "tags": "", "owner": "c", "stackRank": 200},
         ]
-        flagged, _ = shc.detect_order_inversions(rows)
-        self.assertEqual(flagged, [])  # Blocked on top must NOT invert the RollingOut/Active below it
+        flagged, suggested = shc.detect_order_inversions(rows)
+        self.assertEqual(flagged, [])
+        self.assertEqual([r["id"] for r in suggested], [1, 2, 3])
 
     def test_blocked_at_bottom_not_flagged(self):
         rows = [
@@ -418,8 +705,29 @@ class TestDetectOrderInversions(unittest.TestCase):
             {"id": 2, "state": "Active", "tags": "", "owner": "b", "stackRank": 200},
             {"id": 3, "state": "Blocked", "tags": "", "owner": "c", "stackRank": 900},
         ]
-        flagged, _ = shc.detect_order_inversions(rows)
+        flagged, suggested = shc.detect_order_inversions(rows)
         self.assertEqual(flagged, [])
+        self.assertEqual([r["id"] for r in suggested], [1, 2, 3])
+
+    def test_blocked_below_planning_is_flagged_and_suggested_into_zone(self):
+        rows = [
+            {"id": 1, "state": "Proposed", "tags": "", "owner": "a", "stackRank": 100},
+            {"id": 2, "state": "Blocked", "tags": "", "owner": "b", "stackRank": 200},
+            {"id": 3, "state": "RollingOut", "tags": "", "owner": "c", "stackRank": 300},
+        ]
+        flagged, suggested = shc.detect_order_inversions(rows)
+        self.assertEqual([r["id"] for r in flagged], [3, 2])
+        self.assertEqual([r["id"] for r in suggested], [3, 2, 1])
+
+    def test_blocked_above_exception_is_flagged_and_suggested_after_exception(self):
+        rows = [
+            {"id": 1, "state": "Blocked", "type": "Feature", "tags": "", "owner": "a", "stackRank": 100},
+            {"id": 2, "state": "Open", "type": "Exception", "tags": "", "owner": "b", "stackRank": 200},
+            {"id": 3, "state": "Active", "type": "Feature", "tags": "", "owner": "c", "stackRank": 300},
+        ]
+        flagged, suggested = shc.detect_order_inversions(rows)
+        self.assertEqual([r["id"] for r in flagged], [1])
+        self.assertEqual([r["id"] for r in suggested], [2, 1, 3])
 
     def test_exception_tier_on_top(self):
         rows = [
@@ -463,6 +771,7 @@ class TestDetectOrderInversions(unittest.TestCase):
         ]
         flagged, suggested = shc.detect_order_inversions(rows)
         self.assertEqual(len(flagged), 0)
+        self.assertEqual([r["id"] for r in suggested], [2])
 
 
 if __name__ == "__main__":

@@ -89,7 +89,7 @@ if not version_match:
 SYSTEM_VERSION = version_match.group(1)
 
 # Mutating check IDs (referenced by safety policy)
-MUTATING_CHECKS = {"1", "2", "3", "4", "5", "6", "15", "17", "18"}
+MUTATING_CHECKS = {"1", "2", "3", "4", "5", "6", "15", "17", "18", "20"}
 
 # Mutating checks must contain the workitems area filter literally.
 # Check 1 is a workitemLinks query which uses [Source].[System.AreaPath].
@@ -267,19 +267,21 @@ WIQL_CHECK15_ROLLOUT_ACTIVE_MONTH = (
 )
 
 WIQL_CHECK17_ZERO_REMAINING = (
-    "SELECT [System.Id], [System.Title], [System.State], [System.AreaPath] "
+    "SELECT [System.Id], [System.Title], [System.WorkItemType], [System.State], "
+    "[System.AreaPath] "
     "FROM workitems "
-    "WHERE [System.WorkItemType] IN ('Task', 'Bug') "
-    "AND [System.State] = 'Active' "
+    "WHERE [System.WorkItemType] IN ('Feature', 'Exception') "
+    "AND [System.State] IN ('Active', 'RollingOut') "
     "AND [Microsoft.VSTS.Scheduling.RemainingWork] = 0 "
     "AND [System.AreaPath] UNDER '{area}'"
 )
 
 WIQL_CHECK18_STALE_REMAINING = (
-    "SELECT [System.Id], [System.Title], [System.State], [System.AreaPath] "
+    "SELECT [System.Id], [System.Title], [System.WorkItemType], [System.State], "
+    "[System.AreaPath] "
     "FROM workitems "
-    "WHERE [System.WorkItemType] IN ('Task', 'Bug') "
-    "AND [System.State] <> 'Closed' AND [System.State] <> 'Removed' "
+    "WHERE [System.WorkItemType] IN ('Feature', 'Exception') "
+    "AND [System.State] NOT IN ('Closed', 'Removed') "
     "AND [Microsoft.VSTS.Scheduling.RemainingWork] > 0 "
     "AND [System.ChangedDate] < @today - {stale_days} "
     "AND [System.AreaPath] UNDER '{area}'"
@@ -294,6 +296,7 @@ WIQL_CHECK20_BACKLOG_ORDER = (
     "AND [System.AreaPath] UNDER '{area}' "
     "ORDER BY [Microsoft.VSTS.Common.StackRank]"
 )
+CHECK20_QUERY_ID = "e52188a5-b262-4984-8175-4c185e06f831"
 
 # Check 18 staleness threshold (days since last change) -- configurable.
 STALE_REMAINING_DAYS = 30
@@ -304,6 +307,7 @@ STALE_REMAINING_DAYS = 30
 # System.Tags substring match kept as a fallback signal.
 EXCEPTION_TYPES = ["Exception"]
 EXCEPTION_TAGS = ["exception"]
+FEATURE_BACKLOG_TYPES = {"Feature", "Exception"}
 # Lifecycle-state tiers for Madhu's backlog order (6/29 EM Sync; corrected 2026-07-28
 # per EM feedback). Lower tier belongs higher in the backlog.
 #   * "Committed" is NOT a lifecycle state -- it is a FUNDING value
@@ -313,9 +317,10 @@ EXCEPTION_TAGS = ["exception"]
 #     RollingOut (before or after), so it is handled via EXEMPT_ORDER_STATES below rather
 #     than tiered to the bottom.
 TIER_BY_STATE = {"RollingOut": 1, "Active": 2}
-# States exempt from state-order inversion detection: they may legitimately appear
-# anywhere in the in-flight zone, so they neither trigger nor receive an inversion flag.
+# States exempt from relative ordering within the in-flight zone. A separate
+# boundary check still keeps them below Exceptions and above planning items.
 EXEMPT_ORDER_STATES = {"Blocked"}
+AUTO_RANK_STATES = {"RollingOut", "Active"}
 
 
 # ---------------------------------------------------------------------------
@@ -514,6 +519,18 @@ def wiql_query(wiql, token):
     return []
 
 
+def saved_query_ids(query_id, token):
+    # type: (str, str) -> List[int]
+    """Execute a fixed ADO Shared Query by ID and return its ordered work-item IDs."""
+    resp = ado_request(
+        "{0}/_apis/wit/wiql/{1}?api-version=7.1".format(PROJECT, query_id),
+        token,
+    )
+    if not resp:
+        return []
+    return [item["id"] for item in resp.get("workItems", [])]
+
+
 def wiql_link_query(wiql, token):
     # type: (str, str) -> List[Dict[str, int]]
     resp = ado_request(
@@ -562,6 +579,23 @@ def patch_work_item(wid, ops, token):
     return ado_request(
         "{0}/_apis/wit/workItems/{1}?api-version=7.1".format(PROJECT, wid),
         token, "PATCH", ops, content_type="application/json-patch+json",
+    )
+
+
+def reorder_backlog_item(wid, previous_id, next_id, parent_id, token):
+    # type: (int, int, int, int, str) -> Optional[Any]
+    """Move one item between two neighbors in the team's Features backlog."""
+    return ado_request(
+        "{0}/{1}/_apis/work/workitemsorder?api-version=7.1".format(PROJECT, TEAM_ID),
+        token,
+        "PATCH",
+        {
+            "ids": [wid],
+            "previousId": previous_id,
+            "nextId": next_id,
+            "parentId": parent_id,
+        },
+        content_type="application/json",
     )
 
 
@@ -802,8 +836,9 @@ def detect_order_inversions(rows):
 
     rows: list of {id, title, state, tags, owner, stackRank}. Returns
     (flagged, suggested): `flagged` = items that sit below a higher-priority-
-    state item once ordered by StackRank (an inversion); `suggested` = the
-    same rows re-sorted into the desired (tier, StackRank) order.
+    state item once ordered by StackRank (an inversion); `suggested` = ranked
+    rows with reorderable items sorted by tier while exempt states retain
+    their current positions. Unranked items are omitted.
     """
     enriched = []
     for r in rows:
@@ -840,13 +875,159 @@ def detect_order_inversions(rows):
         else:
             running_max = r["tier"]
             running_item = r
+    ranked = [r for r in enriched if r["stackRank"] is not None]
+    exception_indexes = [index for index, row in enumerate(ranked) if row["tier"] == 0]
+    planning_indexes = [
+        index for index, row in enumerate(ranked)
+        if row["state"] not in EXEMPT_ORDER_STATES and row["tier"] == 4
+    ]
+    last_exception_index = max(exception_indexes) if exception_indexes else None
+    first_planning_index = min(planning_indexes) if planning_indexes else None
+    for index, row in enumerate(ranked):
+        if row["state"] not in EXEMPT_ORDER_STATES:
+            continue
+        if last_exception_index is not None and index < last_exception_index:
+            exception = ranked[last_exception_index]
+            flagged.append({
+                "id": row["id"], "title": row["title"], "state": row["state"],
+                "tier": row["tier"], "stackRank": row["stackRank"], "owner": row["owner"],
+                "below": "must follow #{0} (Exception)".format(exception["id"]),
+            })
+        elif first_planning_index is not None and index > first_planning_index:
+            planning = ranked[first_planning_index]
+            flagged.append({
+                "id": row["id"], "title": row["title"], "state": row["state"],
+                "tier": row["tier"], "stackRank": row["stackRank"], "owner": row["owner"],
+                "below": "#{0} ({1})".format(planning["id"], planning["state"]),
+            })
+    reorderable = sorted(
+        (r for r in ranked if r["state"] not in EXEMPT_ORDER_STATES),
+        key=lambda x: (x["tier"], x["stackRank"]),
+    )
+    reorderable_iter = iter(reorderable)
+    suggested_rows = [
+        r if r["state"] in EXEMPT_ORDER_STATES else next(reorderable_iter)
+        for r in ranked
+    ]
+    for blocked in [
+            row for row in list(suggested_rows)
+            if row["state"] in EXEMPT_ORDER_STATES]:
+        index = suggested_rows.index(blocked)
+        last_exception_index = max(
+            (i for i, row in enumerate(suggested_rows) if row["tier"] == 0),
+            default=None,
+        )
+        first_planning_index = min(
+            (i for i, row in enumerate(suggested_rows)
+             if row["state"] not in EXEMPT_ORDER_STATES and row["tier"] == 4),
+            default=None,
+        )
+        if last_exception_index is not None and index < last_exception_index:
+            suggested_rows.pop(index)
+            last_exception_index = max(
+                i for i, row in enumerate(suggested_rows) if row["tier"] == 0
+            )
+            suggested_rows.insert(last_exception_index + 1, blocked)
+        elif first_planning_index is not None and index > first_planning_index:
+            suggested_rows.pop(index)
+            first_planning_index = min(
+                i for i, row in enumerate(suggested_rows)
+                if row["state"] not in EXEMPT_ORDER_STATES and row["tier"] == 4
+            )
+            suggested_rows.insert(first_planning_index, blocked)
     suggested = [
         {"id": r["id"], "title": r["title"], "state": r["state"],
          "tier": r["tier"], "stackRank": r["stackRank"]}
-        for r in sorted(enriched, key=lambda x: (x["tier"], x["stackRank"] is None,
-                                                 x["stackRank"] if x["stackRank"] is not None else 0))
+        for r in suggested_rows
     ]
     return flagged, suggested
+
+
+def _rank_move_for_violation(rows, wid):
+    # type: (List[Dict[str, Any]], int) -> Optional[Dict[str, int]]
+    """Return the minimal neighbor move that restores one in-flight item.
+
+    WorkItemType Exception and RollingOut/Active items are eligible. The item
+    is inserted immediately before the first ranked, non-exempt item with a
+    lower business priority.
+    """
+    ranked = sorted(
+        (row for row in rows if row.get("stackRank") is not None),
+        key=lambda row: row["stackRank"],
+    )
+    item = next((row for row in ranked if row.get("id") == wid), None)
+    if not item:
+        return None
+    item_tier = _tier_for(item.get("state", ""), item.get("tags", ""), item.get("type"))
+    if item.get("type") in EXCEPTION_TYPES:
+        item_index = ranked.index(item)
+        target_index = next((
+            index for index, row in enumerate(ranked[:item_index])
+            if _tier_for(
+                row.get("state", ""), row.get("tags", ""), row.get("type")
+            ) > 0
+        ), None)
+        if target_index is None:
+            return None
+        preceding = [row for row in ranked[:target_index] if row.get("id") != wid]
+        return {
+            "previousId": preceding[-1]["id"] if preceding else 0,
+            "nextId": ranked[target_index]["id"],
+        }
+    if item.get("state") in EXEMPT_ORDER_STATES:
+        item_index = ranked.index(item)
+        exception_indexes = [
+            index for index, row in enumerate(ranked)
+            if _tier_for(row.get("state", ""), row.get("tags", ""), row.get("type")) == 0
+        ]
+        planning_indexes = [
+            index for index, row in enumerate(ranked)
+            if row.get("state") not in EXEMPT_ORDER_STATES
+            and _tier_for(row.get("state", ""), row.get("tags", ""), row.get("type")) == 4
+        ]
+        if exception_indexes and item_index < max(exception_indexes):
+            without_item = [row for row in ranked if row.get("id") != wid]
+            last_exception_index = max(
+                index for index, row in enumerate(without_item)
+                if _tier_for(
+                    row.get("state", ""), row.get("tags", ""), row.get("type")
+                ) == 0
+            )
+            return {
+                "previousId": without_item[last_exception_index]["id"],
+                "nextId": (
+                    without_item[last_exception_index + 1]["id"]
+                    if last_exception_index + 1 < len(without_item) else 0
+                ),
+            }
+        if planning_indexes and item_index > min(planning_indexes):
+            target_index = min(planning_indexes)
+            preceding = [row for row in ranked[:target_index] if row.get("id") != wid]
+            return {
+                "previousId": preceding[-1]["id"] if preceding else 0,
+                "nextId": ranked[target_index]["id"],
+            }
+        return None
+    if item_tier == 0:
+        # A normal Feature classified as an Exception only by tag is report-only.
+        return None
+    if (
+        item.get("state") not in AUTO_RANK_STATES
+    ):
+        return None
+    item_index = ranked.index(item)
+    target_index = next((
+        index for index, row in enumerate(ranked[:item_index])
+        if row.get("state") not in EXEMPT_ORDER_STATES
+        and _tier_for(row.get("state", ""), row.get("tags", ""), row.get("type")) > item_tier
+    ), None)
+    if target_index is None:
+        return None
+    preceding = [row for row in ranked[:target_index] if row.get("id") != wid]
+    return {
+        "previousId": preceding[-1]["id"] if preceding else 0,
+        "nextId": ranked[target_index]["id"],
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -1164,7 +1345,10 @@ def check4(token, allowed_areas, current_iter, mc):
             missing = []
             if not f.get("Microsoft.VSTS.Scheduling.OriginalEstimate"):
                 missing.append("OriginalEstimate")
-            if not f.get("Microsoft.VSTS.Scheduling.RemainingWork"):
+            if (
+                "Microsoft.VSTS.Scheduling.RemainingWork" not in f
+                or f.get("Microsoft.VSTS.Scheduling.RemainingWork") is None
+            ):
                 missing.append("RemainingWork")
             has_parent = any(
                 rel.get("rel") == "System.LinkTypes.Hierarchy-Reverse"
@@ -1749,6 +1933,24 @@ def check14(token, pbi_token, allowed_areas, now):
 # ---------------------------------------------------------------------------
 
 
+def _is_feature_backlog_item(fields):
+    # type: (Dict[str, Any]) -> bool
+    """Return True only for work-item types shown on the Features backlog."""
+    return fields.get("System.WorkItemType") in FEATURE_BACKLOG_TYPES
+
+
+def _is_exact_numeric_zero(value):
+    # type: (Any) -> bool
+    """Match JSON numeric 0/0.0, but not bool, strings, null, or missing values."""
+    return not isinstance(value, bool) and isinstance(value, (int, float)) and value == 0
+
+
+def _is_positive_number(value):
+    # type: (Any) -> bool
+    """Match positive JSON numbers while excluding bool and numeric strings."""
+    return not isinstance(value, bool) and isinstance(value, (int, float)) and value > 0
+
+
 def check15(token, allowed_areas, mc, dry_run, current_iter, today):
     # type: (str, List[str], MutationController, bool, Dict[str, Any], date) -> Dict[str, Any]
     print("Check 15: Rolling-out/Active Features not in current month (Madhu req 6/29)")
@@ -1766,12 +1968,16 @@ def check15(token, allowed_areas, mc, dry_run, current_iter, today):
         if not ids:
             continue
         wis = get_work_items_batch(ids, token, fields=[
-            "System.Id", "System.Title", "System.State", "System.IterationPath",
-            "System.AssignedTo", "System.AreaPath",
+            "System.Id", "System.Title", "System.WorkItemType", "System.State",
+            "System.IterationPath", "System.AssignedTo", "System.AreaPath",
         ])
         for wi in wis:
             wid = wi["id"]
             f = wi.get("fields", {})
+            if not _is_feature_backlog_item(f):
+                continue
+            if f.get("System.State") in ("Closed", "Removed"):
+                continue
             ap = f.get("System.AreaPath", "")
             if not area_path_allowed(ap, allowed_areas):
                 mc.plan({"event": "skip_area_mismatch", "check": "check15", "id": wid, "areaPath": ap})
@@ -1820,7 +2026,7 @@ def check15(token, allowed_areas, mc, dry_run, current_iter, today):
 
 def check17(token, allowed_areas, mc):
     # type: (str, List[str], MutationController) -> Dict[str, Any]
-    print("Check 17: Zero RemainingWork on Active items (Madhu req 6/29)")
+    print("Check 17: Zero RemainingWork on Active/RollingOut Features backlog (Madhu req 6/29)")
     items = []
     for area in allowed_areas:
         wiql = WIQL_CHECK17_ZERO_REMAINING.format(area=area)
@@ -1831,18 +2037,26 @@ def check17(token, allowed_areas, mc):
         if not ids:
             continue
         wis = get_work_items_batch(ids, token, fields=[
-            "System.Id", "System.Title", "System.State", "System.AssignedTo",
-            "System.AreaPath", "Microsoft.VSTS.Scheduling.RemainingWork",
+            "System.Id", "System.Title", "System.WorkItemType", "System.State",
+            "System.AssignedTo", "System.AreaPath",
+            "Microsoft.VSTS.Scheduling.RemainingWork",
         ])
         for wi in wis:
             f = wi.get("fields", {})
+            if not _is_feature_backlog_item(f):
+                continue
+            if f.get("System.State") not in ("Active", "RollingOut"):
+                continue
+            rw = f.get("Microsoft.VSTS.Scheduling.RemainingWork")
+            if not _is_exact_numeric_zero(rw):
+                continue
             ap = f.get("System.AreaPath", "")
             if not area_path_allowed(ap, allowed_areas):
                 continue
             wid = wi["id"]
             action = controlled_comment(wid, (
-                "{0} This Active item shows 0 Remaining Work. Per Madhu's backlog rule "
-                "(2026-06-29 EM Sync), an active item with work left must not show 0 - "
+                "{0} This Active/RollingOut Feature backlog item shows 0 Remaining Work. "
+                "Per Madhu's backlog rule (2026-06-29 EM Sync), an item with work left must not show 0 - "
                 "please set a realistic Remaining Work value or close it."
             ).format(mention_html(wi)), token, "check17", mc, {"areaPath": ap})
             items.append({
@@ -1869,19 +2083,27 @@ def check18(token, allowed_areas, mc, today):
         if not ids:
             continue
         wis = get_work_items_batch(ids, token, fields=[
-            "System.Id", "System.Title", "System.State", "System.AssignedTo",
-            "System.AreaPath", "System.ChangedDate",
+            "System.Id", "System.Title", "System.WorkItemType", "System.State",
+            "System.AssignedTo", "System.AreaPath", "System.ChangedDate",
             "Microsoft.VSTS.Scheduling.RemainingWork",
         ])
         for wi in wis:
             f = wi.get("fields", {})
+            if not _is_feature_backlog_item(f):
+                continue
+            if f.get("System.State") in ("Closed", "Removed"):
+                continue
+            rw = f.get("Microsoft.VSTS.Scheduling.RemainingWork")
+            if not _is_positive_number(rw):
+                continue
+            changed = _parse_iter_date(f.get("System.ChangedDate"))
+            if changed is None or (today - changed).days <= STALE_REMAINING_DAYS:
+                continue
             ap = f.get("System.AreaPath", "")
             if not area_path_allowed(ap, allowed_areas):
                 continue
             wid = wi["id"]
-            changed = _parse_iter_date(f.get("System.ChangedDate"))
-            days = (today - changed).days if changed else None
-            rw = f.get("Microsoft.VSTS.Scheduling.RemainingWork")
+            days = (today - changed).days
             action = controlled_comment(wid, (
                 "{0} This item has {1} Remaining Work but hasn't been updated in {2} days. "
                 "Per Madhu's backlog rule (2026-06-29 EM Sync), Remaining Work must reflect "
@@ -1901,43 +2123,132 @@ def check18(token, allowed_areas, mc, today):
     return {"items": items, "count": len(items)}
 
 
-def check20(token, allowed_areas):
-    # type: (str, List[str]) -> Dict[str, Any]
+def _load_check20_rows(token, allowed_areas):
+    # type: (str, List[str]) -> List[Dict[str, Any]]
+    ids = saved_query_ids(CHECK20_QUERY_ID, token)
+    if not ids:
+        return []
+    wis = get_work_items_batch(ids, token, fields=[
+        "System.Id", "System.Title", "System.WorkItemType", "System.State",
+        "System.Tags", "System.AssignedTo", "System.AreaPath", "System.Parent",
+        "Microsoft.VSTS.Common.StackRank",
+    ])
+    rows = []
+    for wi in wis:
+        f = wi.get("fields", {})
+        if not _is_feature_backlog_item(f):
+            continue
+        if f.get("System.State") in ("Closed", "Removed"):
+            continue
+        ap = f.get("System.AreaPath", "")
+        if not area_path_allowed(ap, allowed_areas):
+            continue
+        rows.append({
+            "id": wi["id"],
+            "title": f.get("System.Title", ""),
+            "state": f.get("System.State", ""),
+            "type": f.get("System.WorkItemType", ""),
+            "tags": f.get("System.Tags", ""),
+            "owner": get_owner_name(wi),
+            "parentId": f.get("System.Parent") or 0,
+            "stackRank": f.get("Microsoft.VSTS.Common.StackRank"),
+        })
+    return rows
+
+
+def check20(token, allowed_areas, mc, dry_run):
+    # type: (str, List[str], MutationController, bool) -> Dict[str, Any]
     print("Check 20: Backlog state-order violations (Madhu req 6/29)")
-    flagged = []
-    suggested = []
-    for area in allowed_areas:
-        wiql = WIQL_CHECK20_BACKLOG_ORDER.format(area=area)
-        if not validate_wiql_has_area_filter(wiql, False):
-            print("  ABORT check20: missing area filter", file=sys.stderr)
-            continue
-        ids = wiql_query(wiql, token)
-        if not ids:
-            continue
-        wis = get_work_items_batch(ids, token, fields=[
-            "System.Id", "System.Title", "System.WorkItemType", "System.State",
-            "System.Tags", "System.AssignedTo", "System.AreaPath",
-            "Microsoft.VSTS.Common.StackRank",
-        ])
-        rows = []
-        for wi in wis:
-            f = wi.get("fields", {})
-            ap = f.get("System.AreaPath", "")
-            if not area_path_allowed(ap, allowed_areas):
-                continue
-            rows.append({
-                "id": wi["id"],
-                "title": f.get("System.Title", ""),
-                "state": f.get("System.State", ""),
-                "type": f.get("System.WorkItemType", ""),
-                "tags": f.get("System.Tags", ""),
-                "owner": get_owner_name(wi),
-                "stackRank": f.get("Microsoft.VSTS.Common.StackRank"),
-            })
-        area_flagged, area_suggested = detect_order_inversions(rows)
-        flagged.extend(area_flagged)
-        suggested.extend(area_suggested)
-    return {"items": flagged, "count": len(flagged), "suggestedOrder": suggested}
+    rows = _load_check20_rows(token, allowed_areas)
+    flagged, suggested = detect_order_inversions(rows)
+    items = []
+    for initial in flagged:
+        wid = initial["id"]
+        live_rows = _load_check20_rows(token, allowed_areas)
+        live_flagged, _ = detect_order_inversions(live_rows)
+        live_violation = next((item for item in live_flagged if item["id"] == wid), None)
+        if not live_violation:
+            action = "already-fixed"
+        else:
+            move = _rank_move_for_violation(live_rows, wid)
+            if not move:
+                action = "reported-only"
+            else:
+                before = next(row for row in live_rows if row["id"] == wid)
+                plan_ok = mc.plan({
+                    "event": "plan_backlog_reorder",
+                    "check": "check20",
+                    "id": wid,
+                    "before": {
+                        "stackRank": before["stackRank"],
+                        "parentId": before["parentId"],
+                    },
+                    "move": move,
+                })
+                if plan_ok and dry_run:
+                    action = "would-rerank (dry-run)"
+                elif plan_ok:
+                    response = reorder_backlog_item(
+                        wid,
+                        move["previousId"],
+                        move["nextId"],
+                        before["parentId"],
+                        token,
+                    )
+                    verified_rows = _load_check20_rows(token, allowed_areas)
+                    verified_flagged, _ = detect_order_inversions(verified_rows)
+                    still_flagged = any(item["id"] == wid for item in verified_flagged)
+                    after = next((row for row in verified_rows if row["id"] == wid), None)
+                    response_item = next((
+                        item for item in (response or {}).get("value", [])
+                        if item.get("id") == wid
+                    ), None) if isinstance(response, dict) else None
+                    parent_preserved = (
+                        after is not None and after["parentId"] == before["parentId"]
+                    )
+                    rank_changed = (
+                        after is not None and after["stackRank"] != before["stackRank"]
+                    )
+                    response_matches = (
+                        response_item is not None
+                        and after is not None
+                        and response_item.get("order") == after["stackRank"]
+                    )
+                    ok = (
+                        response_matches
+                        and parent_preserved
+                        and rank_changed
+                        and not still_flagged
+                    )
+                    mc.record({
+                        "check": "check20",
+                        "id": wid,
+                        "before": {
+                            "stackRank": before["stackRank"],
+                            "parentId": before["parentId"],
+                        },
+                        "after": {
+                            "stackRank": after["stackRank"] if after else None,
+                            "parentId": after["parentId"] if after else None,
+                            "previousId": move["previousId"],
+                            "nextId": move["nextId"],
+                        },
+                        "ok": ok,
+                    })
+                    action = "reranked" if ok else "rerank-failed-verification"
+                else:
+                    action = "skipped (cap)"
+        item = dict(initial)
+        item["action"] = action
+        items.append(item)
+    final_rows = _load_check20_rows(token, allowed_areas)
+    remaining, final_suggested = detect_order_inversions(final_rows)
+    return {
+        "items": items,
+        "count": len(items),
+        "remainingCount": len(remaining),
+        "suggestedOrder": final_suggested,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -2203,7 +2514,7 @@ def _build_check8_section(res):
     return _section_html(
         "Check 8: Committed Features Outside Current Semester",
         "{0} flagged".format(len(items)),
-        "Features that are funding-Committed (Custom.CommittedTargettedCut) must belong to the current semester. Summary posted to Teams.",
+        "Features with funding field Custom.CommittedTargettedCut set to Committed must belong to the current semester. Committed is not a lifecycle or deployment state. Summary posted to Teams.",
         ["Feature ID", "Title", "Owner", "Iteration", "Area"],
         rows,
         _query_link(ids, "Open all {0} items in ADO query".format(len(items))),
@@ -2403,10 +2714,10 @@ def _build_check15_section(res):
             '<span class="badge badge-moved">{0}</span>'.format(_html_escape(it.get("action", ""))),
         ))
     return _section_html(
-        "Check 15: Rolling-out/Active Items Not in Current Month",
+        "Check 15: Rolling-out/Active Features Backlog Items Not in Current Month",
         "{0} moved".format(len(items)),
-        "Madhu requirement (6/29 EM Sync): Active/RollingOut Features must be in the current month. Auto-moved to the current-month node.",
-        ["Feature ID", "Title", "State", "Owner", "Previous Iteration", "Action"],
+        "Madhu requirement (6/29 EM Sync): Feature/Exception items on the Features backlog in Active/RollingOut must be in the current month. Auto-moved to the current-month node.",
+        ["Item ID", "Title", "State", "Owner", "Previous Iteration", "Action"],
         rows,
         _query_link(ids, "Open all {0} items in ADO query".format(len(items))),
     )
@@ -2428,9 +2739,9 @@ def _build_check17_section(res):
             '<span class="badge badge-flagged">{0}</span>'.format(_html_escape(it.get("action", ""))),
         ))
     return _section_html(
-        "Check 17: Zero Remaining Work on Active Items",
+        "Check 17: Exact-Zero Remaining Work on Active Features Backlog Items",
         "{0} flagged".format(len(items)),
-        "Madhu requirement (6/29 EM Sync): an Active item with work left must not show 0 Remaining Work. Owner notified to set a realistic value.",
+        "Madhu requirement (6/29 EM Sync): Feature/Exception items in Active/RollingOut with exact numeric RemainingWork 0 or 0.0 need attention. Missing/null, empty, boolean, and string values do not match.",
         ["ID", "Title", "State", "Owner", "Area", "Action"],
         rows,
         _query_link(ids, "Open all {0} items in ADO query".format(len(items))),
@@ -2458,7 +2769,7 @@ def _build_check18_section(res):
     return _section_html(
         "Check 18: Stale Remaining Work",
         "{0} flagged".format(len(items)),
-        "Madhu requirement (6/29 EM Sync): Remaining Work must reflect reality. These items have work left but have not been updated in over {0} days.".format(STALE_REMAINING_DAYS),
+        "Madhu requirement (6/29 EM Sync): non-closed Feature/Exception items on the Features backlog with numeric Remaining Work greater than zero have not been updated in over {0} days.".format(STALE_REMAINING_DAYS),
         ["ID", "Title", "State", "Owner", "Area", "Remaining", "Stale", "Action"],
         rows,
         _query_link(ids, "Open all {0} items in ADO query".format(len(items))),
@@ -2480,12 +2791,13 @@ def _build_check20_section(res):
             _html_escape(it.get("stackRank", "")),
             _html_escape(it.get("owner", "")),
             _html_escape(it.get("below", "")),
+            _html_escape(it.get("action", "")),
         ))
     return _section_html(
-        "Check 20: Backlog State-Order Violations",
+        "Check 20: Features Backlog State-Order Violations",
         "{0} out of order".format(len(items)),
-        "Madhu requirement (6/29 EM Sync): backlog order should be exceptions &gt; RollingOut / Active &gt; plan/backlog (Proposed/New). Blocked is exempt (in-flight, may sit anywhere between Active and RollingOut); Committed is a funding value, not a lifecycle state. These items sit below a higher-priority-state item. Report-only (no auto-reorder); see suggested order in the JSON output.",
-        ["ID", "Title", "State", "Tier", "StackRank", "Owner", "Sits Below"],
+        "Madhu requirement (6/29 EM Sync): Feature/Exception items on the Features backlog should be ordered as exceptions &gt; in-flight (RollingOut / Active / Blocked) &gt; plan/backlog (Proposed/New). Blocked may sit anywhere inside the in-flight zone. Eligible ranking-only inversions are moved one at a time using the backlog reorder API and verified.",
+        ["ID", "Title", "State", "Tier", "StackRank", "Owner", "Sits Below", "Action"],
         rows,
         _query_link(ids, "Open all {0} items in ADO query".format(len(items))),
     )
@@ -2726,7 +3038,7 @@ def main(argv=None):
     if should_run("18"):
         results["check18"] = check18(ado_token, allowed_areas, mc, today)
     if should_run("20"):
-        results["check20"] = check20(ado_token, allowed_areas)
+        results["check20"] = check20(ado_token, allowed_areas, mc, args.dry_run)
 
     complete_dt = datetime.now(PST)
 
